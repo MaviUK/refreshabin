@@ -257,24 +257,6 @@ export default function App() {
         </div>
       </section>
 
-      <section className="px-6 pb-16">
-        <div className="mx-auto max-w-7xl rounded-[2rem] bg-gradient-to-r from-[#0c63ba] via-[#1188de] to-[#19a9f4] p-10 text-white shadow-[0_24px_70px_rgba(13,103,194,0.2)]">
-          <div className="grid gap-6 lg:grid-cols-[1fr_auto] lg:items-center">
-            <div>
-              <h2 className="text-4xl font-black">Ready to make the site look right and actually book customers?</h2>
-              <p className="mt-4 max-w-2xl text-white/90">
-                This version gives you the stronger branding and fuller information you asked for. Next we should wire the booking form to a real booking flow.
-              </p>
-            </div>
-            <a
-              href="#book"
-              className="inline-flex items-center justify-center rounded-full bg-white px-7 py-3.5 text-sm font-semibold text-[#0d67c2] shadow-lg"
-            >
-              Start Booking
-            </a>
-          </div>
-        </div>
-      </section>
 
       {/* Mobile Bottom Contact Bar */}
       <div className="fixed bottom-0 left-0 right-0 z-50 border-t border-white/20 bg-white/95 p-3 shadow-[0_-10px_30px_rgba(0,0,0,0.08)] backdrop-blur md:hidden">
