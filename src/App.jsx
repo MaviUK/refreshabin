@@ -280,7 +280,7 @@ export default function App() {
       <div className="fixed bottom-0 left-0 right-0 z-50 border-t border-white/20 bg-white/95 p-3 shadow-[0_-10px_30px_rgba(0,0,0,0.08)] backdrop-blur md:hidden">
         <div className="grid grid-cols-2 gap-3">
           <a
-            href="https://wa.me/447555178484"
+            href="https://wa.me/447835843481"
             target="_blank"
             rel="noreferrer"
             className="rounded-full bg-[#22a94f] px-4 py-3 text-center text-sm font-bold text-white shadow-lg"
@@ -288,7 +288,7 @@ export default function App() {
             Chat
           </a>
           <a
-            href="tel:+447555178484"
+            href="tel:+447835843481"
             className="rounded-full bg-gradient-to-r from-[#0d67c2] to-[#18a7f5] px-4 py-3 text-center text-sm font-bold text-white shadow-lg"
           >
             Call Us
