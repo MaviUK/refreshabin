@@ -27,7 +27,7 @@ export default function App() {
   ];
 
   return (
-    <div className="min-h-screen bg-[#eef7ff] text-slate-900">
+    <div className="min-h-screen bg-[#eef7ff] pb-24 text-slate-900 md:pb-0">
       <header className="sticky top-0 z-20 border-b border-[#cfe7ff] bg-white/90 backdrop-blur">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
           <div className="flex items-center gap-4">
@@ -167,9 +167,15 @@ export default function App() {
           {services.map((item, index) => (
             <div
               key={item.title}
-              className={`rounded-[2rem] border bg-white p-8 shadow-sm ${index === 1 ? "border-[#d9efdc]" : "border-[#cce8ff]"}`}
+              className={`rounded-[2rem] border bg-white p-8 shadow-sm ${
+                index === 1 ? "border-[#d9efdc]" : "border-[#cce8ff]"
+              }`}
             >
-              <div className={`inline-flex rounded-full px-3 py-1 text-xs font-bold uppercase tracking-[0.2em] ${index === 1 ? "bg-[#ecfaef] text-[#22964a]" : "bg-[#eef8ff] text-[#0d67c2]"}`}>
+              <div
+                className={`inline-flex rounded-full px-3 py-1 text-xs font-bold uppercase tracking-[0.2em] ${
+                  index === 1 ? "bg-[#ecfaef] text-[#22964a]" : "bg-[#eef8ff] text-[#0d67c2]"
+                }`}
+              >
                 {index === 1 ? "Commercial" : "Service"}
               </div>
               <h3 className="mt-5 text-2xl font-bold text-[#0c2340]">{item.title}</h3>
@@ -193,15 +199,32 @@ export default function App() {
             </ul>
           </div>
 
-          <div id="areas" className="rounded-[2rem] border border-[#d9efdc] bg-gradient-to-br from-[#ffffff] to-[#f3fff6] p-8 shadow-sm">
+          <div
+            id="areas"
+            className="rounded-[2rem] border border-[#d9efdc] bg-gradient-to-br from-[#ffffff] to-[#f3fff6] p-8 shadow-sm"
+          >
             <p className="text-sm font-semibold uppercase tracking-[0.2em] text-[#22a94f]">Coverage</p>
             <h2 className="mt-3 text-4xl font-black text-[#0c2340]">Refresh a bin in your area</h2>
             <p className="mt-5 leading-7 text-slate-600">
-               Covering the following areas.
+              Covering the following areas.
             </p>
             <div className="mt-6 flex flex-wrap gap-3">
-              {["Ardglass", "Killough", "Strangford", "Downpatrick", "Crossgar", "Ballynahinch", "Newcastle", "Castlewellan", "Killcoo", "Surrounding Areas"].map((area) => (
-                <span key={area} className="rounded-full bg-white px-4 py-2 text-sm font-semibold text-[#0c2340] shadow-sm ring-1 ring-[#d6efe0]">
+              {[
+                "Ardglass",
+                "Killough",
+                "Strangford",
+                "Downpatrick",
+                "Crossgar",
+                "Ballynahinch",
+                "Newcastle",
+                "Castlewellan",
+                "Killcoo",
+                "Surrounding Areas",
+              ].map((area) => (
+                <span
+                  key={area}
+                  className="rounded-full bg-white px-4 py-2 text-sm font-semibold text-[#0c2340] shadow-sm ring-1 ring-[#d6efe0]"
+                >
                   {area}
                 </span>
               ))}
@@ -220,10 +243,14 @@ export default function App() {
           {pricing.map((item, index) => (
             <div
               key={item.title}
-              className={`rounded-[2rem] border bg-white p-8 text-center shadow-sm ${index === 1 ? "border-[#22c55e] ring-2 ring-[#dff6e8]" : "border-[#cce8ff]"}`}
+              className={`rounded-[2rem] border bg-white p-8 text-center shadow-sm ${
+                index === 1 ? "border-[#22c55e] ring-2 ring-[#dff6e8]" : "border-[#cce8ff]"
+              }`}
             >
               <h3 className="text-2xl font-bold text-[#0c2340]">{item.title}</h3>
-              <div className={`mt-5 text-5xl font-black ${index === 1 ? "text-[#22a94f]" : "text-[#0d67c2]"}`}>{item.price}</div>
+              <div className={`mt-5 text-5xl font-black ${index === 1 ? "text-[#22a94f]" : "text-[#0d67c2]"}`}>
+                {item.price}
+              </div>
               <p className="mt-4 text-slate-600">{item.note}</p>
             </div>
           ))}
@@ -239,12 +266,35 @@ export default function App() {
                 This version gives you the stronger branding and fuller information you asked for. Next we should wire the booking form to a real booking flow.
               </p>
             </div>
-            <a href="#book" className="inline-flex items-center justify-center rounded-full bg-white px-7 py-3.5 text-sm font-semibold text-[#0d67c2] shadow-lg">
+            <a
+              href="#book"
+              className="inline-flex items-center justify-center rounded-full bg-white px-7 py-3.5 text-sm font-semibold text-[#0d67c2] shadow-lg"
+            >
               Start Booking
             </a>
           </div>
         </div>
       </section>
+
+      {/* Mobile Bottom Contact Bar */}
+      <div className="fixed bottom-0 left-0 right-0 z-50 border-t border-white/20 bg-white/95 p-3 shadow-[0_-10px_30px_rgba(0,0,0,0.08)] backdrop-blur md:hidden">
+        <div className="grid grid-cols-2 gap-3">
+          <a
+            href="https://wa.me/447555178484"
+            target="_blank"
+            rel="noreferrer"
+            className="rounded-full bg-[#22a94f] px-4 py-3 text-center text-sm font-bold text-white shadow-lg"
+          >
+            Chat
+          </a>
+          <a
+            href="tel:+447555178484"
+            className="rounded-full bg-gradient-to-r from-[#0d67c2] to-[#18a7f5] px-4 py-3 text-center text-sm font-bold text-white shadow-lg"
+          >
+            Call Us
+          </a>
+        </div>
+      </div>
     </div>
   );
 }
