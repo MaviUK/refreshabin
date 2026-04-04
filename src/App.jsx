@@ -161,7 +161,7 @@ export default function App() {
                     postcode: e.target.value,
                   }))
                 }
-                className="w-full rounded-2xl border border-[#cbe7ff] px-4 py-4 outline-none placeholder:text-slate-400 focus:border-[#18a7f5]"
+                className="w-full rounded-2xl border border-[#cbe7ff] px-4 py-4 uppercase outline-none placeholder:text-slate-400 focus:border-[#18a7f5]"
               />
 
               <select
@@ -393,6 +393,7 @@ export default function App() {
 function BookingModal({ draft, onClose }) {
   const [addresses, setAddresses] = useState([]);
   const [loadingAddresses, setLoadingAddresses] = useState(true);
+  const [addressError, setAddressError] = useState("");
   const [selectedAddress, setSelectedAddress] = useState("");
   const [termsOpened, setTermsOpened] = useState(false);
   const [termsAccepted, setTermsAccepted] = useState(false);
@@ -414,6 +415,7 @@ function BookingModal({ draft, onClose }) {
     async function loadAddresses() {
       try {
         setLoadingAddresses(true);
+        setAddressError("");
         const found = await fetchAddressesByPostcode(draft.postcode);
 
         if (!ignore) {
@@ -421,6 +423,10 @@ function BookingModal({ draft, onClose }) {
         }
       } catch (error) {
         console.error("Address lookup failed:", error);
+        if (!ignore) {
+          setAddresses([]);
+          setAddressError("We couldn’t load addresses for this postcode. Please enter your full address manually below.");
+        }
       } finally {
         if (!ignore) {
           setLoadingAddresses(false);
@@ -477,6 +483,11 @@ function BookingModal({ draft, onClose }) {
     e.preventDefault();
 
     if (!termsAccepted) return;
+
+    if (!formData.addressLine.trim()) {
+      alert("Please select or enter your address.");
+      return;
+    }
 
     setSending(true);
 
@@ -584,18 +595,32 @@ function BookingModal({ draft, onClose }) {
               value={selectedAddress}
               onChange={(e) => handleAddressChange(e.target.value)}
               className="w-full rounded-2xl border border-slate-300 px-4 py-3"
-              disabled={loadingAddresses}
+              disabled={loadingAddresses || addresses.length === 0}
             >
               <option value="">
                 {loadingAddresses ? "Loading addresses..." : "Choose your address"}
               </option>
               {addresses.map((address) => (
-  <option key={address.id} value={address.value}>
-    {address.label}
-  </option>
-))}
+                <option key={address.id} value={address.value}>
+                  {address.label}
+                </option>
+              ))}
             </select>
           </div>
+
+          {addressError && (
+            <p className="text-sm text-red-600">{addressError}</p>
+          )}
+
+          <input
+            type="text"
+            placeholder="Full Address"
+            value={formData.addressLine}
+            onChange={(e) =>
+              setFormData((prev) => ({ ...prev, addressLine: e.target.value }))
+            }
+            className="w-full rounded-2xl border border-slate-300 px-4 py-3"
+          />
 
           <input
             type="text"
@@ -690,7 +715,7 @@ async function fetchAddressesByPostcode(postcode) {
   const data = await response.json();
 
   if (!response.ok) {
-    throw new Error(data.error || "Failed to fetch addresses");
+    throw new Error(data.error || data.message || "Failed to fetch addresses");
   }
 
   return data.addresses || [];
