@@ -1,5 +1,3 @@
-const fetch = require("node-fetch");
-
 exports.handler = async (event) => {
   try {
     const postcode = (event.queryStringParameters.postcode || "").trim();
