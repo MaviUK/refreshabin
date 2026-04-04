@@ -72,6 +72,12 @@ export default function App() {
               className="mt-7 w-full max-w-2xl mx-auto"
             />
 
+            const highlights = [
+    "Domestic & Commercial",
+    "Hygienic, Fresh Bins",
+    "Reliable Scheduled Service",
+  ];
+
             <p className="mt-6 max-w-2xl text-lg leading-8 text-slate-600">
               RefreshaBin provides reliable domestic and commercial bin cleaning throughout County Down.
               We offer one-off cleans and regular 4-weekly services to help keep bins hygienic, fresh, and presentable.
