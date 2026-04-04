@@ -13,6 +13,8 @@ exports.handler = async (event) => {
 
     const apiKey = process.env.GETADDRESS_API_KEY;
 
+    console.log("API key present:", !!apiKey);
+
     if (!apiKey) {
       return {
         statusCode: 500,
@@ -29,6 +31,8 @@ exports.handler = async (event) => {
     });
 
     const text = await response.text();
+    console.log("Upstream status:", response.status);
+    console.log("Upstream body:", text);
 
     let data = {};
     try {
@@ -48,6 +52,7 @@ exports.handler = async (event) => {
         statusCode: response.status,
         body: JSON.stringify({
           error:
+            data.Message ||
             data.message ||
             data.error ||
             `Address lookup failed with status ${response.status}`,
@@ -67,8 +72,6 @@ exports.handler = async (event) => {
       body: JSON.stringify({ addresses }),
     };
   } catch (error) {
-    console.error("addressLookup error:", error);
-
     return {
       statusCode: 500,
       body: JSON.stringify({
