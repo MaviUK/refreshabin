@@ -29,12 +29,30 @@ exports.handler = async (event) => {
     });
 
     const text = await response.text();
-    const data = text ? JSON.parse(text) : {};
+
+    let data = {};
+    try {
+      data = text ? JSON.parse(text) : {};
+    } catch {
+      return {
+        statusCode: 500,
+        body: JSON.stringify({
+          error: "Address API returned invalid JSON",
+          raw: text,
+        }),
+      };
+    }
 
     if (!response.ok) {
       return {
         statusCode: response.status,
-        body: JSON.stringify(data),
+        body: JSON.stringify({
+          error:
+            data.message ||
+            data.error ||
+            `Address lookup failed with status ${response.status}`,
+          details: data,
+        }),
       };
     }
 
@@ -49,9 +67,13 @@ exports.handler = async (event) => {
       body: JSON.stringify({ addresses }),
     };
   } catch (error) {
+    console.error("addressLookup error:", error);
+
     return {
       statusCode: 500,
-      body: JSON.stringify({ error: error.message || "Address lookup failed" }),
+      body: JSON.stringify({
+        error: error.message || "Address lookup failed",
+      }),
     };
   }
 };
