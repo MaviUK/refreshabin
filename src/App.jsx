@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react"; 
+import React, { useEffect, useMemo, useState } from "react";
 
 const GETADDRESS_TOKEN = import.meta.env.VITE_GETADDRESS_TOKEN || "";
 
@@ -411,7 +411,7 @@ function BookingModal({ draft, onClose, getAddressToken }) {
   });
 
   const addressInputId = useMemo(
-    () => `getaddress-find-${Math.random().toString(36).slice(2, 9)}`,
+    () => `getaddress-autocomplete-${Math.random().toString(36).slice(2, 9)}`,
     []
   );
 
@@ -422,27 +422,32 @@ function BookingModal({ draft, onClose, getAddressToken }) {
     }
 
     const scriptId = "getaddress-script";
-    const existingScript = document.getElementById(scriptId);
 
-    const initialise = () => {
-      if (!window.getAddress || !document.getElementById(addressInputId)) return;
+    const initAutocomplete = () => {
+      const input = document.getElementById(addressInputId);
+      if (!window.getAddress || !input) return;
 
       try {
         setAddressError("");
         setScriptLoaded(true);
 
-        const input = document.getElementById(addressInputId);
         input.value = draft.postcode || "";
 
-        window.getAddress.find(
+        window.getAddress.autocomplete(
           addressInputId,
           getAddressToken,
-          undefined,
-          (address) => {
-            const fullAddress =
-              address?.formatted_address?.join(", ") ||
-              address?.formatted_address?.filter(Boolean)?.join(", ") ||
-              [
+          {
+            show_postcode: true,
+            enable_repositioning: true,
+            suggestion_count: 6,
+            input_focus_on_select: false,
+            bind_output_fields: false,
+            list_style:
+              "z-index:999999; position:absolute; background:white; border:1px solid #cbd5e1; border-radius:16px; box-shadow:0 10px 30px rgba(0,0,0,0.12); overflow:hidden;",
+            list_item_style:
+              "padding:12px 14px; font-size:14px; border-bottom:1px solid #e2e8f0; cursor:pointer; background:white;",
+            selected: (address) => {
+              const fullAddress = [
                 address?.line_1,
                 address?.line_2,
                 address?.line_3,
@@ -454,25 +459,30 @@ function BookingModal({ draft, onClose, getAddressToken }) {
                 .filter(Boolean)
                 .join(", ");
 
-            setFormData((prev) => ({
-              ...prev,
-              addressLine: fullAddress,
-              postcode: address?.postcode || prev.postcode,
-            }));
+              setFormData((prev) => ({
+                ...prev,
+                addressLine: fullAddress,
+                postcode: address?.postcode || prev.postcode,
+              }));
+            },
           }
         );
       } catch (error) {
         console.error("getAddress init failed:", error);
-        setAddressError("We couldn’t load address lookup. Please type your full address manually below.");
+        setAddressError(
+          "We couldn’t load address lookup. Please type your full address manually below."
+        );
       }
     };
 
+    const existingScript = document.getElementById(scriptId);
+
     if (existingScript) {
       if (window.getAddress) {
-        initialise();
+        initAutocomplete();
       } else {
-        existingScript.addEventListener("load", initialise);
-        return () => existingScript.removeEventListener("load", initialise);
+        existingScript.addEventListener("load", initAutocomplete);
+        return () => existingScript.removeEventListener("load", initAutocomplete);
       }
       return;
     }
@@ -481,9 +491,11 @@ function BookingModal({ draft, onClose, getAddressToken }) {
     script.id = scriptId;
     script.src = "https://cdn.getaddress.io/scripts/getaddress-3.0.17.min.js";
     script.async = true;
-    script.onload = initialise;
+    script.onload = initAutocomplete;
     script.onerror = () => {
-      setAddressError("Couldn’t load the address lookup script. Please type your full address manually below.");
+      setAddressError(
+        "Couldn’t load the address lookup script. Please type your full address manually below."
+      );
     };
 
     document.body.appendChild(script);
@@ -555,7 +567,7 @@ function BookingModal({ draft, onClose, getAddressToken }) {
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 p-4">
-      <div className="relative max-h-[90vh] w-full max-w-md overflow-y-auto rounded-[2rem] bg-white p-5 shadow-2xl sm:p-6">
+      <div className="relative w-full max-w-md rounded-[2rem] bg-white p-5 shadow-2xl sm:p-6">
         <button
           onClick={onClose}
           className="absolute right-4 top-4 text-xl text-slate-500 hover:text-slate-800"
@@ -567,183 +579,185 @@ function BookingModal({ draft, onClose, getAddressToken }) {
           Book a Bin Clean
         </h2>
 
-        <form className="space-y-4" onSubmit={handleSubmit}>
-          <input
-            type="text"
-            placeholder="Your Name"
-            value={formData.name}
-            onChange={(e) =>
-              setFormData((prev) => ({ ...prev, name: e.target.value }))
-            }
-            className="w-full rounded-2xl border border-slate-300 px-4 py-3"
-          />
+        <div className="max-h-[75vh] overflow-y-auto pr-1">
+          <form className="space-y-4" onSubmit={handleSubmit}>
+            <input
+              type="text"
+              placeholder="Your Name"
+              value={formData.name}
+              onChange={(e) =>
+                setFormData((prev) => ({ ...prev, name: e.target.value }))
+              }
+              className="w-full rounded-2xl border border-slate-300 px-4 py-3"
+            />
 
-          {formData.bins.map((bin, index) => (
-            <div key={index} className="space-y-3 rounded-2xl border border-slate-200 p-3">
-              <div className="grid grid-cols-[1fr_90px] gap-3">
+            {formData.bins.map((bin, index) => (
+              <div key={index} className="space-y-3 rounded-2xl border border-slate-200 p-3">
+                <div className="grid grid-cols-[1fr_90px] gap-3">
+                  <select
+                    value={bin.binType}
+                    onChange={(e) => updateBin(index, "binType", e.target.value)}
+                    className="rounded-2xl border border-slate-300 px-4 py-3"
+                  >
+                    <option>General Waste Bin</option>
+                    <option>Recycling Bin</option>
+                    <option>Garden Bin</option>
+                    <option>Commercial Bin</option>
+                  </select>
+
+                  <input
+                    type="number"
+                    min="1"
+                    value={bin.quantity}
+                    onChange={(e) => updateBin(index, "quantity", Number(e.target.value))}
+                    className="rounded-2xl border border-slate-300 px-4 py-3"
+                  />
+                </div>
+
                 <select
-                  value={bin.binType}
-                  onChange={(e) => updateBin(index, "binType", e.target.value)}
-                  className="rounded-2xl border border-slate-300 px-4 py-3"
+                  value={bin.cleanType}
+                  onChange={(e) => updateBin(index, "cleanType", e.target.value)}
+                  className="w-full rounded-2xl border border-slate-300 px-4 py-3"
                 >
-                  <option>General Waste Bin</option>
-                  <option>Recycling Bin</option>
-                  <option>Garden Bin</option>
-                  <option>Commercial Bin</option>
+                  <option>One-Off Clean</option>
+                  <option>Every 4 Weeks</option>
+                  <option>Monthly Service</option>
+                  <option>Commercial Quote Request</option>
                 </select>
 
-                <input
-                  type="number"
-                  min="1"
-                  value={bin.quantity}
-                  onChange={(e) => updateBin(index, "quantity", Number(e.target.value))}
-                  className="rounded-2xl border border-slate-300 px-4 py-3"
-                />
+                {formData.bins.length > 1 && (
+                  <button
+                    type="button"
+                    onClick={() => removeBin(index)}
+                    className="text-sm font-semibold text-red-600"
+                  >
+                    Remove Bin
+                  </button>
+                )}
               </div>
+            ))}
 
-              <select
-                value={bin.cleanType}
-                onChange={(e) => updateBin(index, "cleanType", e.target.value)}
-                className="w-full rounded-2xl border border-slate-300 px-4 py-3"
-              >
-                <option>One-Off Clean</option>
-                <option>Every 4 Weeks</option>
-                <option>Monthly Service</option>
-                <option>Commercial Quote Request</option>
-              </select>
-
-              {formData.bins.length > 1 && (
-                <button
-                  type="button"
-                  onClick={() => removeBin(index)}
-                  className="text-sm font-semibold text-red-600"
-                >
-                  Remove Bin
-                </button>
-              )}
-            </div>
-          ))}
-
-          <button
-            type="button"
-            onClick={addAnotherBin}
-            className="text-sm font-semibold text-[#22a94f]"
-          >
-            + Add Another Bin
-          </button>
-
-          <div>
-            <label className="mb-2 block text-sm font-semibold text-slate-700">
-              Select Address
-            </label>
-            <input
-              id={addressInputId}
-              type="text"
-              defaultValue={draft.postcode}
-              placeholder="Enter postcode or start typing address"
-              className="w-full rounded-2xl border border-slate-300 px-4 py-3 uppercase"
-            />
-            <p className="mt-2 text-xs text-slate-500">
-              {scriptLoaded
-                ? "Choose your address from the getAddress dropdown suggestions."
-                : "Loading address lookup..."}
-            </p>
-          </div>
-
-          {addressError && (
-            <p className="text-sm text-red-600">{addressError}</p>
-          )}
-
-          <input
-            type="text"
-            placeholder="Full Address"
-            value={formData.addressLine}
-            onChange={(e) =>
-              setFormData((prev) => ({ ...prev, addressLine: e.target.value }))
-            }
-            className="w-full rounded-2xl border border-slate-300 px-4 py-3"
-          />
-
-          <input
-            type="text"
-            value={formData.postcode}
-            readOnly
-            className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3"
-          />
-
-          <input
-            type="tel"
-            placeholder="Contact Number"
-            value={formData.phone}
-            onChange={(e) =>
-              setFormData((prev) => ({ ...prev, phone: e.target.value }))
-            }
-            className="w-full rounded-2xl border border-slate-300 px-4 py-3"
-          />
-
-          <input
-            type="email"
-            placeholder="Email Address"
-            value={formData.email}
-            onChange={(e) =>
-              setFormData((prev) => ({ ...prev, email: e.target.value }))
-            }
-            className="w-full rounded-2xl border border-slate-300 px-4 py-3"
-          />
-
-          <input
-            type="date"
-            value={formData.date}
-            onChange={(e) =>
-              setFormData((prev) => ({ ...prev, date: e.target.value }))
-            }
-            className="w-full rounded-2xl border border-slate-300 px-4 py-3"
-          />
-
-          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
             <button
               type="button"
-              onClick={() => setTermsOpened(true)}
-              className="text-sm font-semibold text-[#0d67c2] underline"
+              onClick={addAnotherBin}
+              className="text-sm font-semibold text-[#22a94f]"
             >
-              View Terms & Conditions
+              + Add Another Bin
             </button>
 
-            {termsOpened && (
-              <div className="mt-4 max-h-48 overflow-y-auto rounded-xl border border-slate-200 bg-white p-3 text-sm text-slate-600">
-                <p className="mb-3 font-semibold text-slate-800">Terms & Conditions</p>
-                <p>Bookings are subject to availability.</p>
-                <p>Customers must ensure bins are accessible on the agreed date.</p>
-                <p>Missed appointments may require rebooking.</p>
-                <p>Service pricing may vary if the selected booking details are changed.</p>
-                <p>By booking, you agree to the service terms and contact regarding your booking.</p>
-              </div>
+            <div className="relative">
+              <label className="mb-2 block text-sm font-semibold text-slate-700">
+                Select Address
+              </label>
+              <input
+                id={addressInputId}
+                type="text"
+                defaultValue={draft.postcode}
+                placeholder="Start typing postcode or address"
+                className="w-full rounded-2xl border border-slate-300 px-4 py-3 uppercase"
+              />
+              <p className="mt-2 text-xs text-slate-500">
+                {scriptLoaded
+                  ? "Choose your address from the getAddress dropdown suggestions."
+                  : "Loading address lookup..."}
+              </p>
+            </div>
+
+            {addressError && (
+              <p className="text-sm text-red-600">{addressError}</p>
             )}
 
-            <label className="mt-4 flex items-start gap-3 text-sm text-slate-700">
-              <input
-                type="checkbox"
-                checked={termsAccepted}
-                onChange={(e) => setTermsAccepted(e.target.checked)}
-                disabled={!termsOpened}
-                className="mt-1"
-              />
-              <span>I have read and agree to the Terms & Conditions.</span>
-            </label>
-          </div>
+            <input
+              type="text"
+              placeholder="Full Address"
+              value={formData.addressLine}
+              onChange={(e) =>
+                setFormData((prev) => ({ ...prev, addressLine: e.target.value }))
+              }
+              className="w-full rounded-2xl border border-slate-300 px-4 py-3"
+            />
 
-          <button
-            type="submit"
-            disabled={!termsAccepted || sending}
-            className={`w-full rounded-2xl py-4 text-sm font-semibold text-white ${
-              !termsAccepted || sending
-                ? "cursor-not-allowed bg-slate-300"
-                : "bg-gradient-to-r from-[#0d67c2] via-[#0d83dc] to-[#18a7f5]"
-            }`}
-          >
-            {sending ? "Sending..." : "Send Booking"}
-          </button>
-        </form>
+            <input
+              type="text"
+              value={formData.postcode}
+              readOnly
+              className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3"
+            />
+
+            <input
+              type="tel"
+              placeholder="Contact Number"
+              value={formData.phone}
+              onChange={(e) =>
+                setFormData((prev) => ({ ...prev, phone: e.target.value }))
+              }
+              className="w-full rounded-2xl border border-slate-300 px-4 py-3"
+            />
+
+            <input
+              type="email"
+              placeholder="Email Address"
+              value={formData.email}
+              onChange={(e) =>
+                setFormData((prev) => ({ ...prev, email: e.target.value }))
+              }
+              className="w-full rounded-2xl border border-slate-300 px-4 py-3"
+            />
+
+            <input
+              type="date"
+              value={formData.date}
+              onChange={(e) =>
+                setFormData((prev) => ({ ...prev, date: e.target.value }))
+              }
+              className="w-full rounded-2xl border border-slate-300 px-4 py-3"
+            />
+
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+              <button
+                type="button"
+                onClick={() => setTermsOpened(true)}
+                className="text-sm font-semibold text-[#0d67c2] underline"
+              >
+                View Terms & Conditions
+              </button>
+
+              {termsOpened && (
+                <div className="mt-4 max-h-48 overflow-y-auto rounded-xl border border-slate-200 bg-white p-3 text-sm text-slate-600">
+                  <p className="mb-3 font-semibold text-slate-800">Terms & Conditions</p>
+                  <p>Bookings are subject to availability.</p>
+                  <p>Customers must ensure bins are accessible on the agreed date.</p>
+                  <p>Missed appointments may require rebooking.</p>
+                  <p>Service pricing may vary if the selected booking details are changed.</p>
+                  <p>By booking, you agree to the service terms and contact regarding your booking.</p>
+                </div>
+              )}
+
+              <label className="mt-4 flex items-start gap-3 text-sm text-slate-700">
+                <input
+                  type="checkbox"
+                  checked={termsAccepted}
+                  onChange={(e) => setTermsAccepted(e.target.checked)}
+                  disabled={!termsOpened}
+                  className="mt-1"
+                />
+                <span>I have read and agree to the Terms & Conditions.</span>
+              </label>
+            </div>
+
+            <button
+              type="submit"
+              disabled={!termsAccepted || sending}
+              className={`w-full rounded-2xl py-4 text-sm font-semibold text-white ${
+                !termsAccepted || sending
+                  ? "cursor-not-allowed bg-slate-300"
+                  : "bg-gradient-to-r from-[#0d67c2] via-[#0d83dc] to-[#18a7f5]"
+              }`}
+            >
+              {sending ? "Sending..." : "Send Booking"}
+            </button>
+          </form>
+        </div>
       </div>
     </div>
   );
