@@ -1,3 +1,5 @@
+import React, { useEffect, useState } from "react";
+
 export default function App() {
   const services = [
     {
@@ -26,6 +28,36 @@ export default function App() {
     { title: "Commercial Quote", price: "Custom", note: "Tailored pricing for larger sites and business needs" },
   ];
 
+  const [bookingDraft, setBookingDraft] = useState({
+    postcode: "",
+    bins: [
+      {
+        binType: "General Waste Bin",
+        cleanType: "One-Off Clean",
+        quantity: 1,
+      },
+    ],
+    date: "",
+  });
+
+  const [showBookingModal, setShowBookingModal] = useState(false);
+
+  const handleContinueBooking = (e) => {
+    e.preventDefault();
+
+    if (
+      !bookingDraft.postcode.trim() ||
+      !bookingDraft.bins[0].binType ||
+      !bookingDraft.bins[0].cleanType ||
+      !bookingDraft.date
+    ) {
+      alert("Please complete postcode, bin type, clean type, and date.");
+      return;
+    }
+
+    setShowBookingModal(true);
+  };
+
   return (
     <div className="min-h-screen bg-[#eef7ff] pb-24 text-slate-900 md:pb-0">
       <header className="sticky top-0 z-20 border-b border-[#cfe7ff] bg-white/90 backdrop-blur">
@@ -43,7 +75,7 @@ export default function App() {
 
           <a
             href="#book"
-            className="rounded-full bg-gradient-to-r from-[#0d67c2] to-[#18a7f5] px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-sky-200"
+            className="hidden rounded-full bg-gradient-to-r from-[#0d67c2] to-[#18a7f5] px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-sky-200 md:inline-flex"
           >
             Book Now
           </a>
@@ -69,7 +101,7 @@ export default function App() {
             <img
               src="/logo.jpeg"
               alt="RefreshaBin logo"
-              className="mt-0 w-full max-w-2xl mx-auto"
+              className="mt-0 mx-auto w-full max-w-2xl"
             />
 
             <p className="mt-6 max-w-2xl text-lg leading-8 text-slate-600">
@@ -118,21 +150,56 @@ export default function App() {
               <p className="mt-2 text-sm text-slate-500">Arrange a domestic or commercial clean in just a few steps.</p>
             </div>
 
-            <div className="space-y-4">
+            <form className="space-y-4" onSubmit={handleContinueBooking}>
               <input
                 type="text"
                 placeholder="Enter your postcode"
+                value={bookingDraft.postcode}
+                onChange={(e) =>
+                  setBookingDraft((prev) => ({
+                    ...prev,
+                    postcode: e.target.value,
+                  }))
+                }
                 className="w-full rounded-2xl border border-[#cbe7ff] px-4 py-4 outline-none placeholder:text-slate-400 focus:border-[#18a7f5]"
               />
 
-              <select className="w-full rounded-2xl border border-[#cbe7ff] px-4 py-4 outline-none focus:border-[#18a7f5]">
+              <select
+                value={bookingDraft.bins[0].binType}
+                onChange={(e) =>
+                  setBookingDraft((prev) => ({
+                    ...prev,
+                    bins: [
+                      {
+                        ...prev.bins[0],
+                        binType: e.target.value,
+                      },
+                    ],
+                  }))
+                }
+                className="w-full rounded-2xl border border-[#cbe7ff] px-4 py-4 outline-none focus:border-[#18a7f5]"
+              >
                 <option>General Waste Bin</option>
                 <option>Recycling Bin</option>
                 <option>Garden Bin</option>
                 <option>Commercial Bin</option>
               </select>
 
-              <select className="w-full rounded-2xl border border-[#cbe7ff] px-4 py-4 outline-none focus:border-[#18a7f5]">
+              <select
+                value={bookingDraft.bins[0].cleanType}
+                onChange={(e) =>
+                  setBookingDraft((prev) => ({
+                    ...prev,
+                    bins: [
+                      {
+                        ...prev.bins[0],
+                        cleanType: e.target.value,
+                      },
+                    ],
+                  }))
+                }
+                className="w-full rounded-2xl border border-[#cbe7ff] px-4 py-4 outline-none focus:border-[#18a7f5]"
+              >
                 <option>One-Off Clean</option>
                 <option>Every 4 Weeks</option>
                 <option>Monthly Service</option>
@@ -141,13 +208,23 @@ export default function App() {
 
               <input
                 type="date"
+                value={bookingDraft.date}
+                onChange={(e) =>
+                  setBookingDraft((prev) => ({
+                    ...prev,
+                    date: e.target.value,
+                  }))
+                }
                 className="w-full rounded-2xl border border-[#cbe7ff] px-4 py-4 outline-none focus:border-[#18a7f5]"
               />
 
-              <button className="w-full rounded-2xl bg-gradient-to-r from-[#0d67c2] via-[#0d83dc] to-[#18a7f5] py-4 text-sm font-semibold text-white shadow-lg shadow-sky-200">
+              <button
+                type="submit"
+                className="w-full rounded-2xl bg-gradient-to-r from-[#0d67c2] via-[#0d83dc] to-[#18a7f5] py-4 text-sm font-semibold text-white shadow-lg shadow-sky-200"
+              >
                 Continue Booking
               </button>
-            </div>
+            </form>
 
             <div className="mt-5 rounded-2xl bg-[#eff8ff] p-4 text-sm text-slate-600">
               Professional bin cleaning for homes, businesses, apartment blocks, and shared waste areas across County Down.
@@ -278,31 +355,340 @@ export default function App() {
         </div>
       </section>
 
-     {/* Mobile Bottom Contact Bar */}
-<div className="fixed bottom-0 left-0 right-0 z-50 border-t border-white/20 bg-white/95 p-2 shadow-[0_-10px_30px_rgba(0,0,0,0.08)] backdrop-blur md:hidden">
-  <div className="grid grid-cols-3 gap-2">
-    <a
-      href="#book"
-      className="rounded-full bg-gradient-to-r from-[#0d67c2] to-[#18a7f5] px-2 py-3 text-center text-xs font-bold text-white shadow-lg"
-    >
-      Book Now
-    </a>
-    <a
-      href="https://wa.me/447835843481"
-      target="_blank"
-      rel="noreferrer"
-      className="rounded-full bg-[#22a94f] px-2 py-3 text-center text-xs font-bold text-white shadow-lg"
-    >
-      Chat
-    </a>
-    <a
-      href="tel:+447835843481"
-      className="rounded-full bg-gradient-to-r from-[#0d67c2] to-[#18a7f5] px-2 py-3 text-center text-xs font-bold text-white shadow-lg"
-    >
-      Call Us
-    </a>
+      {showBookingModal && (
+        <BookingModal
+          draft={bookingDraft}
+          onClose={() => setShowBookingModal(false)}
+        />
+      )}
+
+      <div className="fixed bottom-0 left-0 right-0 z-50 border-t border-white/20 bg-white/95 p-2 shadow-[0_-10px_30px_rgba(0,0,0,0.08)] backdrop-blur md:hidden">
+        <div className="grid grid-cols-3 gap-2">
+          <a
+            href="#book"
+            className="rounded-full bg-gradient-to-r from-[#0d67c2] to-[#18a7f5] px-2 py-3 text-center text-xs font-bold text-white shadow-lg"
+          >
+            Book Now
+          </a>
+          <a
+            href="https://wa.me/447835843481"
+            target="_blank"
+            rel="noreferrer"
+            className="rounded-full bg-[#22a94f] px-2 py-3 text-center text-xs font-bold text-white shadow-lg"
+          >
+            Chat
+          </a>
+          <a
+            href="tel:+447835843481"
+            className="rounded-full bg-gradient-to-r from-[#0d67c2] to-[#18a7f5] px-2 py-3 text-center text-xs font-bold text-white shadow-lg"
+          >
+            Call Us
+          </a>
         </div>
       </div>
     </div>
   );
+}
+
+function BookingModal({ draft, onClose }) {
+  const [addresses, setAddresses] = useState([]);
+  const [loadingAddresses, setLoadingAddresses] = useState(true);
+  const [selectedAddress, setSelectedAddress] = useState("");
+  const [termsOpened, setTermsOpened] = useState(false);
+  const [termsAccepted, setTermsAccepted] = useState(false);
+  const [sending, setSending] = useState(false);
+
+  const [formData, setFormData] = useState({
+    name: "",
+    postcode: draft.postcode,
+    addressLine: "",
+    phone: "",
+    email: "",
+    date: draft.date,
+    bins: draft.bins,
+  });
+
+  useEffect(() => {
+    let ignore = false;
+
+    async function loadAddresses() {
+      try {
+        setLoadingAddresses(true);
+        const found = await fetchAddressesByPostcode(draft.postcode);
+
+        if (!ignore) {
+          setAddresses(found);
+        }
+      } catch (error) {
+        console.error("Address lookup failed:", error);
+      } finally {
+        if (!ignore) {
+          setLoadingAddresses(false);
+        }
+      }
+    }
+
+    loadAddresses();
+
+    return () => {
+      ignore = true;
+    };
+  }, [draft.postcode]);
+
+  const updateBin = (index, field, value) => {
+    setFormData((prev) => ({
+      ...prev,
+      bins: prev.bins.map((bin, i) =>
+        i === index ? { ...bin, [field]: value } : bin
+      ),
+    }));
+  };
+
+  const addAnotherBin = () => {
+    setFormData((prev) => ({
+      ...prev,
+      bins: [
+        ...prev.bins,
+        {
+          binType: "General Waste Bin",
+          cleanType: prev.bins[0]?.cleanType || "One-Off Clean",
+          quantity: 1,
+        },
+      ],
+    }));
+  };
+
+  const removeBin = (index) => {
+    setFormData((prev) => ({
+      ...prev,
+      bins: prev.bins.filter((_, i) => i !== index),
+    }));
+  };
+
+  const handleAddressChange = (value) => {
+    setSelectedAddress(value);
+    setFormData((prev) => ({
+      ...prev,
+      addressLine: value,
+    }));
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+
+    if (!termsAccepted) return;
+
+    setSending(true);
+
+    try {
+      await fetch("/.netlify/functions/sendBookingEmail", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(formData),
+      });
+
+      alert("Booking sent successfully.");
+      onClose();
+    } catch (error) {
+      console.error(error);
+      alert("Something went wrong sending your booking.");
+    } finally {
+      setSending(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 p-4">
+      <div className="relative max-h-[90vh] w-full max-w-md overflow-y-auto rounded-[2rem] bg-white p-5 shadow-2xl sm:p-6">
+        <button
+          onClick={onClose}
+          className="absolute right-4 top-4 text-xl text-slate-500 hover:text-slate-800"
+        >
+          ×
+        </button>
+
+        <h2 className="mb-5 text-center text-3xl font-black text-[#0c2340]">
+          Book a Bin Clean
+        </h2>
+
+        <form className="space-y-4" onSubmit={handleSubmit}>
+          <input
+            type="text"
+            placeholder="Your Name"
+            value={formData.name}
+            onChange={(e) =>
+              setFormData((prev) => ({ ...prev, name: e.target.value }))
+            }
+            className="w-full rounded-2xl border border-slate-300 px-4 py-3"
+          />
+
+          {formData.bins.map((bin, index) => (
+            <div key={index} className="space-y-3 rounded-2xl border border-slate-200 p-3">
+              <div className="grid grid-cols-[1fr_90px] gap-3">
+                <select
+                  value={bin.binType}
+                  onChange={(e) => updateBin(index, "binType", e.target.value)}
+                  className="rounded-2xl border border-slate-300 px-4 py-3"
+                >
+                  <option>General Waste Bin</option>
+                  <option>Recycling Bin</option>
+                  <option>Garden Bin</option>
+                  <option>Commercial Bin</option>
+                </select>
+
+                <input
+                  type="number"
+                  min="1"
+                  value={bin.quantity}
+                  onChange={(e) => updateBin(index, "quantity", Number(e.target.value))}
+                  className="rounded-2xl border border-slate-300 px-4 py-3"
+                />
+              </div>
+
+              <select
+                value={bin.cleanType}
+                onChange={(e) => updateBin(index, "cleanType", e.target.value)}
+                className="w-full rounded-2xl border border-slate-300 px-4 py-3"
+              >
+                <option>One-Off Clean</option>
+                <option>Every 4 Weeks</option>
+                <option>Monthly Service</option>
+                <option>Commercial Quote Request</option>
+              </select>
+
+              {formData.bins.length > 1 && (
+                <button
+                  type="button"
+                  onClick={() => removeBin(index)}
+                  className="text-sm font-semibold text-red-600"
+                >
+                  Remove Bin
+                </button>
+              )}
+            </div>
+          ))}
+
+          <button
+            type="button"
+            onClick={addAnotherBin}
+            className="text-sm font-semibold text-[#22a94f]"
+          >
+            + Add Another Bin
+          </button>
+
+          <div>
+            <label className="mb-2 block text-sm font-semibold text-slate-700">
+              Select Address
+            </label>
+            <select
+              value={selectedAddress}
+              onChange={(e) => handleAddressChange(e.target.value)}
+              className="w-full rounded-2xl border border-slate-300 px-4 py-3"
+              disabled={loadingAddresses}
+            >
+              <option value="">
+                {loadingAddresses ? "Loading addresses..." : "Choose your address"}
+              </option>
+              {addresses.map((address) => (
+                <option key={address} value={address}>
+                  {address}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <input
+            type="text"
+            value={formData.postcode}
+            readOnly
+            className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3"
+          />
+
+          <input
+            type="tel"
+            placeholder="Contact Number"
+            value={formData.phone}
+            onChange={(e) =>
+              setFormData((prev) => ({ ...prev, phone: e.target.value }))
+            }
+            className="w-full rounded-2xl border border-slate-300 px-4 py-3"
+          />
+
+          <input
+            type="email"
+            placeholder="Email Address"
+            value={formData.email}
+            onChange={(e) =>
+              setFormData((prev) => ({ ...prev, email: e.target.value }))
+            }
+            className="w-full rounded-2xl border border-slate-300 px-4 py-3"
+          />
+
+          <input
+            type="date"
+            value={formData.date}
+            onChange={(e) =>
+              setFormData((prev) => ({ ...prev, date: e.target.value }))
+            }
+            className="w-full rounded-2xl border border-slate-300 px-4 py-3"
+          />
+
+          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+            <button
+              type="button"
+              onClick={() => setTermsOpened(true)}
+              className="text-sm font-semibold text-[#0d67c2] underline"
+            >
+              View Terms & Conditions
+            </button>
+
+            {termsOpened && (
+              <div className="mt-4 max-h-48 overflow-y-auto rounded-xl border border-slate-200 bg-white p-3 text-sm text-slate-600">
+                <p className="mb-3 font-semibold text-slate-800">Terms & Conditions</p>
+                <p>Bookings are subject to availability.</p>
+                <p>Customers must ensure bins are accessible on the agreed date.</p>
+                <p>Missed appointments may require rebooking.</p>
+                <p>Service pricing may vary if the selected booking details are changed.</p>
+                <p>By booking, you agree to the service terms and contact regarding your booking.</p>
+              </div>
+            )}
+
+            <label className="mt-4 flex items-start gap-3 text-sm text-slate-700">
+              <input
+                type="checkbox"
+                checked={termsAccepted}
+                onChange={(e) => setTermsAccepted(e.target.checked)}
+                disabled={!termsOpened}
+                className="mt-1"
+              />
+              <span>I have read and agree to the Terms & Conditions.</span>
+            </label>
+          </div>
+
+          <button
+            type="submit"
+            disabled={!termsAccepted || sending}
+            className={`w-full rounded-2xl py-4 text-sm font-semibold text-white ${
+              !termsAccepted || sending
+                ? "cursor-not-allowed bg-slate-300"
+                : "bg-gradient-to-r from-[#0d67c2] via-[#0d83dc] to-[#18a7f5]"
+            }`}
+          >
+            {sending ? "Sending..." : "Send Booking"}
+          </button>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+async function fetchAddressesByPostcode(postcode) {
+  const cleanPostcode = postcode.trim().toUpperCase();
+
+  return [
+    `1 Main Street, ${cleanPostcode}`,
+    `2 Main Street, ${cleanPostcode}`,
+    `3 Main Street, ${cleanPostcode}`,
+    `4 Main Street, ${cleanPostcode}`,
+  ];
 }
