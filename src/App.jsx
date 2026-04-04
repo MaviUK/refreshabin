@@ -590,10 +590,10 @@ function BookingModal({ draft, onClose }) {
                 {loadingAddresses ? "Loading addresses..." : "Choose your address"}
               </option>
               {addresses.map((address) => (
-                <option key={address} value={address}>
-                  {address}
-                </option>
-              ))}
+  <option key={address.id} value={address.value}>
+    {address.label}
+  </option>
+))}
             </select>
           </div>
 
@@ -693,5 +693,5 @@ async function fetchAddressesByPostcode(postcode) {
     throw new Error(data.error || "Failed to fetch addresses");
   }
 
-  return data.addresses.map((item) => item.label);
+  return data.addresses || [];
 }
