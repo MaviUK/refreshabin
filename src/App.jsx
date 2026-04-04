@@ -410,120 +410,126 @@ function BookingModal({ draft, onClose, getAddressToken }) {
     bins: draft.bins,
   });
 
-  const addressInputId = useMemo(
-    () => `getaddress-autocomplete-${Math.random().toString(36).slice(2, 9)}`,
+  const lookupContainerId = useMemo(
+    () => `postcode_lookup_${Math.random().toString(36).slice(2, 9)}`,
     []
   );
 
-useEffect(() => {
-  if (!getAddressToken) {
-    setAddressError("Missing VITE_GETADDRESS_TOKEN.");
-    return;
-  }
-
-  const scriptId = "getaddress-script";
-
-  const initLookup = () => {
-    if (!window.getAddress) return;
-
-    try {
-      setAddressError("");
-      setScriptLoaded(true);
-
-      window.getAddress.find(
-        addressInputId,
-        getAddressToken,
-        {
-          input: draft.postcode,
-          output_fields: {
-            line_1: "line1",
-            line_2: "line2",
-            line_3: "line3",
-            town_or_city: "city",
-            county: "county",
-            postcode: "postcode",
-          },
-          on_address_selected: (address) => {
-            const fullAddress = [
-              address.line_1,
-              address.line_2,
-              address.line_3,
-              address.town_or_city,
-              address.county,
-              address.postcode,
-            ]
-              .filter(Boolean)
-              .join(", ");
-
-            setFormData((prev) => ({
-              ...prev,
-              addressLine: fullAddress,
-              postcode: address.postcode,
-            }));
-          },
-        }
-      );
-    } catch (error) {
-      console.error("getAddress init failed:", error);
-      setAddressError("Address lookup failed.");
+  useEffect(() => {
+    if (!getAddressToken) {
+      setAddressError("Missing VITE_GETADDRESS_TOKEN.");
+      return;
     }
-  };
 
-  const existingScript = document.getElementById(scriptId);
+    const scriptId = "getaddress-find-script";
 
-  if (existingScript) {
-    if (window.getAddress) initLookup();
-    else existingScript.addEventListener("load", initLookup);
-    return () => existingScript.removeEventListener("load", initLookup);
-  }
+    const handleSelected = (e) => {
+      const address = e?.address || {};
+      const fullAddress = [
+        address.line_1,
+        address.line_2,
+        address.line_3,
+        address.line_4,
+        address.town_or_city,
+        address.county,
+        address.postcode,
+      ]
+        .filter(Boolean)
+        .join(", ");
 
-  const script = document.createElement("script");
-  script.id = scriptId;
-  script.src = "https://cdn.getaddress.io/scripts/getaddress-3.0.17.min.js";
-  script.async = true;
-  script.onload = initLookup;
-  script.onerror = () => {
-    setAddressError("Failed to load address lookup.");
-  };
+      setFormData((prev) => ({
+        ...prev,
+        addressLine: fullAddress,
+        postcode: address.postcode || prev.postcode,
+      }));
+    };
 
-  document.body.appendChild(script);
+    const handleFailed = (e) => {
+      console.error("getAddress failed:", e?.status, e?.message);
+      setAddressError(e?.message || "Address lookup failed.");
+    };
 
-  return () => {
-    script.onload = null;
-    script.onerror = null;
-  };
-}, [draft.postcode]);
+    const initLookup = () => {
+      if (!window.getAddress) return;
+
+      try {
+        setAddressError("");
+        setScriptLoaded(true);
+
+        const container = document.getElementById(lookupContainerId);
+        if (container) container.innerHTML = "";
+
+        document.addEventListener("getaddress-find-address-selected", handleSelected);
+        document.addEventListener("getaddress-find-suggestions-failed", handleFailed);
+        document.addEventListener("getaddress-find-address-selected-failed", handleFailed);
+
+        window.getAddress.find(lookupContainerId, getAddressToken, {
+          input: {
+            id: `${lookupContainerId}_input`,
+            name: "postcode_lookup",
+            class: "w-full rounded-2xl border border-slate-300 px-4 py-3 uppercase outline-none",
+            label: "Enter your postcode",
+          },
+          button: {
+            id: `${lookupContainerId}_button`,
+            class: "mt-3 w-full rounded-2xl bg-gradient-to-r from-[#0d67c2] via-[#0d83dc] to-[#18a7f5] px-4 py-3 text-sm font-semibold text-white shadow-lg",
+            label: "Find Address",
+            disabled_message: "Enter postcode first",
+          },
+          dropdown: {
+            id: `${lookupContainerId}_dropdown`,
+            class: "mt-3 w-full rounded-2xl border border-slate-300 px-4 py-3 bg-white text-slate-900",
+            select_message: "Choose your address",
+          },
+          error_message: {
+            id: `${lookupContainerId}_error`,
+            class: "mt-2 text-sm text-red-600",
+            not_found: "Address not found",
+          },
+        });
+
+        const generatedInput = document.getElementById(`${lookupContainerId}_input`);
+        if (generatedInput) {
+          generatedInput.value = draft.postcode || "";
+        }
+      } catch (error) {
+        console.error("getAddress init failed:", error);
+        setAddressError("Address lookup failed.");
+      }
+    };
 
     const existingScript = document.getElementById(scriptId);
 
     if (existingScript) {
       if (window.getAddress) {
-        initAutocomplete();
+        initLookup();
       } else {
-        existingScript.addEventListener("load", initAutocomplete);
-        return () => existingScript.removeEventListener("load", initAutocomplete);
+        existingScript.addEventListener("load", initLookup);
       }
-      return;
+    } else {
+      const script = document.createElement("script");
+      script.id = scriptId;
+      script.src = "https://cdn.getaddress.io/scripts/getaddress-find-2.1.0.min.js";
+      script.async = true;
+      script.onload = initLookup;
+      script.onerror = () => {
+        setAddressError("Failed to load address lookup.");
+      };
+      document.body.appendChild(script);
     }
 
-    const script = document.createElement("script");
-    script.id = scriptId;
-    script.src = "https://cdn.getaddress.io/scripts/getaddress-3.0.17.min.js";
-    script.async = true;
-    script.onload = initAutocomplete;
-    script.onerror = () => {
-      setAddressError(
-        "Couldn’t load the address lookup script. Please type your full address manually below."
-      );
-    };
-
-    document.body.appendChild(script);
-
     return () => {
-      script.onload = null;
-      script.onerror = null;
+      document.removeEventListener("getaddress-find-address-selected", handleSelected);
+      document.removeEventListener("getaddress-find-suggestions-failed", handleFailed);
+      document.removeEventListener("getaddress-find-address-selected-failed", handleFailed);
+
+      const existing = document.getElementById(scriptId);
+      if (existing) {
+        existing.onload = null;
+        existing.onerror = null;
+      }
     };
-  }, [addressInputId, draft.postcode, getAddressToken]);
+  }, [draft.postcode, getAddressToken, lookupContainerId]);
 
   const updateBin = (index, field, value) => {
     setFormData((prev) => ({
@@ -668,16 +674,15 @@ useEffect(() => {
               <label className="mb-2 block text-sm font-semibold text-slate-700">
                 Select Address
               </label>
-              <input
-                id={addressInputId}
-                type="text"
-                defaultValue={draft.postcode}
-                placeholder="Start typing postcode or address"
-                className="w-full rounded-2xl border border-slate-300 px-4 py-3 uppercase"
+
+              <div
+                id={lookupContainerId}
+                className="rounded-2xl"
               />
+
               <p className="mt-2 text-xs text-slate-500">
                 {scriptLoaded
-                  ? "Choose your address from the getAddress dropdown suggestions."
+                  ? "Enter the postcode and use Find Address, then choose from the dropdown."
                   : "Loading address lookup..."}
               </p>
             </div>
