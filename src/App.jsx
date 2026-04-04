@@ -69,7 +69,7 @@ export default function App() {
             <img
               src="/logo.jpeg"
               alt="RefreshaBin logo"
-              className="mt-7 w-full max-w-xl mx-auto"
+              className="mt-7 w-full max-w-2xl mx-auto"
             />
 
             <p className="mt-6 max-w-2xl text-lg leading-8 text-slate-600">
