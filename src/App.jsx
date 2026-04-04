@@ -415,65 +415,84 @@ function BookingModal({ draft, onClose, getAddressToken }) {
     []
   );
 
-  useEffect(() => {
-    if (!getAddressToken) {
-      setAddressError("Missing VITE_GETADDRESS_TOKEN.");
-      return;
+useEffect(() => {
+  if (!getAddressToken) {
+    setAddressError("Missing VITE_GETADDRESS_TOKEN.");
+    return;
+  }
+
+  const scriptId = "getaddress-script";
+
+  const initLookup = () => {
+    if (!window.getAddress) return;
+
+    try {
+      setAddressError("");
+      setScriptLoaded(true);
+
+      window.getAddress.find(
+        addressInputId,
+        getAddressToken,
+        {
+          input: draft.postcode,
+          output_fields: {
+            line_1: "line1",
+            line_2: "line2",
+            line_3: "line3",
+            town_or_city: "city",
+            county: "county",
+            postcode: "postcode",
+          },
+          on_address_selected: (address) => {
+            const fullAddress = [
+              address.line_1,
+              address.line_2,
+              address.line_3,
+              address.town_or_city,
+              address.county,
+              address.postcode,
+            ]
+              .filter(Boolean)
+              .join(", ");
+
+            setFormData((prev) => ({
+              ...prev,
+              addressLine: fullAddress,
+              postcode: address.postcode,
+            }));
+          },
+        }
+      );
+    } catch (error) {
+      console.error("getAddress init failed:", error);
+      setAddressError("Address lookup failed.");
     }
+  };
 
-    const scriptId = "getaddress-script";
+  const existingScript = document.getElementById(scriptId);
 
-    const initAutocomplete = () => {
-      const input = document.getElementById(addressInputId);
-      if (!window.getAddress || !input) return;
+  if (existingScript) {
+    if (window.getAddress) initLookup();
+    else existingScript.addEventListener("load", initLookup);
+    return () => existingScript.removeEventListener("load", initLookup);
+  }
 
-      try {
-        setAddressError("");
-        setScriptLoaded(true);
+  const script = document.createElement("script");
+  script.id = scriptId;
+  script.src = "https://cdn.getaddress.io/scripts/getaddress-3.0.17.min.js";
+  script.async = true;
+  script.onload = initLookup;
+  script.onerror = () => {
+    setAddressError("Failed to load address lookup.");
+  };
 
-        input.value = draft.postcode || "";
+  document.body.appendChild(script);
 
-        window.getAddress.autocomplete(
-          addressInputId,
-          getAddressToken,
-          {
-            show_postcode: true,
-            enable_repositioning: true,
-            suggestion_count: 6,
-            input_focus_on_select: false,
-            bind_output_fields: false,
-            list_style:
-              "z-index:999999; position:absolute; background:white; border:1px solid #cbd5e1; border-radius:16px; box-shadow:0 10px 30px rgba(0,0,0,0.12); overflow:hidden;",
-            list_item_style:
-              "padding:12px 14px; font-size:14px; border-bottom:1px solid #e2e8f0; cursor:pointer; background:white;",
-            selected: (address) => {
-              const fullAddress = [
-                address?.line_1,
-                address?.line_2,
-                address?.line_3,
-                address?.line_4,
-                address?.town_or_city,
-                address?.county,
-                address?.postcode,
-              ]
-                .filter(Boolean)
-                .join(", ");
-
-              setFormData((prev) => ({
-                ...prev,
-                addressLine: fullAddress,
-                postcode: address?.postcode || prev.postcode,
-              }));
-            },
-          }
-        );
-      } catch (error) {
-        console.error("getAddress init failed:", error);
-        setAddressError(
-          "We couldn’t load address lookup. Please type your full address manually below."
-        );
-      }
-    };
+  return () => {
+    script.onload = null;
+    script.onerror = null;
+  };
+}, [draft.postcode]);
 
     const existingScript = document.getElementById(scriptId);
 
