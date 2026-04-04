@@ -66,9 +66,11 @@ export default function App() {
               ))}
             </div>
 
-            <h1 className="mt-7 max-w-3xl text-5xl font-black tracking-tight text-[#0c2340] sm:text-6xl">
-              Professional bin cleaning services across County Down
-            </h1>
+            <img
+              src="/logo.jpeg"
+              alt="RefreshaBin logo"
+              className="mt-7 max-w-3xl w-full sm:max-w-lg"
+            />
 
             <p className="mt-6 max-w-2xl text-lg leading-8 text-slate-600">
               RefreshaBin provides reliable domestic and commercial bin cleaning throughout County Down.
