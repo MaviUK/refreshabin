@@ -21,7 +21,7 @@ export default function App() {
   ];
 
   const pricing = [
-    { title: "One-Off Clean", price: "£6", note: "A convenient single clean for bins that need freshened up" },
+    { title: "One-Off Clean", price: "£15", note: "A convenient single clean for bins that need freshened up" },
     { title: "4 Weekly Service", price: "£5", note: "Our most popular regular cleaning option" },
     { title: "Commercial Quote", price: "Custom", note: "Tailored pricing for larger sites and business needs" },
   ];
