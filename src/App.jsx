@@ -69,7 +69,7 @@ export default function App() {
             <img
               src="/logo.jpeg"
               alt="RefreshaBin logo"
-              className="mt-7 w-full max-w-2xl mx-auto"
+              className="mt-1 w-full max-w-2xl mx-auto"
             />
 
             <p className="mt-6 max-w-2xl text-lg leading-8 text-slate-600">
@@ -278,23 +278,29 @@ export default function App() {
         </div>
       </section>
 
-      {/* Mobile Bottom Contact Bar */}
-      <div className="fixed bottom-0 left-0 right-0 z-50 border-t border-white/20 bg-white/95 p-3 shadow-[0_-10px_30px_rgba(0,0,0,0.08)] backdrop-blur md:hidden">
-        <div className="grid grid-cols-2 gap-3">
-          <a
-            href="https://wa.me/447835843481"
-            target="_blank"
-            rel="noreferrer"
-            className="rounded-full bg-[#22a94f] px-4 py-3 text-center text-sm font-bold text-white shadow-lg"
-          >
-            Chat
-          </a>
-          <a
-            href="tel:+447835843481"
-            className="rounded-full bg-gradient-to-r from-[#0d67c2] to-[#18a7f5] px-4 py-3 text-center text-sm font-bold text-white shadow-lg"
-          >
-            Call Us
-          </a>
+     {/* Mobile Bottom Contact Bar */}
+<div className="fixed bottom-0 left-0 right-0 z-50 border-t border-white/20 bg-white/95 p-2 shadow-[0_-10px_30px_rgba(0,0,0,0.08)] backdrop-blur md:hidden">
+  <div className="grid grid-cols-3 gap-2">
+    <a
+      href="#book"
+      className="rounded-full bg-gradient-to-r from-[#0d67c2] to-[#18a7f5] px-2 py-3 text-center text-xs font-bold text-white shadow-lg"
+    >
+      Book Now
+    </a>
+    <a
+      href="https://wa.me/447835843481"
+      target="_blank"
+      rel="noreferrer"
+      className="rounded-full bg-[#22a94f] px-2 py-3 text-center text-xs font-bold text-white shadow-lg"
+    >
+      Chat
+    </a>
+    <a
+      href="tel:+447835843481"
+      className="rounded-full bg-gradient-to-r from-[#0d67c2] to-[#18a7f5] px-2 py-3 text-center text-xs font-bold text-white shadow-lg"
+    >
+      Call Us
+    </a>
         </div>
       </div>
     </div>
