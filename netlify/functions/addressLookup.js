@@ -1,6 +1,8 @@
 exports.handler = async (event) => {
   try {
-    const postcode = (event.queryStringParameters.postcode || "").trim();
+    let postcode = (event.queryStringParameters.postcode || "")
+      .trim()
+      .toUpperCase();
 
     if (!postcode) {
       return {
@@ -12,9 +14,7 @@ exports.handler = async (event) => {
     const apiKey = process.env.GETADDRESS_API_KEY;
 
     const response = await fetch(
-      `https://api.getAddress.io/find/${encodeURIComponent(
-        postcode
-      )}?api-key=${apiKey}`
+      `https://api.getAddress.io/find/${encodeURIComponent(postcode)}?api-key=${apiKey}`
     );
 
     const data = await response.json();
@@ -27,8 +27,8 @@ exports.handler = async (event) => {
     }
 
     const addresses = (data.addresses || []).map((addr) => ({
-      label: `${addr}, ${postcode.toUpperCase()}`,
-      value: `${addr}, ${postcode.toUpperCase()}`,
+      label: `${addr}, ${postcode}`,
+      value: `${addr}, ${postcode}`,
     }));
 
     return {
@@ -36,7 +36,7 @@ exports.handler = async (event) => {
       body: JSON.stringify({ addresses }),
     };
   } catch (error) {
-    console.error(error);
+    console.error("ERROR:", error);
 
     return {
       statusCode: 500,
