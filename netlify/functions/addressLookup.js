@@ -1,6 +1,6 @@
 exports.handler = async (event) => {
   try {
-    let postcode = (event.queryStringParameters.postcode || "")
+    const postcode = (event.queryStringParameters.postcode || "")
       .trim()
       .toUpperCase();
 
@@ -13,20 +13,52 @@ exports.handler = async (event) => {
 
     const apiKey = process.env.GETADDRESS_API_KEY;
 
-    const response = await fetch(
-      `https://api.getAddress.io/find/${encodeURIComponent(postcode)}?api-key=${apiKey}`
-    );
+    if (!apiKey) {
+      return {
+        statusCode: 500,
+        body: JSON.stringify({ error: "Missing GETADDRESS_API_KEY" }),
+      };
+    }
 
-    const data = await response.json();
+    const url = `https://api.getAddress.io/find/${encodeURIComponent(
+      postcode
+    )}?api-key=${encodeURIComponent(apiKey)}`;
+
+    const response = await fetch(url, {
+      headers: {
+        Accept: "application/json",
+      },
+    });
+
+    const rawText = await response.text();
+
+    console.log("Lookup postcode:", postcode);
+    console.log("Status:", response.status);
+    console.log("Raw response:", rawText);
+
+    let data = null;
+
+    try {
+      data = rawText ? JSON.parse(rawText) : null;
+    } catch (parseError) {
+      return {
+        statusCode: 500,
+        body: JSON.stringify({
+          error: "Address API did not return valid JSON",
+          raw: rawText,
+          status: response.status,
+        }),
+      };
+    }
 
     if (!response.ok) {
       return {
         statusCode: response.status,
-        body: JSON.stringify(data),
+        body: JSON.stringify(data || { error: "Address lookup failed" }),
       };
     }
 
-    const addresses = (data.addresses || []).map((addr) => ({
+    const addresses = (data?.addresses || []).map((addr) => ({
       label: `${addr}, ${postcode}`,
       value: `${addr}, ${postcode}`,
     }));
@@ -36,11 +68,13 @@ exports.handler = async (event) => {
       body: JSON.stringify({ addresses }),
     };
   } catch (error) {
-    console.error("ERROR:", error);
+    console.error("addressLookup error:", error);
 
     return {
       statusCode: 500,
-      body: JSON.stringify({ error: "Address lookup failed" }),
+      body: JSON.stringify({
+        error: error.message || "Address lookup failed",
+      }),
     };
   }
 };
