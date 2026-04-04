@@ -683,12 +683,15 @@ function BookingModal({ draft, onClose }) {
 }
 
 async function fetchAddressesByPostcode(postcode) {
-  const cleanPostcode = postcode.trim().toUpperCase();
+  const response = await fetch(
+    `/.netlify/functions/addressLookup?postcode=${encodeURIComponent(postcode)}`
+  );
 
-  return [
-    `1 Main Street, ${cleanPostcode}`,
-    `2 Main Street, ${cleanPostcode}`,
-    `3 Main Street, ${cleanPostcode}`,
-    `4 Main Street, ${cleanPostcode}`,
-  ];
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(data.error || "Failed to fetch addresses");
+  }
+
+  return data.addresses.map((item) => item.label);
 }
