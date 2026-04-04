@@ -31,7 +31,7 @@ export default function App() {
       <header className="sticky top-0 z-20 border-b border-[#cfe7ff] bg-white/90 backdrop-blur">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
           <div className="flex items-center gap-4">
-            <img src="/logo.jpeg" alt="RefreshaBin logo" className="h-14 w-full sm:h-16" />
+            <img src="/logo.jpeg" alt="RefreshaBin logo" className="mt-7 max-w-3xl w-full sm:max-w-lg" />
           </div>
 
           <nav className="hidden items-center gap-8 text-sm font-semibold text-slate-700 md:flex">
