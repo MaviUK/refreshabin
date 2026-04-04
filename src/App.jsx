@@ -1,4 +1,6 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
+
+const GETADDRESS_TOKEN = import.meta.env.VITE_GETADDRESS_TOKEN || "";
 
 export default function App() {
   const services = [
@@ -158,7 +160,7 @@ export default function App() {
                 onChange={(e) =>
                   setBookingDraft((prev) => ({
                     ...prev,
-                    postcode: e.target.value,
+                    postcode: e.target.value.toUpperCase(),
                   }))
                 }
                 className="w-full rounded-2xl border border-[#cbe7ff] px-4 py-4 uppercase outline-none placeholder:text-slate-400 focus:border-[#18a7f5]"
@@ -359,6 +361,7 @@ export default function App() {
         <BookingModal
           draft={bookingDraft}
           onClose={() => setShowBookingModal(false)}
+          getAddressToken={GETADDRESS_TOKEN}
         />
       )}
 
@@ -390,14 +393,12 @@ export default function App() {
   );
 }
 
-function BookingModal({ draft, onClose }) {
-  const [addresses, setAddresses] = useState([]);
-  const [loadingAddresses, setLoadingAddresses] = useState(true);
-  const [addressError, setAddressError] = useState("");
-  const [selectedAddress, setSelectedAddress] = useState("");
+function BookingModal({ draft, onClose, getAddressToken }) {
   const [termsOpened, setTermsOpened] = useState(false);
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [sending, setSending] = useState(false);
+  const [addressError, setAddressError] = useState("");
+  const [scriptLoaded, setScriptLoaded] = useState(false);
 
   const [formData, setFormData] = useState({
     name: "",
@@ -409,37 +410,89 @@ function BookingModal({ draft, onClose }) {
     bins: draft.bins,
   });
 
+  const addressInputId = useMemo(
+    () => `getaddress-find-${Math.random().toString(36).slice(2, 9)}`,
+    []
+  );
+
   useEffect(() => {
-    let ignore = false;
-
-    async function loadAddresses() {
-      try {
-        setLoadingAddresses(true);
-        setAddressError("");
-        const found = await fetchAddressesByPostcode(draft.postcode);
-
-        if (!ignore) {
-          setAddresses(found);
-        }
-      } catch (error) {
-        console.error("Address lookup failed:", error);
-        if (!ignore) {
-          setAddresses([]);
-          setAddressError("We couldn’t load addresses for this postcode. Please enter your full address manually below.");
-        }
-      } finally {
-        if (!ignore) {
-          setLoadingAddresses(false);
-        }
-      }
+    if (!getAddressToken) {
+      setAddressError("Missing VITE_GETADDRESS_TOKEN.");
+      return;
     }
 
-    loadAddresses();
+    const scriptId = "getaddress-script";
+    const existingScript = document.getElementById(scriptId);
+
+    const initialise = () => {
+      if (!window.getAddress || !document.getElementById(addressInputId)) return;
+
+      try {
+        setAddressError("");
+        setScriptLoaded(true);
+
+        const input = document.getElementById(addressInputId);
+        input.value = draft.postcode || "";
+
+        window.getAddress.find(
+          addressInputId,
+          getAddressToken,
+          undefined,
+          (address) => {
+            const fullAddress =
+              address?.formatted_address?.join(", ") ||
+              address?.formatted_address?.filter(Boolean)?.join(", ") ||
+              [
+                address?.line_1,
+                address?.line_2,
+                address?.line_3,
+                address?.line_4,
+                address?.town_or_city,
+                address?.county,
+                address?.postcode,
+              ]
+                .filter(Boolean)
+                .join(", ");
+
+            setFormData((prev) => ({
+              ...prev,
+              addressLine: fullAddress,
+              postcode: address?.postcode || prev.postcode,
+            }));
+          }
+        );
+      } catch (error) {
+        console.error("getAddress init failed:", error);
+        setAddressError("We couldn’t load address lookup. Please type your full address manually below.");
+      }
+    };
+
+    if (existingScript) {
+      if (window.getAddress) {
+        initialise();
+      } else {
+        existingScript.addEventListener("load", initialise);
+        return () => existingScript.removeEventListener("load", initialise);
+      }
+      return;
+    }
+
+    const script = document.createElement("script");
+    script.id = scriptId;
+    script.src = "https://cdn.getaddress.io/scripts/getaddress-3.0.17.min.js";
+    script.async = true;
+    script.onload = initialise;
+    script.onerror = () => {
+      setAddressError("Couldn’t load the address lookup script. Please type your full address manually below.");
+    };
+
+    document.body.appendChild(script);
 
     return () => {
-      ignore = true;
+      script.onload = null;
+      script.onerror = null;
     };
-  }, [draft.postcode]);
+  }, [addressInputId, draft.postcode, getAddressToken]);
 
   const updateBin = (index, field, value) => {
     setFormData((prev) => ({
@@ -471,21 +524,13 @@ function BookingModal({ draft, onClose }) {
     }));
   };
 
-  const handleAddressChange = (value) => {
-    setSelectedAddress(value);
-    setFormData((prev) => ({
-      ...prev,
-      addressLine: value,
-    }));
-  };
-
   const handleSubmit = async (e) => {
     e.preventDefault();
 
     if (!termsAccepted) return;
 
     if (!formData.addressLine.trim()) {
-      alert("Please select or enter your address.");
+      alert("Please select or enter your full address.");
       return;
     }
 
@@ -591,21 +636,18 @@ function BookingModal({ draft, onClose }) {
             <label className="mb-2 block text-sm font-semibold text-slate-700">
               Select Address
             </label>
-            <select
-              value={selectedAddress}
-              onChange={(e) => handleAddressChange(e.target.value)}
-              className="w-full rounded-2xl border border-slate-300 px-4 py-3"
-              disabled={loadingAddresses || addresses.length === 0}
-            >
-              <option value="">
-                {loadingAddresses ? "Loading addresses..." : "Choose your address"}
-              </option>
-              {addresses.map((address) => (
-                <option key={address.id} value={address.value}>
-                  {address.label}
-                </option>
-              ))}
-            </select>
+            <input
+              id={addressInputId}
+              type="text"
+              defaultValue={draft.postcode}
+              placeholder="Enter postcode or start typing address"
+              className="w-full rounded-2xl border border-slate-300 px-4 py-3 uppercase"
+            />
+            <p className="mt-2 text-xs text-slate-500">
+              {scriptLoaded
+                ? "Choose your address from the getAddress dropdown suggestions."
+                : "Loading address lookup..."}
+            </p>
           </div>
 
           {addressError && (
@@ -705,18 +747,4 @@ function BookingModal({ draft, onClose }) {
       </div>
     </div>
   );
-}
-
-async function fetchAddressesByPostcode(postcode) {
-  const response = await fetch(
-    `/.netlify/functions/addressLookup?postcode=${encodeURIComponent(postcode)}`
-  );
-
-  const data = await response.json();
-
-  if (!response.ok) {
-    throw new Error(data.error || data.message || "Failed to fetch addresses");
-  }
-
-  return data.addresses || [];
 }
