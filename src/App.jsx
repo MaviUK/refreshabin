@@ -55,7 +55,7 @@ export default function App() {
 
         <div className="relative mx-auto grid max-w-7xl gap-10 px-6 py-14 lg:grid-cols-[1.15fr_0.85fr] lg:items-center lg:py-20">
           <div>
-            <div className="inline-flex flex-wrap gap-2">
+            <div className="hidden md:inline-flex flex-wrap gap-2">
               {highlights.map((item) => (
                 <span
                   key={item}
@@ -71,12 +71,6 @@ export default function App() {
               alt="RefreshaBin logo"
               className="mt-7 w-full max-w-2xl mx-auto"
             />
-
-            const highlights = [
-    "Domestic & Commercial",
-    "Hygienic, Fresh Bins",
-    "Reliable Scheduled Service",
-  ];
 
             <p className="mt-6 max-w-2xl text-lg leading-8 text-slate-600">
               RefreshaBin provides reliable domestic and commercial bin cleaning throughout County Down.
