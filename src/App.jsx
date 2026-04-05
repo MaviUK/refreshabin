@@ -1,6 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
-
-const GETADDRESS_TOKEN = import.meta.env.VITE_GETADDRESS_TOKEN || "";
+import React, { useState } from "react";
 
 export default function App() {
   const services = [
@@ -361,7 +359,6 @@ export default function App() {
         <BookingModal
           draft={bookingDraft}
           onClose={() => setShowBookingModal(false)}
-          getAddressToken={GETADDRESS_TOKEN}
         />
       )}
 
@@ -393,12 +390,10 @@ export default function App() {
   );
 }
 
-function BookingModal({ draft, onClose, getAddressToken }) {
+function BookingModal({ draft, onClose }) {
   const [termsOpened, setTermsOpened] = useState(false);
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [sending, setSending] = useState(false);
-  const [addressError, setAddressError] = useState("");
-  const [scriptLoaded, setScriptLoaded] = useState(false);
 
   const [formData, setFormData] = useState({
     name: "",
@@ -409,127 +404,6 @@ function BookingModal({ draft, onClose, getAddressToken }) {
     date: draft.date,
     bins: draft.bins,
   });
-
-  const lookupContainerId = useMemo(
-    () => `postcode_lookup_${Math.random().toString(36).slice(2, 9)}`,
-    []
-  );
-
-  useEffect(() => {
-    if (!getAddressToken) {
-      setAddressError("Missing VITE_GETADDRESS_TOKEN.");
-      return;
-    }
-
-    const scriptId = "getaddress-find-script";
-
-    const handleSelected = (e) => {
-      const address = e?.address || {};
-      const fullAddress = [
-        address.line_1,
-        address.line_2,
-        address.line_3,
-        address.line_4,
-        address.town_or_city,
-        address.county,
-        address.postcode,
-      ]
-        .filter(Boolean)
-        .join(", ");
-
-      setFormData((prev) => ({
-        ...prev,
-        addressLine: fullAddress,
-        postcode: address.postcode || prev.postcode,
-      }));
-    };
-
-    const handleFailed = (e) => {
-      console.error("getAddress failed:", e?.status, e?.message);
-      setAddressError(e?.message || "Address lookup failed.");
-    };
-
-    const initLookup = () => {
-      if (!window.getAddress) return;
-
-      try {
-        setAddressError("");
-        setScriptLoaded(true);
-
-        const container = document.getElementById(lookupContainerId);
-        if (container) container.innerHTML = "";
-
-        document.addEventListener("getaddress-find-address-selected", handleSelected);
-        document.addEventListener("getaddress-find-suggestions-failed", handleFailed);
-        document.addEventListener("getaddress-find-address-selected-failed", handleFailed);
-
-        window.getAddress.find(lookupContainerId, getAddressToken, {
-          input: {
-            id: `${lookupContainerId}_input`,
-            name: "postcode_lookup",
-            class: "w-full rounded-2xl border border-slate-300 px-4 py-3 uppercase outline-none",
-            label: "Enter your postcode",
-          },
-          button: {
-            id: `${lookupContainerId}_button`,
-            class: "mt-3 w-full rounded-2xl bg-gradient-to-r from-[#0d67c2] via-[#0d83dc] to-[#18a7f5] px-4 py-3 text-sm font-semibold text-white shadow-lg",
-            label: "Find Address",
-            disabled_message: "Enter postcode first",
-          },
-          dropdown: {
-            id: `${lookupContainerId}_dropdown`,
-            class: "mt-3 w-full rounded-2xl border border-slate-300 px-4 py-3 bg-white text-slate-900",
-            select_message: "Choose your address",
-          },
-          error_message: {
-            id: `${lookupContainerId}_error`,
-            class: "mt-2 text-sm text-red-600",
-            not_found: "Address not found",
-          },
-        });
-
-        const generatedInput = document.getElementById(`${lookupContainerId}_input`);
-        if (generatedInput) {
-          generatedInput.value = draft.postcode || "";
-        }
-      } catch (error) {
-        console.error("getAddress init failed:", error);
-        setAddressError("Address lookup failed.");
-      }
-    };
-
-    const existingScript = document.getElementById(scriptId);
-
-    if (existingScript) {
-      if (window.getAddress) {
-        initLookup();
-      } else {
-        existingScript.addEventListener("load", initLookup);
-      }
-    } else {
-      const script = document.createElement("script");
-      script.id = scriptId;
-      script.src = "https://cdn.getaddress.io/scripts/getaddress-find-2.1.0.min.js";
-      script.async = true;
-      script.onload = initLookup;
-      script.onerror = () => {
-        setAddressError("Failed to load address lookup.");
-      };
-      document.body.appendChild(script);
-    }
-
-    return () => {
-      document.removeEventListener("getaddress-find-address-selected", handleSelected);
-      document.removeEventListener("getaddress-find-suggestions-failed", handleFailed);
-      document.removeEventListener("getaddress-find-address-selected-failed", handleFailed);
-
-      const existing = document.getElementById(scriptId);
-      if (existing) {
-        existing.onload = null;
-        existing.onerror = null;
-      }
-    };
-  }, [draft.postcode, getAddressToken, lookupContainerId]);
 
   const updateBin = (index, field, value) => {
     setFormData((prev) => ({
@@ -567,7 +441,7 @@ function BookingModal({ draft, onClose, getAddressToken }) {
     if (!termsAccepted) return;
 
     if (!formData.addressLine.trim()) {
-      alert("Please select or enter your full address.");
+      alert("Please enter your full address.");
       return;
     }
 
@@ -604,7 +478,13 @@ function BookingModal({ draft, onClose, getAddressToken }) {
           Book a Bin Clean
         </h2>
 
-        <div className="max-h-[75vh] overflow-y-auto pr-1">
+        <div
+          className="max-h-[75vh] overflow-y-auto pr-2 popup-scroll"
+          style={{
+            scrollbarWidth: "thin",
+            scrollbarColor: "#94a3b8 transparent",
+          }}
+        >
           <form className="space-y-4" onSubmit={handleSubmit}>
             <input
               type="text"
@@ -670,26 +550,17 @@ function BookingModal({ draft, onClose, getAddressToken }) {
               + Add Another Bin
             </button>
 
-            <div className="relative">
+            <div>
               <label className="mb-2 block text-sm font-semibold text-slate-700">
-                Select Address
+                Postcode
               </label>
-
-              <div
-                id={lookupContainerId}
-                className="rounded-2xl"
+              <input
+                type="text"
+                value={formData.postcode}
+                readOnly
+                className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 uppercase"
               />
-
-              <p className="mt-2 text-xs text-slate-500">
-                {scriptLoaded
-                  ? "Enter the postcode and use Find Address, then choose from the dropdown."
-                  : "Loading address lookup..."}
-              </p>
             </div>
-
-            {addressError && (
-              <p className="text-sm text-red-600">{addressError}</p>
-            )}
 
             <input
               type="text"
@@ -699,13 +570,6 @@ function BookingModal({ draft, onClose, getAddressToken }) {
                 setFormData((prev) => ({ ...prev, addressLine: e.target.value }))
               }
               className="w-full rounded-2xl border border-slate-300 px-4 py-3"
-            />
-
-            <input
-              type="text"
-              value={formData.postcode}
-              readOnly
-              className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3"
             />
 
             <input
