@@ -29,16 +29,16 @@ export default function App() {
   ];
 
   const [bookingDraft, setBookingDraft] = useState({
-    postcode: "",
-    bins: [
-      {
-        binType: "General Waste Bin",
-        cleanType: "One-Off Clean",
-        quantity: 1,
-      },
-    ],
-    date: "",
-  });
+  postcode: "",
+  bins: [
+    {
+      binType: "General Waste Bin",
+      cleanType: "One-Off Clean",
+      quantity: 1,
+      date: "",
+    },
+  ],
+});
 
   const [showBookingModal, setShowBookingModal] = useState(false);
 
@@ -46,11 +46,11 @@ export default function App() {
     e.preventDefault();
 
     if (
-      !bookingDraft.postcode.trim() ||
-      !bookingDraft.bins[0].binType ||
-      !bookingDraft.bins[0].cleanType ||
-      !bookingDraft.date
-    ) {
+  !bookingDraft.postcode.trim() ||
+  !bookingDraft.bins[0].binType ||
+  !bookingDraft.bins[0].cleanType ||
+  !bookingDraft.bins[0].date
+) {
       alert("Please complete postcode, bin type, clean type, and date.");
       return;
     }
@@ -207,16 +207,21 @@ export default function App() {
               </select>
 
               <input
-                type="date"
-                value={bookingDraft.date}
-                onChange={(e) =>
-                  setBookingDraft((prev) => ({
-                    ...prev,
-                    date: e.target.value,
-                  }))
-                }
-                className="w-full rounded-2xl border border-[#cbe7ff] px-4 py-4 outline-none focus:border-[#18a7f5]"
-              />
+  type="date"
+  value={bookingDraft.bins[0].date}
+  onChange={(e) =>
+    setBookingDraft((prev) => ({
+      ...prev,
+      bins: [
+        {
+          ...prev.bins[0],
+          date: e.target.value,
+        },
+      ],
+    }))
+  }
+  className="w-full rounded-2xl border border-[#cbe7ff] px-4 py-4 outline-none focus:border-[#18a7f5]"
+/>
 
               <button
                 type="submit"
@@ -395,15 +400,14 @@ function BookingModal({ draft, onClose }) {
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [sending, setSending] = useState(false);
 
-  const [formData, setFormData] = useState({
-    name: "",
-    postcode: draft.postcode,
-    addressLine: "",
-    phone: "",
-    email: "",
-    date: draft.date,
-    bins: draft.bins,
-  });
+ const [formData, setFormData] = useState({
+  name: "",
+  postcode: draft.postcode,
+  addressLine: "",
+  phone: "",
+  email: "",
+  bins: draft.bins,
+});
 
   const updateBin = (index, field, value) => {
     setFormData((prev) => ({
@@ -414,19 +418,20 @@ function BookingModal({ draft, onClose }) {
     }));
   };
 
-  const addAnotherBin = () => {
-    setFormData((prev) => ({
-      ...prev,
-      bins: [
-        ...prev.bins,
-        {
-          binType: "General Waste Bin",
-          cleanType: prev.bins[0]?.cleanType || "One-Off Clean",
-          quantity: 1,
-        },
-      ],
-    }));
-  };
+const addAnotherBin = () => {
+  setFormData((prev) => ({
+    ...prev,
+    bins: [
+      ...prev.bins,
+      {
+        binType: "General Waste Bin",
+        cleanType: prev.bins[0]?.cleanType || "One-Off Clean",
+        quantity: 1,
+        date: "",
+      },
+    ],
+  }));
+};
 
   const removeBin = (index) => {
     setFormData((prev) => ({
@@ -497,50 +502,57 @@ function BookingModal({ draft, onClose }) {
             />
 
             {formData.bins.map((bin, index) => (
-              <div key={index} className="space-y-3 rounded-2xl border border-slate-200 p-3">
-                <div className="grid grid-cols-[1fr_90px] gap-3">
-                  <select
-                    value={bin.binType}
-                    onChange={(e) => updateBin(index, "binType", e.target.value)}
-                    className="rounded-2xl border border-slate-300 px-4 py-3"
-                  >
-                    <option>General Waste Bin</option>
-                    <option>Recycling Bin</option>
-                    <option>Garden Bin</option>
-                    <option>Commercial Bin</option>
-                  </select>
+  <div key={index} className="space-y-3 rounded-2xl border border-slate-200 p-3">
+    <div className="grid grid-cols-[1fr_90px] gap-3">
+      <select
+        value={bin.binType}
+        onChange={(e) => updateBin(index, "binType", e.target.value)}
+        className="rounded-2xl border border-slate-300 px-4 py-3"
+      >
+        <option>General Waste Bin</option>
+        <option>Recycling Bin</option>
+        <option>Garden Bin</option>
+        <option>Commercial Bin</option>
+      </select>
 
-                  <input
-                    type="number"
-                    min="1"
-                    value={bin.quantity}
-                    onChange={(e) => updateBin(index, "quantity", Number(e.target.value))}
-                    className="rounded-2xl border border-slate-300 px-4 py-3"
-                  />
-                </div>
+      <input
+        type="number"
+        min="1"
+        value={bin.quantity}
+        onChange={(e) => updateBin(index, "quantity", Number(e.target.value))}
+        className="rounded-2xl border border-slate-300 px-4 py-3"
+      />
+    </div>
 
-                <select
-                  value={bin.cleanType}
-                  onChange={(e) => updateBin(index, "cleanType", e.target.value)}
-                  className="w-full rounded-2xl border border-slate-300 px-4 py-3"
-                >
-                  <option>One-Off Clean</option>
-                  <option>Every 4 Weeks</option>
-                  <option>Monthly Service</option>
-                  <option>Commercial Quote Request</option>
-                </select>
+    <select
+      value={bin.cleanType}
+      onChange={(e) => updateBin(index, "cleanType", e.target.value)}
+      className="w-full rounded-2xl border border-slate-300 px-4 py-3"
+    >
+      <option>One-Off Clean</option>
+      <option>Every 4 Weeks</option>
+      <option>Monthly Service</option>
+      <option>Commercial Quote Request</option>
+    </select>
 
-                {formData.bins.length > 1 && (
-                  <button
-                    type="button"
-                    onClick={() => removeBin(index)}
-                    className="text-sm font-semibold text-red-600"
-                  >
-                    Remove Bin
-                  </button>
-                )}
-              </div>
-            ))}
+    <input
+      type="date"
+      value={bin.date || ""}
+      onChange={(e) => updateBin(index, "date", e.target.value)}
+      className="w-full rounded-2xl border border-slate-300 px-4 py-3"
+    />
+
+    {formData.bins.length > 1 && (
+      <button
+        type="button"
+        onClick={() => removeBin(index)}
+        className="text-sm font-semibold text-red-600"
+      >
+        Remove Bin
+      </button>
+    )}
+  </div>
+))}
 
             <button
               type="button"
@@ -592,14 +604,6 @@ function BookingModal({ draft, onClose }) {
               className="w-full rounded-2xl border border-slate-300 px-4 py-3"
             />
 
-            <input
-              type="date"
-              value={formData.date}
-              onChange={(e) =>
-                setFormData((prev) => ({ ...prev, date: e.target.value }))
-              }
-              className="w-full rounded-2xl border border-slate-300 px-4 py-3"
-            />
 
             <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
               <button
