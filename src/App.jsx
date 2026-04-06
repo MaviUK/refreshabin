@@ -16,6 +16,12 @@ export default function App() {
     },
   ];
 
+  const highlights = [
+    "Domestic & Commercial",
+    "Hygienic, Fresh Bins",
+    "Reliable Scheduled Service",
+  ];
+
   const pricing = [
     {
       title: "One-Off Clean",
@@ -105,22 +111,22 @@ export default function App() {
 
         <div className="relative mx-auto grid max-w-7xl gap-10 px-6 py-8 md:py-14 lg:grid-cols-[1.15fr_0.85fr] lg:items-center lg:py-20">
           <div>
-            <div className="hidden md:inline-flex flex-wrap gap-2">
-              {highlights.map((item) => (
-                <span
-                  key={item}
-                  className="rounded-full border border-[#c8e6ff] bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm"
-                >
-                  {item}
-                </span>
-              ))}
-            </div>
+            <div className="mb-8 hidden md:inline-flex flex-wrap gap-2">
+  {highlights.map((item) => (
+    <span
+      key={item}
+      className="rounded-full border border-[#c8e6ff] bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm"
+    >
+      {item}
+    </span>
+  ))}
+</div>
 
-            <img
-              src="/logo.jpeg"
-              alt="RefreshaBin logo"
-              className="mt-0 mx-auto w-full max-w-2xl"
-            />
+<img
+  src="/logo.jpeg"
+  alt="RefreshaBin logo"
+  className="mx-auto w-full max-w-2xl"
+/>
 
             <p className="mt-6 max-w-2xl text-lg leading-8 text-slate-600">
               At RefreshaBin, we support local families across County Down by keeping bins clean, fresh, and odour-free. With flexible one-off cleans and simple 4-weekly plans, we help take one less job off your hands.
