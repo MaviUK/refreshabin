@@ -442,8 +442,8 @@ function BookingModal({ draft, onClose }) {
 
   const isFormComplete =
     formData.name.trim() !== "" &&
-    formData.addressLine.trim() !== "" &&
     formData.postcode.trim() !== "" &&
+     formData.addressLine.trim() !== "" &&
     formData.phone.trim() !== "" &&
     formData.email.trim() !== "" &&
     termsAccepted &&
@@ -460,8 +460,8 @@ function BookingModal({ draft, onClose }) {
     e.preventDefault();
 
     const nameValid = formData.name.trim() !== "";
-    const postcodeValid = formData.postcode.trim() !== "";
     const addressValid = formData.addressLine.trim() !== "";
+    const postcodeValid = formData.postcode.trim() !== "";
     const phoneValid = formData.phone.trim() !== "";
     const emailValid = formData.email.trim() !== "";
 
