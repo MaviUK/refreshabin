@@ -3,6 +3,8 @@ export default async () => {
     const pdfjsModule = await import("pdfjs-dist/legacy/build/pdf.js");
     const pdfjsLib = pdfjsModule.default || pdfjsModule;
 
+    pdfjsLib.GlobalWorkerOptions.workerSrc = null;
+
     const pdfUrl =
       "https://www.newrymournedown.org/bin-collections/FRI-Z1.pdf?v=5";
 
@@ -14,7 +16,14 @@ export default async () => {
 
     const arrayBuffer = await response.arrayBuffer();
 
-    const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer });
+    const loadingTask = pdfjsLib.getDocument({
+      data: arrayBuffer,
+      disableWorker: true,
+      useWorkerFetch: false,
+      isEvalSupported: false,
+      useSystemFonts: true,
+    });
+
     const pdf = await loadingTask.promise;
 
     let fullText = "";
