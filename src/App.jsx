@@ -613,14 +613,16 @@ function BookingModal({ draft, onClose }) {
 
     try {
       const response = await fetch("/.netlify/functions/sendBookingEmail", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(formData),
-      });
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify(formData),
+});
 
-      if (!response.ok) {
-        throw new Error("Failed to send booking");
-      }
+const result = await response.json();
+
+if (!response.ok) {
+  throw new Error(result.details || result.error || "Failed to send booking");
+}
 
       alert("Booking sent successfully.");
       onClose();
