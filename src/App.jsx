@@ -40,6 +40,22 @@ export default function App() {
   ],
 });
 
+  const isFormComplete =
+  formData.name.trim() !== "" &&
+  formData.postcode.trim() !== "" &&
+  formData.addressLine.trim() !== "" &&
+  formData.phone.trim() !== "" &&
+  formData.email.trim() !== "" &&
+  termsAccepted &&
+  formData.bins.every(
+    (bin) =>
+      bin.binType?.trim() !== "" &&
+      bin.cleanType?.trim() !== "" &&
+      bin.quantity &&
+      Number(bin.quantity) > 0 &&
+      bin.date?.trim() !== ""
+  );
+
   const [showBookingModal, setShowBookingModal] = useState(false);
 
   const handleContinueBooking = (e) => {
@@ -440,33 +456,80 @@ const addAnotherBin = () => {
     }));
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+const handleSubmit = async (e) => {
+  e.preventDefault();
 
-    if (!termsAccepted) return;
+  const nameValid = formData.name.trim() !== "";
+  const postcodeValid = formData.postcode.trim() !== "";
+  const addressValid = formData.addressLine.trim() !== "";
+  const phoneValid = formData.phone.trim() !== "";
+  const emailValid = formData.email.trim() !== "";
 
-    if (!formData.addressLine.trim()) {
-      alert("Please enter your full address.");
-      return;
+  const allBinsValid = formData.bins.every(
+    (bin) =>
+      bin.binType?.trim() !== "" &&
+      bin.cleanType?.trim() !== "" &&
+      bin.quantity &&
+      Number(bin.quantity) > 0 &&
+      bin.date?.trim() !== ""
+  );
+
+  if (!nameValid) {
+    alert("Please enter your name.");
+    return;
+  }
+
+  if (!postcodeValid) {
+    alert("Postcode is missing.");
+    return;
+  }
+
+  if (!allBinsValid) {
+    alert("Please complete all bin details, including type, quantity, clean type, and date.");
+    return;
+  }
+
+  if (!addressValid) {
+    alert("Please enter your full address.");
+    return;
+  }
+
+  if (!phoneValid) {
+    alert("Please enter your contact number.");
+    return;
+  }
+
+  if (!emailValid) {
+    alert("Please enter your email address.");
+    return;
+  }
+
+  if (!termsAccepted) {
+    alert("Please read and accept the Terms & Conditions.");
+    return;
+  }
+
+  setSending(true);
+
+  try {
+    const response = await fetch("/.netlify/functions/sendBookingEmail", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(formData),
+    });
+
+    if (!response.ok) {
+      throw new Error("Failed to send booking");
     }
 
-    setSending(true);
-
-    try {
-      await fetch("/.netlify/functions/sendBookingEmail", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(formData),
-      });
-
-      alert("Booking sent successfully.");
-      onClose();
-    } catch (error) {
-      console.error(error);
-      alert("Something went wrong sending your booking.");
-    } finally {
-      setSending(false);
-    }
+    alert("Booking sent successfully.");
+    onClose();
+  } catch (error) {
+    console.error(error);
+    alert("Something went wrong sending your booking.");
+  } finally {
+    setSending(false);
+  }
   };
 
   return (
@@ -638,16 +701,16 @@ const addAnotherBin = () => {
             </div>
 
             <button
-              type="submit"
-              disabled={!termsAccepted || sending}
-              className={`w-full rounded-2xl py-4 text-sm font-semibold text-white ${
-                !termsAccepted || sending
-                  ? "cursor-not-allowed bg-slate-300"
-                  : "bg-gradient-to-r from-[#0d67c2] via-[#0d83dc] to-[#18a7f5]"
-              }`}
-            >
-              {sending ? "Sending..." : "Send Booking"}
-            </button>
+  type="submit"
+  disabled={!isFormComplete || sending}
+  className={`w-full rounded-2xl py-4 text-sm font-semibold text-white ${
+    !isFormComplete || sending
+      ? "cursor-not-allowed bg-slate-300"
+      : "bg-gradient-to-r from-[#0d67c2] via-[#0d83dc] to-[#18a7f5]"
+  }`}
+>
+  {sending ? "Sending..." : "Send Booking"}
+</button>
           </form>
         </div>
       </div>
