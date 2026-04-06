@@ -40,22 +40,6 @@ export default function App() {
   ],
 });
 
-  const isFormComplete =
-  formData.name.trim() !== "" &&
-  formData.postcode.trim() !== "" &&
-  formData.addressLine.trim() !== "" &&
-  formData.phone.trim() !== "" &&
-  formData.email.trim() !== "" &&
-  termsAccepted &&
-  formData.bins.every(
-    (bin) =>
-      bin.binType?.trim() !== "" &&
-      bin.cleanType?.trim() !== "" &&
-      bin.quantity &&
-      Number(bin.quantity) > 0 &&
-      bin.date?.trim() !== ""
-  );
-
   const [showBookingModal, setShowBookingModal] = useState(false);
 
   const handleContinueBooking = (e) => {
@@ -416,14 +400,14 @@ function BookingModal({ draft, onClose }) {
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [sending, setSending] = useState(false);
 
- const [formData, setFormData] = useState({
-  name: "",
-  postcode: draft.postcode,
-  addressLine: "",
-  phone: "",
-  email: "",
-  bins: draft.bins,
-});
+  const [formData, setFormData] = useState({
+    name: "",
+    postcode: draft.postcode,
+    addressLine: "",
+    phone: "",
+    email: "",
+    bins: draft.bins,
+  });
 
   const updateBin = (index, field, value) => {
     setFormData((prev) => ({
@@ -434,20 +418,20 @@ function BookingModal({ draft, onClose }) {
     }));
   };
 
-const addAnotherBin = () => {
-  setFormData((prev) => ({
-    ...prev,
-    bins: [
-      ...prev.bins,
-      {
-        binType: "General Waste Bin",
-        cleanType: prev.bins[0]?.cleanType || "One-Off Clean",
-        quantity: 1,
-        date: "",
-      },
-    ],
-  }));
-};
+  const addAnotherBin = () => {
+    setFormData((prev) => ({
+      ...prev,
+      bins: [
+        ...prev.bins,
+        {
+          binType: "General Waste Bin",
+          cleanType: prev.bins[0]?.cleanType || "One-Off Clean",
+          quantity: 1,
+          date: "",
+        },
+      ],
+    }));
+  };
 
   const removeBin = (index) => {
     setFormData((prev) => ({
@@ -456,80 +440,96 @@ const addAnotherBin = () => {
     }));
   };
 
-const handleSubmit = async (e) => {
-  e.preventDefault();
+  const isFormComplete =
+    formData.name.trim() !== "" &&
+    formData.postcode.trim() !== "" &&
+    formData.addressLine.trim() !== "" &&
+    formData.phone.trim() !== "" &&
+    formData.email.trim() !== "" &&
+    termsAccepted &&
+    formData.bins.every(
+      (bin) =>
+        bin.binType?.trim() !== "" &&
+        bin.cleanType?.trim() !== "" &&
+        bin.quantity &&
+        Number(bin.quantity) > 0 &&
+        bin.date?.trim() !== ""
+    );
 
-  const nameValid = formData.name.trim() !== "";
-  const postcodeValid = formData.postcode.trim() !== "";
-  const addressValid = formData.addressLine.trim() !== "";
-  const phoneValid = formData.phone.trim() !== "";
-  const emailValid = formData.email.trim() !== "";
+  const handleSubmit = async (e) => {
+    e.preventDefault();
 
-  const allBinsValid = formData.bins.every(
-    (bin) =>
-      bin.binType?.trim() !== "" &&
-      bin.cleanType?.trim() !== "" &&
-      bin.quantity &&
-      Number(bin.quantity) > 0 &&
-      bin.date?.trim() !== ""
-  );
+    const nameValid = formData.name.trim() !== "";
+    const postcodeValid = formData.postcode.trim() !== "";
+    const addressValid = formData.addressLine.trim() !== "";
+    const phoneValid = formData.phone.trim() !== "";
+    const emailValid = formData.email.trim() !== "";
 
-  if (!nameValid) {
-    alert("Please enter your name.");
-    return;
-  }
+    const allBinsValid = formData.bins.every(
+      (bin) =>
+        bin.binType?.trim() !== "" &&
+        bin.cleanType?.trim() !== "" &&
+        bin.quantity &&
+        Number(bin.quantity) > 0 &&
+        bin.date?.trim() !== ""
+    );
 
-  if (!postcodeValid) {
-    alert("Postcode is missing.");
-    return;
-  }
-
-  if (!allBinsValid) {
-    alert("Please complete all bin details, including type, quantity, clean type, and date.");
-    return;
-  }
-
-  if (!addressValid) {
-    alert("Please enter your full address.");
-    return;
-  }
-
-  if (!phoneValid) {
-    alert("Please enter your contact number.");
-    return;
-  }
-
-  if (!emailValid) {
-    alert("Please enter your email address.");
-    return;
-  }
-
-  if (!termsAccepted) {
-    alert("Please read and accept the Terms & Conditions.");
-    return;
-  }
-
-  setSending(true);
-
-  try {
-    const response = await fetch("/.netlify/functions/sendBookingEmail", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(formData),
-    });
-
-    if (!response.ok) {
-      throw new Error("Failed to send booking");
+    if (!nameValid) {
+      alert("Please enter your name.");
+      return;
     }
 
-    alert("Booking sent successfully.");
-    onClose();
-  } catch (error) {
-    console.error(error);
-    alert("Something went wrong sending your booking.");
-  } finally {
-    setSending(false);
-  }
+    if (!postcodeValid) {
+      alert("Postcode is missing.");
+      return;
+    }
+
+    if (!allBinsValid) {
+      alert("Please complete all bin details, including type, quantity, clean type, and date.");
+      return;
+    }
+
+    if (!addressValid) {
+      alert("Please enter your full address.");
+      return;
+    }
+
+    if (!phoneValid) {
+      alert("Please enter your contact number.");
+      return;
+    }
+
+    if (!emailValid) {
+      alert("Please enter your email address.");
+      return;
+    }
+
+    if (!termsAccepted) {
+      alert("Please read and accept the Terms & Conditions.");
+      return;
+    }
+
+    setSending(true);
+
+    try {
+      const response = await fetch("/.netlify/functions/sendBookingEmail", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(formData),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to send booking");
+      }
+
+      alert("Booking sent successfully.");
+      onClose();
+    } catch (error) {
+      console.error(error);
+      alert("Something went wrong sending your booking.");
+    } finally {
+      setSending(false);
+    }
   };
 
   return (
@@ -565,57 +565,57 @@ const handleSubmit = async (e) => {
             />
 
             {formData.bins.map((bin, index) => (
-  <div key={index} className="space-y-3 rounded-2xl border border-slate-200 p-3">
-    <div className="grid grid-cols-[1fr_90px] gap-3">
-      <select
-        value={bin.binType}
-        onChange={(e) => updateBin(index, "binType", e.target.value)}
-        className="rounded-2xl border border-slate-300 px-4 py-3"
-      >
-        <option>General Waste Bin</option>
-        <option>Recycling Bin</option>
-        <option>Garden Bin</option>
-        <option>Commercial Bin</option>
-      </select>
+              <div key={index} className="space-y-3 rounded-2xl border border-slate-200 p-3">
+                <div className="grid grid-cols-[1fr_90px] gap-3">
+                  <select
+                    value={bin.binType}
+                    onChange={(e) => updateBin(index, "binType", e.target.value)}
+                    className="rounded-2xl border border-slate-300 px-4 py-3"
+                  >
+                    <option>General Waste Bin</option>
+                    <option>Recycling Bin</option>
+                    <option>Garden Bin</option>
+                    <option>Commercial Bin</option>
+                  </select>
 
-      <input
-        type="number"
-        min="1"
-        value={bin.quantity}
-        onChange={(e) => updateBin(index, "quantity", Number(e.target.value))}
-        className="rounded-2xl border border-slate-300 px-4 py-3"
-      />
-    </div>
+                  <input
+                    type="number"
+                    min="1"
+                    value={bin.quantity}
+                    onChange={(e) => updateBin(index, "quantity", Number(e.target.value))}
+                    className="rounded-2xl border border-slate-300 px-4 py-3"
+                  />
+                </div>
 
-    <select
-      value={bin.cleanType}
-      onChange={(e) => updateBin(index, "cleanType", e.target.value)}
-      className="w-full rounded-2xl border border-slate-300 px-4 py-3"
-    >
-      <option>One-Off Clean</option>
-      <option>Every 4 Weeks</option>
-      <option>Monthly Service</option>
-      <option>Commercial Quote Request</option>
-    </select>
+                <select
+                  value={bin.cleanType}
+                  onChange={(e) => updateBin(index, "cleanType", e.target.value)}
+                  className="w-full rounded-2xl border border-slate-300 px-4 py-3"
+                >
+                  <option>One-Off Clean</option>
+                  <option>Every 4 Weeks</option>
+                  <option>Monthly Service</option>
+                  <option>Commercial Quote Request</option>
+                </select>
 
-    <input
-      type="date"
-      value={bin.date || ""}
-      onChange={(e) => updateBin(index, "date", e.target.value)}
-      className="w-full rounded-2xl border border-slate-300 px-4 py-3"
-    />
+                <input
+                  type="date"
+                  value={bin.date || ""}
+                  onChange={(e) => updateBin(index, "date", e.target.value)}
+                  className="w-full rounded-2xl border border-slate-300 px-4 py-3"
+                />
 
-    {formData.bins.length > 1 && (
-      <button
-        type="button"
-        onClick={() => removeBin(index)}
-        className="text-sm font-semibold text-red-600"
-      >
-        Remove Bin
-      </button>
-    )}
-  </div>
-))}
+                {formData.bins.length > 1 && (
+                  <button
+                    type="button"
+                    onClick={() => removeBin(index)}
+                    className="text-sm font-semibold text-red-600"
+                  >
+                    Remove Bin
+                  </button>
+                )}
+              </div>
+            ))}
 
             <button
               type="button"
@@ -667,7 +667,6 @@ const handleSubmit = async (e) => {
               className="w-full rounded-2xl border border-slate-300 px-4 py-3"
             />
 
-
             <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
               <button
                 type="button"
@@ -701,16 +700,16 @@ const handleSubmit = async (e) => {
             </div>
 
             <button
-  type="submit"
-  disabled={!isFormComplete || sending}
-  className={`w-full rounded-2xl py-4 text-sm font-semibold text-white ${
-    !isFormComplete || sending
-      ? "cursor-not-allowed bg-slate-300"
-      : "bg-gradient-to-r from-[#0d67c2] via-[#0d83dc] to-[#18a7f5]"
-  }`}
->
-  {sending ? "Sending..." : "Send Booking"}
-</button>
+              type="submit"
+              disabled={!isFormComplete || sending}
+              className={`w-full rounded-2xl py-4 text-sm font-semibold text-white ${
+                !isFormComplete || sending
+                  ? "cursor-not-allowed bg-slate-300"
+                  : "bg-gradient-to-r from-[#0d67c2] via-[#0d83dc] to-[#18a7f5]"
+              }`}
+            >
+              {sending ? "Sending..." : "Send Booking"}
+            </button>
           </form>
         </div>
       </div>
