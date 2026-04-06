@@ -1,4 +1,4 @@
-export async function handler() {
+export default async () => {
   try {
     const pdfjsLib = await import("pdfjs-dist/legacy/build/pdf.mjs");
 
@@ -30,26 +30,30 @@ export async function handler() {
     const match = normalizedText.match(/collection day is\s+([A-Za-z]+)/i);
     const collectionDay = match ? match[1] : "Not found";
 
-    return {
-      statusCode: 200,
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
+    return new Response(
+      JSON.stringify({
         success: true,
         collectionDay,
         match: match ? match[0] : null,
         preview: normalizedText.slice(0, 1500),
       }),
-    };
+      {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      }
+    );
   } catch (error) {
     console.error("testBinPdf error:", error);
 
-    return {
-      statusCode: 500,
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
+    return new Response(
+      JSON.stringify({
         success: false,
-        error: error.message,
+        error: error?.message || "Unknown error",
       }),
-    };
+      {
+        status: 500,
+        headers: { "content-type": "application/json" },
+      }
+    );
   }
-}
+};
