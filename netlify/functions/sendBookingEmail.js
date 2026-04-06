@@ -55,7 +55,7 @@ export async function handler(event) {
       <div style="font-family:Arial,sans-serif;max-width:700px;margin:0 auto;padding:24px;background:#f8fbff;">
         <div style="background:#ffffff;border:1px solid #dbeafe;border-radius:18px;padding:24px;">
           <h1 style="margin:0 0 16px;color:#0c2340;">New RefreshaBin Booking</h1>
-          
+
           <h2 style="margin:24px 0 10px;color:#0d67c2;font-size:18px;">Customer Details</h2>
           <p style="margin:6px 0;"><strong>Name:</strong> ${name}</p>
           <p style="margin:6px 0;"><strong>Address:</strong> ${addressLine}</p>
@@ -97,20 +97,30 @@ export async function handler(event) {
       </div>
     `;
 
-    await resend.emails.send({
-      from: "RefreshaBin <Newbooking@refreshabin.co.uk>",
+    const sender = "RefreshaBin <bookings@refreshabin.co.uk>";
+
+    const adminResult = await resend.emails.send({
+      from: sender,
       to: ["info@refreshabin.co.uk"],
       replyTo: email,
       subject: `New Booking from ${name}`,
       html: emailHtml,
     });
 
-    await resend.emails.send({
-  from: "RefreshaBin <bookings@refreshabin.co.uk>",
-  to: [email],
-  subject: "We’ve received your RefreshaBin booking",
-  html: customerHtml,
-});
+    if (adminResult.error) {
+      throw new Error(adminResult.error.message || "Failed to send admin email");
+    }
+
+    const customerResult = await resend.emails.send({
+      from: sender,
+      to: [email],
+      subject: "We’ve received your RefreshaBin booking",
+      html: customerHtml,
+    });
+
+    if (customerResult.error) {
+      throw new Error(customerResult.error.message || "Failed to send customer email");
+    }
 
     return {
       statusCode: 200,
