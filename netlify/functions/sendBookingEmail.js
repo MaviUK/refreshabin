@@ -106,11 +106,11 @@ export async function handler(event) {
     });
 
     await resend.emails.send({
-      from: "RefreshaBin <bookings@yourdomain.co.uk>",
-      to: [email],
-      subject: "We’ve received your RefreshaBin booking",
-      html: customerHtml,
-    });
+  from: "RefreshaBin <bookings@refreshabin.co.uk>",
+  to: [email],
+  subject: "We’ve received your RefreshaBin booking",
+  html: customerHtml,
+});
 
     return {
       statusCode: 200,
