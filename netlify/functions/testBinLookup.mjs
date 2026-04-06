@@ -19,35 +19,37 @@ export async function handler(event) {
           PostcodeEND: suffix,
           postback: "1",
           submit_btn: "SEARCH",
-        }),
+        }).toString(),
       }
     );
 
     const html = await response.text();
 
-    // Extract addresses + PDF links
-    const results = [];
+    const viewIndex = html.indexOf("View Schedule");
+    const preview =
+      viewIndex >= 0
+        ? html.slice(Math.max(0, viewIndex - 2000), viewIndex + 4000)
+        : html.slice(0, 6000);
 
-    const regex =
-      /([0-9]+\s+[A-Z\s]+NEWCASTLE\s+BT33\s+[A-Z]{3})[\s\S]*?<a[^>]+href="([^"]+)"[^>]*>View Schedule<\/a>/g;
+    const hrefMatches = [...html.matchAll(/href="([^"]+)"/gi)]
+      .map((m) => m[1])
+      .filter((h) => /pdf|bin-collections|schedule/i.test(h))
+      .slice(0, 50);
 
-    let match;
-
-    while ((match = regex.exec(html)) !== null) {
-      results.push({
-        address: match[1].trim(),
-        pdf: match[2].startsWith("http")
-          ? match[2]
-          : `https://www.newrymournedown.org${match[2]}`,
-      });
-    }
+    const onclickMatches = [...html.matchAll(/onclick="([^"]+)"/gi)]
+      .map((m) => m[1])
+      .filter((h) => /pdf|bin-collections|schedule/i.test(h))
+      .slice(0, 50);
 
     return {
       statusCode: 200,
       body: JSON.stringify({
         success: true,
-        count: results.length,
-        results,
+        hasViewSchedule: viewIndex >= 0,
+        viewIndex,
+        hrefMatches,
+        onclickMatches,
+        preview,
       }),
     };
   } catch (error) {
