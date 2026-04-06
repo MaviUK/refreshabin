@@ -72,7 +72,7 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-[#eef7ff] pb-24 text-slate-900 md:pb-0">
-      <header className="sticky top-0 z-20 border-b border-[#cfe7ff] bg-white/90 backdrop-blur">
+      <header className="sticky top-0 z-20 hidden border-b border-[#cfe7ff] bg-white/90 backdrop-blur md:block">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
           <div className="flex items-center gap-4">
             <img
@@ -109,7 +109,7 @@ export default function App() {
       <section className="relative overflow-hidden">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,_rgba(34,197,94,0.14),_transparent_20%),radial-gradient(circle_at_top_left,_rgba(14,165,233,0.16),_transparent_30%)]" />
 
-        <div className="relative mx-auto grid max-w-7xl gap-10 px-6 py-14 lg:grid-cols-[1.15fr_0.85fr] lg:items-center lg:py-20">
+        <div className="relative mx-auto grid max-w-7xl gap-10 px-6 py-8 md:py-14 lg:grid-cols-[1.15fr_0.85fr] lg:items-center lg:py-20">
           <div>
             <div className="hidden md:inline-flex flex-wrap gap-2">
               {highlights.map((item) => (
