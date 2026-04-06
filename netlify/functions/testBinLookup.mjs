@@ -83,17 +83,14 @@ export default async (request) => {
     });
 
     return new Response(
-      JSON.stringify({
-        success: true,
-        prefix,
-        suffix,
-        count: results.length,
-        results,
-      }),
-      {
-        status: 200,
-        headers: { "content-type": "application/json" },
-      }
+  JSON.stringify({
+    success: true,
+    preview: html.slice(0, 3000), // first 3000 chars
+  }),
+  {
+    status: 200,
+    headers: { "content-type": "application/json" },
+  }
     );
   } catch (error) {
     return new Response(
