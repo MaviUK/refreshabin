@@ -1,39 +1,10 @@
 import * as cheerio from "cheerio";
 
-const DAY_MAP = {
-  MON: "Monday",
-  TUE: "Tuesday",
-  WED: "Wednesday",
-  THU: "Thursday",
-  FRI: "Friday",
-  SAT: "Saturday",
-  SUN: "Sunday",
-};
-
-function extractCollectionDay(pdfUrl) {
-  const match = pdfUrl.match(/\/([A-Z]{3})-[^/]+\.pdf/i);
-  const code = match ? match[1].toUpperCase() : null;
-  return code ? DAY_MAP[code] || code : null;
-}
-
 export default async (request) => {
   try {
     const url = new URL(request.url);
     const prefix = (url.searchParams.get("prefix") || "").toUpperCase();
     const suffix = (url.searchParams.get("suffix") || "").toUpperCase();
-
-    if (!prefix || !suffix) {
-      return new Response(
-        JSON.stringify({
-          success: false,
-          error: "Missing prefix or suffix. Example: ?prefix=BT33&suffix=0HR",
-        }),
-        {
-          status: 400,
-          headers: { "content-type": "application/json" },
-        }
-      );
-    }
 
     const form = new URLSearchParams();
     form.set("postcode1", prefix);
@@ -51,46 +22,51 @@ export default async (request) => {
       }
     );
 
-    if (!response.ok) {
-      throw new Error(`Council lookup failed: ${response.status}`);
-    }
-
     const html = await response.text();
     const $ = cheerio.load(html);
 
-    const results = [];
+    const hasViewScheduleText = /view schedule/i.test(html);
+    const hasPdfLink = /\.pdf/i.test(html);
+    const hasTully = /TULLYBRANNIGAN/i.test(html);
 
+    const anchors = [];
     $("a").each((_, el) => {
-      const linkText = $(el).text().trim();
+      const text = $(el).text().replace(/\s+/g, " ").trim();
       const href = $(el).attr("href") || "";
-
-      if (!/view schedule/i.test(linkText) || !/\.pdf/i.test(href)) return;
-
-      const rowText = $(el).closest("tr").text().replace(/\s+/g, " ").trim();
-      const addressText =
-        rowText.replace(/view schedule/i, "").trim() ||
-        $(el).parent().prev().text().replace(/\s+/g, " ").trim();
-
-      const pdfUrl = href.startsWith("http")
-        ? href
-        : `https://www.newrymournedown.org${href.startsWith("/") ? "" : "/"}${href}`;
-
-      results.push({
-        address: addressText,
-        pdfUrl,
-        collectionDay: extractCollectionDay(pdfUrl),
-      });
+      if (/view schedule/i.test(text) || /\.pdf/i.test(href)) {
+        anchors.push({ text, href });
+      }
     });
 
+    const lines = html
+      .split(/\r?\n/)
+      .filter(
+        (line) =>
+          /view schedule/i.test(line) ||
+          /\.pdf/i.test(line) ||
+          /TULLYBRANNIGAN/i.test(line) ||
+          /BT33 0HR/i.test(line)
+      )
+      .slice(0, 50);
+
     return new Response(
-  JSON.stringify({
-    success: true,
-    preview: html.slice(0, 3000), // first 3000 chars
-  }),
-  {
-    status: 200,
-    headers: { "content-type": "application/json" },
-  }
+      JSON.stringify(
+        {
+          success: true,
+          hasViewScheduleText,
+          hasPdfLink,
+          hasTully,
+          anchorCount: anchors.length,
+          anchors: anchors.slice(0, 20),
+          matchingLines: lines,
+        },
+        null,
+        2
+      ),
+      {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      }
     );
   } catch (error) {
     return new Response(
