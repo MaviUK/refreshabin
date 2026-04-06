@@ -132,7 +132,8 @@ export default function App() {
               At RefreshaBin, we support local families across County Down by keeping bins clean, fresh, and odour-free. With flexible one-off cleans and simple 4-weekly plans, we help take one less job off your hands.
             </p>
 
-            <div className="mt-8 flex flex-wrap justify-center md:justify-start gap-4">
+            <div className="mt-8 flex justify-center">
+  <div className="flex flex-wrap justify-center gap-3">
   <a
     href="#book"
     className="rounded-full bg-gradient-to-r from-[#0d67c2] to-[#18a7f5] px-7 py-3.5 text-sm font-semibold text-white shadow-lg shadow-sky-200"
@@ -161,7 +162,8 @@ export default function App() {
     Prices
   </a>
 </div>
-
+</div>
+            
             <div className="mt-10 grid gap-4 sm:grid-cols-3">
               <div className="rounded-[1.75rem] border border-[#cce8ff] bg-white p-5 shadow-sm">
                 <div className="text-2xl font-black text-[#0d67c2]">
