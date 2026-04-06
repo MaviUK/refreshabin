@@ -111,15 +111,17 @@ export default function App() {
 
         <div className="relative mx-auto grid max-w-7xl gap-10 px-6 py-8 md:py-14 lg:grid-cols-[1.15fr_0.85fr] lg:items-center lg:py-20">
           <div>
-            <div className="mb-8 hidden md:inline-flex flex-wrap gap-2">
-  {highlights.map((item) => (
-    <span
-      key={item}
-      className="rounded-full border border-[#c8e6ff] bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm"
-    >
-      {item}
-    </span>
-  ))}
+            <div className="mb-8 hidden md:flex justify-center">
+  <div className="flex max-w-md flex-wrap justify-center gap-2">
+    {highlights.map((item) => (
+      <span
+        key={item}
+        className="rounded-full border border-[#c8e6ff] bg-white px-5 py-2 text-sm font-semibold text-slate-700 shadow-sm"
+      >
+        {item}
+      </span>
+    ))}
+  </div>
 </div>
 
 <img
