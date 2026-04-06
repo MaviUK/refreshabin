@@ -16,12 +16,6 @@ export default function App() {
     },
   ];
 
-  const highlights = [
-    "Domestic & Commercial",
-    "Hygienic, Fresh Bins",
-    "Reliable Scheduled Service",
-  ];
-
   const pricing = [
     {
       title: "One-Off Clean",
