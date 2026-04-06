@@ -3,53 +3,64 @@ export async function handler(event) {
     const prefix = event.queryStringParameters?.prefix || "BT33";
     const suffix = event.queryStringParameters?.suffix || "OHR";
 
-    const response = await fetch(
-      "https://www.newrymournedown.org/weekly-bin-collection-and-calendar",
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/x-www-form-urlencoded",
-          "User-Agent": "Mozilla/5.0",
-          "Origin": "https://www.newrymournedown.org",
-          "Referer":
-            "https://www.newrymournedown.org/weekly-bin-collection-and-calendar",
-        },
-        body: new URLSearchParams({
-          PostcodeBT: prefix,
-          PostcodeEND: suffix,
-          postback: "1",
-          submit_btn: "SEARCH",
-        }).toString(),
-      }
-    );
+    const pageUrl =
+      "https://www.newrymournedown.org/weekly-bin-collection-and-calendar";
+
+    // 1) First load page to get session cookies
+    const firstResponse = await fetch(pageUrl, {
+      method: "GET",
+      headers: {
+        "User-Agent": "Mozilla/5.0",
+        "Accept":
+          "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+      },
+    });
+
+    const setCookie = firstResponse.headers.get("set-cookie") || "";
+
+    // Keep only cookie name=value parts
+    const cookieHeader = setCookie
+      .split(/,(?=\s*[A-Za-z0-9_\-]+=)/)
+      .map((cookie) => cookie.split(";")[0].trim())
+      .filter(Boolean)
+      .join("; ");
+
+    // 2) Submit search with same session
+    const formBody = new URLSearchParams({
+      PostcodeBT: prefix,
+      PostcodeEND: suffix,
+      postback: "1",
+      submit_btn: "SEARCH",
+    }).toString();
+
+    const response = await fetch(pageUrl, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        "User-Agent": "Mozilla/5.0",
+        "Origin": "https://www.newrymournedown.org",
+        "Referer": pageUrl,
+        "Cookie": cookieHeader,
+        "Accept":
+          "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+      },
+      body: formBody,
+    });
 
     const html = await response.text();
 
-    const viewIndex = html.indexOf("View Schedule");
-    const preview =
-      viewIndex >= 0
-        ? html.slice(Math.max(0, viewIndex - 2000), viewIndex + 4000)
-        : html.slice(0, 6000);
-
-    const hrefMatches = [...html.matchAll(/href="([^"]+)"/gi)]
-      .map((m) => m[1])
-      .filter((h) => /pdf|bin-collections|schedule/i.test(h))
-      .slice(0, 50);
-
-    const onclickMatches = [...html.matchAll(/onclick="([^"]+)"/gi)]
-      .map((m) => m[1])
-      .filter((h) => /pdf|bin-collections|schedule/i.test(h))
-      .slice(0, 50);
+    // Temporary debug
+    const hasViewSchedule = html.includes("View Schedule");
+    const hasPdf = /\.pdf/i.test(html);
 
     return {
       statusCode: 200,
       body: JSON.stringify({
         success: true,
-        hasViewSchedule: viewIndex >= 0,
-        viewIndex,
-        hrefMatches,
-        onclickMatches,
-        preview,
+        cookieHeader,
+        hasViewSchedule,
+        hasPdf,
+        preview: html.slice(0, 8000),
       }),
     };
   } catch (error) {
