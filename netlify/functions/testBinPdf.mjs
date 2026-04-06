@@ -1,6 +1,6 @@
 export default async () => {
   try {
-    const pdfjsLib = await import("pdfjs-dist/legacy/build/pdf.mjs");
+    const pdfjsLib = await import("pdfjs-dist/legacy/build/pdf.js");
 
     const pdfUrl =
       "https://www.newrymournedown.org/bin-collections/FRI-Z1.pdf?v=5";
