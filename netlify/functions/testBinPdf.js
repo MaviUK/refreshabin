@@ -1,7 +1,7 @@
-import * as pdfjsLib from "pdfjs-dist/legacy/build/pdf.mjs";
-
 export async function handler() {
   try {
+    const pdfjsLib = await import("pdfjs-dist/legacy/build/pdf.mjs");
+
     const pdfUrl =
       "https://www.newrymournedown.org/bin-collections/FRI-Z1.pdf?v=5";
 
@@ -12,7 +12,9 @@ export async function handler() {
     }
 
     const arrayBuffer = await response.arrayBuffer();
-    const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+
+    const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer });
+    const pdf = await loadingTask.promise;
 
     let fullText = "";
 
@@ -25,11 +27,8 @@ export async function handler() {
 
     const normalizedText = fullText.replace(/\s+/g, " ").trim();
 
-    const sentenceMatch = normalizedText.match(
-      /Your .*? collection day is ([A-Za-z]+)/i
-    );
-
-    const collectionDay = sentenceMatch ? sentenceMatch[1] : "Not found";
+    const match = normalizedText.match(/collection day is\s+([A-Za-z]+)/i);
+    const collectionDay = match ? match[1] : "Not found";
 
     return {
       statusCode: 200,
@@ -37,7 +36,7 @@ export async function handler() {
       body: JSON.stringify({
         success: true,
         collectionDay,
-        match: sentenceMatch ? sentenceMatch[0] : null,
+        match: match ? match[0] : null,
         preview: normalizedText.slice(0, 1500),
       }),
     };
@@ -50,7 +49,6 @@ export async function handler() {
       body: JSON.stringify({
         success: false,
         error: error.message,
-        stack: error.stack,
       }),
     };
   }
