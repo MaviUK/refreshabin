@@ -1,4 +1,4 @@
-import pdf from "pdf-parse";
+import * as pdfjsLib from "pdfjs-dist/legacy/build/pdf.mjs";
 
 export async function handler() {
   try {
@@ -12,13 +12,24 @@ export async function handler() {
     }
 
     const arrayBuffer = await response.arrayBuffer();
-    const buffer = Buffer.from(arrayBuffer);
+    const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
 
-    const data = await pdf(buffer);
-    const text = data.text || "";
+    let fullText = "";
 
-    const match = text.match(/collection day is\s+([A-Za-z]+)/i);
-    const collectionDay = match ? match[1] : "Not found";
+    for (let pageNum = 1; pageNum <= pdf.numPages; pageNum += 1) {
+      const page = await pdf.getPage(pageNum);
+      const textContent = await page.getTextContent();
+      const pageText = textContent.items.map((item) => item.str).join(" ");
+      fullText += ` ${pageText}`;
+    }
+
+    const normalizedText = fullText.replace(/\s+/g, " ").trim();
+
+    const sentenceMatch = normalizedText.match(
+      /Your .*? collection day is ([A-Za-z]+)/i
+    );
+
+    const collectionDay = sentenceMatch ? sentenceMatch[1] : "Not found";
 
     return {
       statusCode: 200,
@@ -26,7 +37,8 @@ export async function handler() {
       body: JSON.stringify({
         success: true,
         collectionDay,
-        preview: text.slice(0, 1200),
+        match: sentenceMatch ? sentenceMatch[0] : null,
+        preview: normalizedText.slice(0, 1500),
       }),
     };
   } catch (error) {
@@ -38,6 +50,7 @@ export async function handler() {
       body: JSON.stringify({
         success: false,
         error: error.message,
+        stack: error.stack,
       }),
     };
   }
