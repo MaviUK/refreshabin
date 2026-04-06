@@ -402,8 +402,8 @@ function BookingModal({ draft, onClose }) {
 
   const [formData, setFormData] = useState({
     name: "",
-    postcode: draft.postcode,
     addressLine: "",
+    postcode: draft.postcode,
     phone: "",
     email: "",
     bins: draft.bins,
