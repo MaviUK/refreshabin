@@ -133,19 +133,34 @@ export default function App() {
             </p>
 
             <div className="mt-8 flex flex-wrap gap-4">
-              <a
-                href="#book"
-                className="rounded-full bg-gradient-to-r from-[#0d67c2] to-[#18a7f5] px-7 py-3.5 text-sm font-semibold text-white shadow-lg shadow-sky-200"
-              >
-                Book Your Clean
-              </a>
-              <a
-                href="#services"
-                className="rounded-full border border-[#bfe1ff] bg-white px-7 py-3.5 text-sm font-semibold text-[#0c2340] shadow-sm"
-              >
-                Our Services
-              </a>
-            </div>
+  <a
+    href="#book"
+    className="rounded-full bg-gradient-to-r from-[#0d67c2] to-[#18a7f5] px-7 py-3.5 text-sm font-semibold text-white shadow-lg shadow-sky-200"
+  >
+    Book Your Clean
+  </a>
+
+  <a
+    href="#services"
+    className="rounded-full border border-[#bfe1ff] bg-white px-7 py-3.5 text-sm font-semibold text-[#0c2340] shadow-sm"
+  >
+    Our Services
+  </a>
+
+  <a
+    href="#areas"
+    className="rounded-full border border-[#bfe1ff] bg-white px-7 py-3.5 text-sm font-semibold text-[#0c2340] shadow-sm"
+  >
+    Areas
+  </a>
+
+  <a
+    href="#pricing"
+    className="rounded-full border border-[#bfe1ff] bg-white px-7 py-3.5 text-sm font-semibold text-[#0c2340] shadow-sm"
+  >
+    Prices
+  </a>
+</div>
 
             <div className="mt-10 grid gap-4 sm:grid-cols-3">
               <div className="rounded-[1.75rem] border border-[#cce8ff] bg-white p-5 shadow-sm">
