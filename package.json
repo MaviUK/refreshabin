@@ -1,0 +1,11 @@
+{
+  "name": "ordered-food",
+  "private": true,
+  "version": "0.1.0",
+  "packageManager": "pnpm@9.15.4",
+  "scripts": {
+    "dev": "pnpm --filter @ordered/customer dev",
+    "build": "pnpm -r build",
+    "lint": "pnpm -r lint"
+  }
+}
