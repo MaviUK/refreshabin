@@ -9,6 +9,7 @@ import Onboarding from './onboarding/Onboarding'
 import MenuBuilder from './menu/MenuBuilder'
 import OpeningHours from './opening-hours/OpeningHours'
 import Branding from './branding/Branding'
+import RestaurantSettings from './settings/RestaurantSettings'
 
 function HomeRedirect() {
   return <Navigate to="/dashboard" replace />
@@ -23,46 +24,12 @@ export default function App() {
       <Route path="/forgot-password" element={<ForgotPassword />} />
       <Route path="/reset-password" element={<ResetPassword />} />
 
-      <Route
-        path="/dashboard"
-        element={(
-          <ProtectedRoute>
-            <Dashboard />
-          </ProtectedRoute>
-        )}
-      />
-      <Route
-        path="/onboarding"
-        element={(
-          <ProtectedRoute>
-            <Onboarding />
-          </ProtectedRoute>
-        )}
-      />
-      <Route
-        path="/menu"
-        element={(
-          <ProtectedRoute>
-            <MenuBuilder />
-          </ProtectedRoute>
-        )}
-      />
-      <Route
-        path="/opening-hours"
-        element={(
-          <ProtectedRoute>
-            <OpeningHours />
-          </ProtectedRoute>
-        )}
-      />
-      <Route
-        path="/branding"
-        element={(
-          <ProtectedRoute>
-            <Branding />
-          </ProtectedRoute>
-        )}
-      />
+      <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+      <Route path="/onboarding" element={<ProtectedRoute><Onboarding /></ProtectedRoute>} />
+      <Route path="/menu" element={<ProtectedRoute><MenuBuilder /></ProtectedRoute>} />
+      <Route path="/opening-hours" element={<ProtectedRoute><OpeningHours /></ProtectedRoute>} />
+      <Route path="/branding" element={<ProtectedRoute><Branding /></ProtectedRoute>} />
+      <Route path="/settings" element={<ProtectedRoute><RestaurantSettings /></ProtectedRoute>} />
 
       <Route path="*" element={<Navigate to="/dashboard" replace />} />
     </Routes>
