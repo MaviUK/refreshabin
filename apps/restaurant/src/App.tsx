@@ -6,21 +6,12 @@ import ResetPassword from './auth/ResetPassword'
 import ProtectedRoute from './components/ProtectedRoute'
 import Dashboard from './dashboard/Dashboard'
 import Onboarding from './onboarding/Onboarding'
+import MenuBuilder from './menu/MenuBuilder'
+import OpeningHours from './opening-hours/OpeningHours'
+import Branding from './branding/Branding'
 
 function HomeRedirect() {
   return <Navigate to="/dashboard" replace />
-}
-
-function ComingSoon({ title }: { title: string }) {
-  return (
-    <main className="app-shell">
-      <section className="hero-card">
-        <span className="eyebrow">Coming next</span>
-        <h1>{title}</h1>
-        <p>This section is part of the next restaurant portal build phase.</p>
-      </section>
-    </main>
-  )
 }
 
 export default function App() {
@@ -52,7 +43,7 @@ export default function App() {
         path="/menu"
         element={(
           <ProtectedRoute>
-            <ComingSoon title="Menu builder" />
+            <MenuBuilder />
           </ProtectedRoute>
         )}
       />
@@ -60,7 +51,15 @@ export default function App() {
         path="/opening-hours"
         element={(
           <ProtectedRoute>
-            <ComingSoon title="Opening hours" />
+            <OpeningHours />
+          </ProtectedRoute>
+        )}
+      />
+      <Route
+        path="/branding"
+        element={(
+          <ProtectedRoute>
+            <Branding />
           </ProtectedRoute>
         )}
       />
