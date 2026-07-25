@@ -12,6 +12,7 @@ import Branding from './branding/Branding'
 import RestaurantSettings from './settings/RestaurantSettings'
 import DeliveryAreas from './settings/DeliveryAreas'
 import DeliveryMap from './settings/DeliveryMap'
+import Storefront from './storefront/Storefront'
 
 function HomeRedirect() {
   return <Navigate to="/dashboard" replace />
@@ -21,6 +22,7 @@ export default function App() {
   return (
     <Routes>
       <Route path="/" element={<HomeRedirect />} />
+      <Route path="/r/:slug" element={<Storefront />} />
       <Route path="/login" element={<Login />} />
       <Route path="/register" element={<Register />} />
       <Route path="/forgot-password" element={<ForgotPassword />} />
