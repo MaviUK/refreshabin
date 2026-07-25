@@ -11,6 +11,7 @@ import OpeningHours from './opening-hours/OpeningHours'
 import Branding from './branding/Branding'
 import RestaurantSettings from './settings/RestaurantSettings'
 import DeliveryAreas from './settings/DeliveryAreas'
+import DeliveryMap from './settings/DeliveryMap'
 
 function HomeRedirect() {
   return <Navigate to="/dashboard" replace />
@@ -32,6 +33,7 @@ export default function App() {
       <Route path="/branding" element={<ProtectedRoute><Branding /></ProtectedRoute>} />
       <Route path="/settings" element={<ProtectedRoute><RestaurantSettings /></ProtectedRoute>} />
       <Route path="/delivery-areas" element={<ProtectedRoute><DeliveryAreas /></ProtectedRoute>} />
+      <Route path="/delivery-map" element={<ProtectedRoute><DeliveryMap /></ProtectedRoute>} />
 
       <Route path="*" element={<Navigate to="/dashboard" replace />} />
     </Routes>
