@@ -1,0 +1,12 @@
+[build]
+  command = "pnpm --filter @ordered/restaurant build"
+  publish = "apps/restaurant/dist"
+
+[build.environment]
+  NODE_VERSION = "22"
+  PNPM_VERSION = "9.15.4"
+
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
