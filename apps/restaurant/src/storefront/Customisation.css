@@ -3,6 +3,22 @@
 .customisable-tag { background: #f6e9f0 !important; color: #9a2e5b !important; }
 .basket-line small { display: block; color: #75676d; font-size: .76rem; line-height: 1.35; }
 
+.basket-toast {
+  position: fixed;
+  z-index: 140;
+  top: 18px;
+  left: 50%;
+  width: min(calc(100% - 28px), 420px);
+  transform: translateX(-50%);
+  padding: 14px 18px;
+  border-radius: 14px;
+  background: #211b1e;
+  color: #fff;
+  font-weight: 900;
+  text-align: center;
+  box-shadow: 0 14px 34px rgba(0,0,0,.28);
+}
+
 .customisation-overlay {
   position: fixed;
   z-index: 100;
@@ -146,6 +162,7 @@
 }
 
 @media (max-width: 620px) {
+  .basket-toast { top: 10px; }
   .customisation-overlay { align-items: end; padding: 0; }
   .customisation-modal { width: 100%; max-height: 94vh; border-radius: 24px 24px 0 0; }
   .customisation-header { padding: 20px 18px; }
