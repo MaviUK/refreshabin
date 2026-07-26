@@ -37,7 +37,7 @@ export default function Restaurants() {
       const { data, error: restaurantError } = await supabase
         .from('restaurants')
         .select('id, name, slug, logo_url, cover_url, cuisines, accepts_delivery, accepts_collection, minimum_order_pence, delivery_fee_pence, preparation_time_minutes')
-        .eq('status', 'approved')
+        .eq('status', 'active')
         .order('name')
 
       if (restaurantError) {
