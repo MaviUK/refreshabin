@@ -9,8 +9,8 @@ type Printer = {
   printer_type: 'escpos' | 'epson' | 'star' | 'sunmi' | 'browser'
   connection_type: 'network' | 'usb' | 'bluetooth' | 'cloud' | 'browser'
   connection_config: Record<string, unknown>
-  prints_kitchen_tickets: boolean
-  prints_customer_receipts: boolean
+  print_kitchen_tickets: boolean
+  print_customer_receipts: boolean
   copies: number
   is_active: boolean
 }
@@ -45,6 +45,7 @@ export default function PrinterManagement() {
   const [printers, setPrinters] = useState<Printer[]>([])
   const [form, setForm] = useState<FormState>(emptyForm)
   const [editingId, setEditingId] = useState<string | null>(null)
+  const [testingId, setTestingId] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
@@ -95,7 +96,7 @@ export default function PrinterManagement() {
   async function loadPrinters(id: string) {
     const { data, error: printersError } = await supabase
       .from('restaurant_printers')
-      .select('id, name, printer_type, connection_type, connection_config, prints_kitchen_tickets, prints_customer_receipts, copies, is_active')
+      .select('id, name, printer_type, connection_type, connection_config, print_kitchen_tickets, print_customer_receipts, copies, is_active')
       .eq('restaurant_id', id)
       .order('created_at', { ascending: true })
 
@@ -121,8 +122,8 @@ export default function PrinterManagement() {
       host: typeof printer.connection_config.host === 'string' ? printer.connection_config.host : '',
       port: String(typeof printer.connection_config.port === 'number' ? printer.connection_config.port : 9100),
       copies: String(printer.copies),
-      kitchen: printer.prints_kitchen_tickets,
-      receipts: printer.prints_customer_receipts,
+      kitchen: printer.print_kitchen_tickets,
+      receipts: printer.print_customer_receipts,
       active: printer.is_active,
     })
     window.scrollTo({ top: 0, behavior: 'smooth' })
@@ -167,8 +168,8 @@ export default function PrinterManagement() {
       connection_config: form.connectionType === 'network'
         ? { host: form.host.trim(), port: Number.isInteger(port) ? port : 9100, cut: true }
         : {},
-      prints_kitchen_tickets: form.kitchen,
-      prints_customer_receipts: form.receipts,
+      print_kitchen_tickets: form.kitchen,
+      print_customer_receipts: form.receipts,
       copies,
       is_active: form.active,
       updated_at: new Date().toISOString(),
@@ -188,6 +189,27 @@ export default function PrinterManagement() {
     setMessage(editingId ? 'Printer updated.' : 'Printer added.')
     resetForm()
     await loadPrinters(restaurantId)
+  }
+
+  async function testPrinter(printer: Printer) {
+    if (!printer.is_active || testingId) return
+
+    setTestingId(printer.id)
+    setError('')
+    setMessage('')
+
+    const { error: testError } = await supabase.rpc('queue_printer_test', {
+      p_printer_id: printer.id,
+    })
+
+    setTestingId(null)
+
+    if (testError) {
+      setError(testError.message)
+      return
+    }
+
+    setMessage(`Test ticket queued for ${printer.name}.`)
   }
 
   async function deletePrinter(printer: Printer) {
@@ -330,11 +352,19 @@ export default function PrinterManagement() {
                 <strong>{printer.copies}×</strong>
               </div>
               <div className="printer-tags">
-                {printer.prints_kitchen_tickets && <span>Kitchen tickets</span>}
-                {printer.prints_customer_receipts && <span>Receipts</span>}
+                {printer.print_kitchen_tickets && <span>Kitchen tickets</span>}
+                {printer.print_customer_receipts && <span>Receipts</span>}
                 {typeof printer.connection_config.host === 'string' && <span>{printer.connection_config.host}:{String(printer.connection_config.port ?? 9100)}</span>}
               </div>
               <div className="printer-card-actions">
+                <button
+                  className="primary-button"
+                  type="button"
+                  disabled={!printer.is_active || testingId !== null}
+                  onClick={() => void testPrinter(printer)}
+                >
+                  {testingId === printer.id ? 'Queuing test…' : 'Print test ticket'}
+                </button>
                 <button className="secondary-button" type="button" onClick={() => editPrinter(printer)}>Edit</button>
                 <button className="danger-text-button" type="button" onClick={() => void deletePrinter(printer)}>Delete</button>
               </div>
