@@ -40,6 +40,12 @@ type CreatedOrder = {
   order_status: string
 }
 
+type CheckoutSessionResponse = {
+  checkout_url?: string
+  session_id?: string
+  error?: string
+}
+
 const money = new Intl.NumberFormat('en-GB', {
   style: 'currency',
   currency: 'GBP',
@@ -157,6 +163,7 @@ export default function Checkout() {
     }))
 
     setSubmitting(true)
+    setMessage('Creating your order…')
 
     const { data, error: orderError } = await supabase.rpc('create_order', {
       storefront_slug: slug,
@@ -176,9 +183,9 @@ export default function Checkout() {
       delivery_instructions: details.instructions || null,
     })
 
-    setSubmitting(false)
-
     if (orderError) {
+      setSubmitting(false)
+      setMessage('')
       setError(orderError.message)
       return
     }
@@ -186,7 +193,21 @@ export default function Checkout() {
     const order = data as CreatedOrder
     setCreatedOrder(order)
     window.localStorage.setItem(`ordered-food-pending-order:${slug}`, JSON.stringify(order))
-    setMessage(`Order #${order.order_number} has been created. Secure payment is the next connection.`)
+    setMessage(`Order #${order.order_number} created. Opening secure payment…`)
+
+    const { data: checkoutData, error: checkoutError } = await supabase.functions.invoke<CheckoutSessionResponse>(
+      'create-checkout-session',
+      { body: { order_id: order.order_id } },
+    )
+
+    if (checkoutError || !checkoutData?.checkout_url) {
+      setSubmitting(false)
+      setMessage('')
+      setError(checkoutData?.error || checkoutError?.message || 'Unable to open secure payment. Please try again.')
+      return
+    }
+
+    window.location.assign(checkoutData.checkout_url)
   }
 
   if (loading) return <main className="checkout-state">Loading checkout…</main>
@@ -275,16 +296,16 @@ export default function Checkout() {
             <span className="checkout-step">{method === 'delivery' ? '4' : '3'}</span>
             <div className="checkout-section-heading">
               <h2>Payment</h2>
-              <p>Card, Apple Pay and Google Pay will be connected here.</p>
+              <p>You will be transferred to Stripe for secure card, Apple Pay or Google Pay payment.</p>
             </div>
-            <div className="payment-placeholder">{createdOrder ? `Order #${createdOrder.order_number} is awaiting payment` : 'Your order will be securely verified before payment'}</div>
+            <div className="payment-placeholder">{createdOrder ? `Order #${createdOrder.order_number} is opening secure payment` : 'Payment details are entered securely on Stripe'}</div>
           </section>
 
           {submitted && minimumShortfall > 0 && <p className="checkout-error">Add {money.format(minimumShortfall / 100)} more to meet the minimum order.</p>}
           {error && <p className="checkout-error">{error}</p>}
           {message && <p className="checkout-message">{message}</p>}
           <button className="checkout-submit" type="submit" disabled={minimumShortfall > 0 || submitting || Boolean(createdOrder)}>
-            {submitting ? 'Creating order…' : createdOrder ? `Order #${createdOrder.order_number} created` : `Create order · ${money.format(total / 100)}`}
+            {submitting ? 'Opening secure payment…' : createdOrder ? `Order #${createdOrder.order_number} created` : `Pay securely · ${money.format(total / 100)}`}
           </button>
         </form>
 
