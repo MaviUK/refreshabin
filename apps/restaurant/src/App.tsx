@@ -16,6 +16,7 @@ import Storefront from './storefront/Storefront'
 import Checkout from './checkout/Checkout'
 import Orders from './orders/Orders'
 import KitchenDisplay from './kds/KitchenDisplay'
+import PrinterManagement from './printers/PrinterManagement'
 
 function HomeRedirect() {
   return <Navigate to="/dashboard" replace />
@@ -35,6 +36,7 @@ export default function App() {
       <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
       <Route path="/orders" element={<ProtectedRoute><Orders /></ProtectedRoute>} />
       <Route path="/kds" element={<ProtectedRoute><KitchenDisplay /></ProtectedRoute>} />
+      <Route path="/printers" element={<ProtectedRoute><PrinterManagement /></ProtectedRoute>} />
       <Route path="/onboarding" element={<ProtectedRoute><Onboarding /></ProtectedRoute>} />
       <Route path="/menu" element={<ProtectedRoute><MenuBuilder /></ProtectedRoute>} />
       <Route path="/opening-hours" element={<ProtectedRoute><OpeningHours /></ProtectedRoute>} />
