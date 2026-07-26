@@ -152,7 +152,7 @@ export default function Onboarding() {
           <form className="onboarding-step" onSubmit={next}>
             <span className="eyebrow">Main location</span>
             <h1>Where can customers find you?</h1>
-            <p>We will add Google Places search here next. For now, enter the trading address.</p>
+            <p>Enter the restaurant's main trading address.</p>
             <div className="form-grid">
               <label className="large-field full-width">
                 Address line 1
@@ -204,12 +204,20 @@ export default function Onboarding() {
         )}
 
         {step === 5 && (
-          <div className="onboarding-step onboarding-welcome">
+          <div className="onboarding-step onboarding-welcome" id="payments">
             <span className="onboarding-icon" aria-hidden="true">🎉</span>
             <span className="eyebrow">Restaurant created</span>
             <h1>{restaurantName || 'Your restaurant'} is ready.</h1>
-            <p>Your restaurant, owner membership and primary location have been saved securely.</p>
+            <p>Your workspace has been created. Complete the final launch steps below before taking your first test order.</p>
             {restaurantId && <div className="success-reference">Workspace created successfully</div>}
+
+            <div className="quick-actions" aria-label="Complete restaurant setup">
+              <Link to="/opening-hours">1. Set opening hours <span>→</span></Link>
+              <Link to="/menu">2. Add a menu category <span>→</span></Link>
+              <Link to="/menu">3. Add your first product <span>→</span></Link>
+              <Link to="/settings">4. Review payment settings <span>→</span></Link>
+            </div>
+
             <button className="primary-button" type="button" onClick={() => navigate('/dashboard')}>Go to dashboard</button>
           </div>
         )}
