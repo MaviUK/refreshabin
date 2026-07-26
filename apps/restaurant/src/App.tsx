@@ -13,6 +13,7 @@ import RestaurantSettings from './settings/RestaurantSettings'
 import DeliveryAreas from './settings/DeliveryAreas'
 import DeliveryMap from './settings/DeliveryMap'
 import Storefront from './storefront/Storefront'
+import Checkout from './checkout/Checkout'
 
 function HomeRedirect() {
   return <Navigate to="/dashboard" replace />
@@ -23,6 +24,7 @@ export default function App() {
     <Routes>
       <Route path="/" element={<HomeRedirect />} />
       <Route path="/r/:slug" element={<Storefront />} />
+      <Route path="/r/:slug/checkout" element={<Checkout />} />
       <Route path="/login" element={<Login />} />
       <Route path="/register" element={<Register />} />
       <Route path="/forgot-password" element={<ForgotPassword />} />
