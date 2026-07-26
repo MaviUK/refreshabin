@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js'
+import { printEscPosNetwork } from './drivers/escpos-network.js'
 
 type ClaimedJob = {
   job_id: string
@@ -165,6 +166,11 @@ async function sendToPrinter(printer: Printer, ticket: string) {
   if (dryRun) {
     console.log(`\n[DRY RUN] ${printer.name} (${printer.printer_type}/${printer.connection_type})`)
     console.log(ticket)
+    return
+  }
+
+  if (printer.printer_type === 'escpos' && printer.connection_type === 'network') {
+    await printEscPosNetwork(ticket, printer.connection_config)
     return
   }
 
