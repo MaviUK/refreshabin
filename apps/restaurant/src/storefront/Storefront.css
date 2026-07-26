@@ -194,25 +194,10 @@
 .mobile-basket-button { display: none; }
 
 @media (max-width: 900px) {
+  .storefront-page { padding-bottom: 100px; }
   .storefront-layout { grid-template-columns: 1fr; }
-  .basket-panel { position: static; }
+  .basket-panel { position: static; scroll-margin-top: 12px; }
   .menu-item-grid { grid-template-columns: 1fr; }
-}
-
-@media (max-width: 620px) {
-  .storefront-page { padding-bottom: 92px; }
-  .storefront-hero { min-height: 300px; }
-  .storefront-identity { width: calc(100% - 28px); padding-bottom: 24px; align-items: center; }
-  .storefront-logo { width: 74px; height: 74px; border-radius: 19px; }
-  .storefront-identity h1 { margin: 5px 0; font-size: 2.35rem; }
-  .storefront-summary,
-  .storefront-layout { width: calc(100% - 28px); }
-  .storefront-summary { flex-direction: column; padding: 14px 0; }
-  .storefront-layout { margin-top: 14px; gap: 20px; }
-  .storefront-search-wrap { padding-top: 6px; }
-  .menu-item-card { min-height: 146px; grid-template-columns: minmax(0,1fr) 96px; padding: 14px; }
-  .menu-item-action { min-height: 96px; }
-  .basket-panel { scroll-margin-top: 12px; }
   .mobile-basket-button {
     position: fixed;
     z-index: 20;
@@ -232,4 +217,19 @@
     box-shadow: 0 16px 34px rgba(0,0,0,.28);
   }
   .mobile-basket-button span { opacity: .72; font-size: .85rem; }
+}
+
+@media (max-width: 620px) {
+  .storefront-page { padding-bottom: 92px; }
+  .storefront-hero { min-height: 300px; }
+  .storefront-identity { width: calc(100% - 28px); padding-bottom: 24px; align-items: center; }
+  .storefront-logo { width: 74px; height: 74px; border-radius: 19px; }
+  .storefront-identity h1 { margin: 5px 0; font-size: 2.35rem; }
+  .storefront-summary,
+  .storefront-layout { width: calc(100% - 28px); }
+  .storefront-summary { flex-direction: column; padding: 14px 0; }
+  .storefront-layout { margin-top: 14px; gap: 20px; }
+  .storefront-search-wrap { padding-top: 6px; }
+  .menu-item-card { min-height: 146px; grid-template-columns: minmax(0,1fr) 96px; padding: 14px; }
+  .menu-item-action { min-height: 96px; }
 }
