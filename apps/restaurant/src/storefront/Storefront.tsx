@@ -133,8 +133,11 @@ export default function Storefront() {
     setExtraQuantities({})
     const defaults: Record<string, Record<string, number>> = {}
     for (const group of item.modifier_groups || []) {
-      defaults[group.id] = {}
-      for (const option of group.options) if (option.is_default) defaults[group.id][option.id] = 1
+      const groupDefaults: Record<string, number> = {}
+      for (const option of group.options) {
+        if (option.is_default) groupDefaults[option.id] = 1
+      }
+      defaults[group.id] = groupDefaults
     }
     setModifierQuantities(defaults)
     setCustomQuantity(1)
