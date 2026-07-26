@@ -1,7 +1,20 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import './Orders.css'
+
+type SnapshotOption = {
+  id: string
+  name: string
+  quantity: number
+  price_pence: number
+}
+
+type SnapshotModifierGroup = {
+  group_id: string
+  group_name: string
+  options: SnapshotOption[]
+}
 
 type OrderItem = {
   id: string
@@ -9,6 +22,11 @@ type OrderItem = {
   quantity: number
   unit_price_pence: number
   customer_notes: string | null
+  item_snapshot: {
+    removed_ingredients?: Array<{ id: string; name: string }>
+    selected_extras?: SnapshotOption[]
+    modifier_groups?: SnapshotModifierGroup[]
+  } | null
 }
 
 type Order = {
@@ -33,6 +51,7 @@ type Order = {
   order_status: string
   created_at: string
   paid_at: string | null
+  estimated_ready_at: string | null
   order_items: OrderItem[]
 }
 
@@ -42,6 +61,7 @@ type RestaurantMembership = {
 }
 
 const activeStatuses = ['placed', 'accepted', 'preparing', 'ready', 'out_for_delivery']
+const preparationChoices = [15, 20, 30, 45]
 const statusLabels: Record<string, string> = {
   pending_payment: 'Awaiting payment',
   placed: 'New',
@@ -62,6 +82,21 @@ function restaurantName(value: RestaurantMembership['restaurants']) {
   return value?.name ?? 'Restaurant'
 }
 
+function modifierLines(item: OrderItem) {
+  const snapshot = item.item_snapshot
+  if (!snapshot) return []
+
+  const lines: string[] = []
+  for (const ingredient of snapshot.removed_ingredients ?? []) lines.push(`No ${ingredient.name}`)
+  for (const extra of snapshot.selected_extras ?? []) lines.push(`+ ${extra.quantity > 1 ? `${extra.quantity} × ` : ''}${extra.name}`)
+  for (const group of snapshot.modifier_groups ?? []) {
+    for (const option of group.options ?? []) {
+      lines.push(`${group.group_name}: ${option.quantity > 1 ? `${option.quantity} × ` : ''}${option.name}`)
+    }
+  }
+  return lines
+}
+
 export default function Orders() {
   const navigate = useNavigate()
   const [restaurantId, setRestaurantId] = useState('')
@@ -71,6 +106,13 @@ export default function Orders() {
   const [error, setError] = useState('')
   const [updatingId, setUpdatingId] = useState('')
   const [view, setView] = useState<'active' | 'completed'>('active')
+  const [soundEnabled, setSoundEnabled] = useState(false)
+  const [choosingTimeFor, setChoosingTimeFor] = useState('')
+  const soundEnabledRef = useRef(false)
+
+  useEffect(() => {
+    soundEnabledRef.current = soundEnabled
+  }, [soundEnabled])
 
   const loadOrders = useCallback(async (id: string) => {
     const { data, error: ordersError } = await supabase
@@ -97,12 +139,14 @@ export default function Orders() {
         order_status,
         created_at,
         paid_at,
+        estimated_ready_at,
         order_items (
           id,
           item_name,
           quantity,
           unit_price_pence,
-          customer_notes
+          customer_notes,
+          item_snapshot
         )
       `)
       .eq('restaurant_id', id)
@@ -112,6 +156,40 @@ export default function Orders() {
     if (ordersError) throw ordersError
     setOrders((data ?? []) as Order[])
   }, [])
+
+  function playOrderAlert() {
+    if (!soundEnabledRef.current) return
+    try {
+      const AudioContextClass = window.AudioContext || (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext
+      if (!AudioContextClass) return
+      const context = new AudioContextClass()
+      const ring = (start: number, frequency: number) => {
+        const oscillator = context.createOscillator()
+        const gain = context.createGain()
+        oscillator.frequency.value = frequency
+        oscillator.type = 'sine'
+        gain.gain.setValueAtTime(0.0001, start)
+        gain.gain.exponentialRampToValueAtTime(0.35, start + 0.02)
+        gain.gain.exponentialRampToValueAtTime(0.0001, start + 0.35)
+        oscillator.connect(gain)
+        gain.connect(context.destination)
+        oscillator.start(start)
+        oscillator.stop(start + 0.38)
+      }
+      const now = context.currentTime
+      ring(now, 880)
+      ring(now + 0.42, 1100)
+      window.setTimeout(() => void context.close(), 1200)
+    } catch {
+      // Browsers can block audio until the user has interacted with the page.
+    }
+  }
+
+  async function enableSound() {
+    setSoundEnabled(true)
+    soundEnabledRef.current = true
+    playOrderAlert()
+  }
 
   useEffect(() => {
     let channel: ReturnType<typeof supabase.channel> | null = null
@@ -149,7 +227,11 @@ export default function Orders() {
               table: 'orders',
               filter: `restaurant_id=eq.${typedMembership.restaurant_id}`,
             },
-            () => loadOrders(typedMembership.restaurant_id),
+            (payload) => {
+              const nextOrder = payload.new as { order_status?: string } | undefined
+              if (payload.eventType === 'INSERT' || nextOrder?.order_status === 'placed') playOrderAlert()
+              void loadOrders(typedMembership.restaurant_id)
+            },
           )
           .subscribe()
       } catch (caughtError) {
@@ -159,9 +241,9 @@ export default function Orders() {
       }
     }
 
-    initialise()
+    void initialise()
     return () => {
-      if (channel) supabase.removeChannel(channel)
+      if (channel) void supabase.removeChannel(channel)
     }
   }, [loadOrders, navigate])
 
@@ -172,14 +254,23 @@ export default function Orders() {
 
   const newCount = orders.filter((order) => order.order_status === 'placed').length
 
-  async function setOrderStatus(order: Order, orderStatus: string) {
+  async function setOrderStatus(order: Order, orderStatus: string, preparationMinutes?: number) {
     if (!restaurantId || updatingId) return
     setUpdatingId(order.id)
     setError('')
 
+    const now = new Date().toISOString()
+    const patch: Record<string, string | null> = { order_status: orderStatus }
+    if (orderStatus === 'accepted') {
+      patch.accepted_at = now
+      patch.estimated_ready_at = new Date(Date.now() + (preparationMinutes ?? 20) * 60_000).toISOString()
+    }
+    if (orderStatus === 'completed') patch.completed_at = now
+    if (orderStatus === 'rejected' || orderStatus === 'cancelled') patch.cancelled_at = now
+
     const { error: updateError } = await supabase
       .from('orders')
-      .update({ order_status: orderStatus })
+      .update(patch)
       .eq('id', order.id)
       .eq('restaurant_id', restaurantId)
 
@@ -187,8 +278,9 @@ export default function Orders() {
       setError(updateError.message)
     } else {
       setOrders((current) => current.map((item) => item.id === order.id
-        ? { ...item, order_status: orderStatus }
+        ? { ...item, ...patch }
         : item))
+      setChoosingTimeFor('')
     }
     setUpdatingId('')
   }
@@ -198,7 +290,17 @@ export default function Orders() {
       case 'placed':
         return (
           <>
-            <button className="order-action primary" onClick={() => setOrderStatus(order, 'accepted')} disabled={updatingId === order.id}>Accept order</button>
+            {choosingTimeFor === order.id ? (
+              <div className="prep-time-picker">
+                <span>Ready in</span>
+                {preparationChoices.map((minutes) => (
+                  <button key={minutes} type="button" onClick={() => setOrderStatus(order, 'accepted', minutes)} disabled={updatingId === order.id}>{minutes} min</button>
+                ))}
+                <button className="cancel" type="button" onClick={() => setChoosingTimeFor('')}>Cancel</button>
+              </div>
+            ) : (
+              <button className="order-action primary" onClick={() => setChoosingTimeFor(order.id)} disabled={updatingId === order.id}>Accept order</button>
+            )}
             <button className="order-action danger" onClick={() => setOrderStatus(order, 'rejected')} disabled={updatingId === order.id}>Reject</button>
           </>
         )
@@ -238,7 +340,10 @@ export default function Orders() {
           <h1>Orders</h1>
           <p>New paid orders appear here automatically.</p>
         </div>
-        {newCount > 0 && <div className="new-order-count">{newCount} new</div>}
+        <div className="orders-title-actions">
+          <button className={soundEnabled ? 'sound-toggle enabled' : 'sound-toggle'} type="button" onClick={soundEnabled ? () => setSoundEnabled(false) : enableSound}>{soundEnabled ? '🔔 Sound on' : '🔕 Enable sound'}</button>
+          {newCount > 0 && <div className="new-order-count">{newCount} new</div>}
+        </div>
       </section>
 
       <div className="orders-tabs" role="tablist">
@@ -263,6 +368,7 @@ export default function Orders() {
                   <span className="order-number">Order #{order.order_number}</span>
                   <strong>{order.customer_first_name} {order.customer_last_name}</strong>
                   <small>{time.format(new Date(order.created_at))} · {order.fulfilment_method}</small>
+                  {order.estimated_ready_at && activeStatuses.includes(order.order_status) && <small className="ready-time">Due {time.format(new Date(order.estimated_ready_at))}</small>}
                 </div>
                 <div className="order-card-total">
                   <span className={`order-status ${order.order_status}`}>{statusLabels[order.order_status] ?? order.order_status}</span>
@@ -273,7 +379,11 @@ export default function Orders() {
               <div className="order-items">
                 {order.order_items.map((item) => (
                   <div key={item.id}>
-                    <span><b>{item.quantity}×</b> {item.item_name}{item.customer_notes ? <small>{item.customer_notes}</small> : null}</span>
+                    <span>
+                      <b>{item.quantity}× {item.item_name}</b>
+                      {modifierLines(item).map((line, index) => <small key={`${item.id}-${index}`}>{line}</small>)}
+                      {item.customer_notes ? <small className="kitchen-note">Note: {item.customer_notes}</small> : null}
+                    </span>
                     <strong>{money.format((item.unit_price_pence * item.quantity) / 100)}</strong>
                   </div>
                 ))}
