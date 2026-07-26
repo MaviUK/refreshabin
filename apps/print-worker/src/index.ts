@@ -4,9 +4,9 @@ import { printEscPosNetwork } from './drivers/escpos-network.js'
 type ClaimedJob = {
   job_id: string
   restaurant_id: string
-  order_id: string
+  order_id: string | null
   printer_id: string
-  document_type: 'kitchen_ticket' | 'customer_receipt'
+  document_type: 'kitchen_ticket' | 'customer_receipt' | 'test_ticket'
   attempts: number
   payload: Record<string, unknown>
 }
@@ -119,6 +119,27 @@ function formatTicket(order: Order) {
   return `${lines.join('\n')}\n`
 }
 
+function formatTestTicket(printer: Printer) {
+  const now = new Date().toLocaleString('en-GB')
+  return [
+    'ORDERED.FOOD',
+    'PRINTER TEST',
+    '-'.repeat(42),
+    `Printer: ${printer.name}`,
+    `Type: ${printer.printer_type.toUpperCase()}`,
+    `Connection: ${printer.connection_type}`,
+    `Time: ${now}`,
+    '-'.repeat(42),
+    'If you can read this, your printer is',
+    'connected and ready to receive orders.',
+    '',
+    'Test successful',
+    '',
+    '',
+    '',
+  ].join('\n')
+}
+
 async function fetchPrinter(): Promise<Printer> {
   const { data, error } = await supabase
     .from('restaurant_printers')
@@ -202,15 +223,25 @@ async function processNextJob(printer: Printer) {
     if (!job) return
 
     try {
-      const order = await fetchOrder(job.order_id)
-      const ticket = formatTicket(order)
+      let ticket: string
+      let logLabel: string
+
+      if (job.document_type === 'test_ticket') {
+        ticket = formatTestTicket(printer)
+        logLabel = 'printer test'
+      } else {
+        if (!job.order_id) throw new Error('Order print job is missing an order ID')
+        const order = await fetchOrder(job.order_id)
+        ticket = formatTicket(order)
+        logLabel = `order #${order.order_number}`
+      }
 
       for (let copy = 0; copy < Math.max(1, printer.copies); copy += 1) {
         await sendToPrinter(printer, ticket)
       }
 
       await completeJob(job.job_id, true)
-      console.log(`Printed job ${job.job_id} for order #${order.order_number}`)
+      console.log(`Printed job ${job.job_id} for ${logLabel}`)
     } catch (caughtError) {
       const message = caughtError instanceof Error ? caughtError.message : 'Unknown print failure'
       await completeJob(job.job_id, false, message)
