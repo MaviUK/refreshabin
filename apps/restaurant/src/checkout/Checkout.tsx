@@ -28,6 +28,18 @@ type StorefrontData = {
 
 type FulfilmentMethod = 'delivery' | 'collection'
 
+type CreatedOrder = {
+  order_id: string
+  order_number: number
+  restaurant_name: string
+  subtotal_pence: number
+  delivery_fee_pence: number
+  total_pence: number
+  currency: string
+  payment_status: string
+  order_status: string
+}
+
 const money = new Intl.NumberFormat('en-GB', {
   style: 'currency',
   currency: 'GBP',
@@ -45,8 +57,11 @@ export default function Checkout() {
   const [basket, setBasket] = useState<Record<string, BasketLine>>({})
   const [method, setMethod] = useState<FulfilmentMethod>('delivery')
   const [loading, setLoading] = useState(true)
+  const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
+  const [message, setMessage] = useState('')
   const [submitted, setSubmitted] = useState(false)
+  const [createdOrder, setCreatedOrder] = useState<CreatedOrder | null>(null)
   const [details, setDetails] = useState({
     firstName: '',
     lastName: '',
@@ -119,28 +134,59 @@ export default function Checkout() {
     setDetails((current) => ({ ...current, [field]: value }))
   }
 
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     setSubmitted(true)
-    if (!slug || !restaurant || !basketLines.length || minimumShortfall > 0) return
+    setError('')
+    setMessage('')
+
+    if (!slug || !restaurant || !basketLines.length || minimumShortfall > 0 || submitting) return
 
     const requiredDeliveryFields = method === 'delivery'
       ? details.addressLine1 && details.town && details.postcode
       : true
 
-    if (!details.firstName || !details.lastName || !details.email || !details.phone || !requiredDeliveryFields) return
+    if (!details.firstName || !details.lastName || !details.email || !details.phone || !requiredDeliveryFields) {
+      setError('Please complete all required fields.')
+      return
+    }
 
     window.localStorage.setItem(`ordered-food-checkout:${slug}`, JSON.stringify({
       method,
       details,
-      restaurantId: restaurant.id,
-      subtotalPence: subtotal,
-      deliveryFeePence: deliveryFee,
-      totalPence: total,
-      basket: basketLines,
     }))
 
-    setError('Payment connection is the next step. Your checkout details have been saved.')
+    setSubmitting(true)
+
+    const { data, error: orderError } = await supabase.rpc('create_order', {
+      storefront_slug: slug,
+      fulfilment_method: method,
+      customer_first_name: details.firstName,
+      customer_last_name: details.lastName,
+      customer_email: details.email,
+      customer_phone: details.phone,
+      basket_items: basketLines.map((line) => ({
+        id: line.id,
+        quantity: line.quantity,
+      })),
+      address_line_1: method === 'delivery' ? details.addressLine1 : null,
+      address_line_2: method === 'delivery' ? details.addressLine2 || null : null,
+      town_city: method === 'delivery' ? details.town : null,
+      postcode: method === 'delivery' ? details.postcode : null,
+      delivery_instructions: details.instructions || null,
+    })
+
+    setSubmitting(false)
+
+    if (orderError) {
+      setError(orderError.message)
+      return
+    }
+
+    const order = data as CreatedOrder
+    setCreatedOrder(order)
+    window.localStorage.setItem(`ordered-food-pending-order:${slug}`, JSON.stringify(order))
+    setMessage(`Order #${order.order_number} has been created. Secure payment is the next connection.`)
   }
 
   if (loading) return <main className="checkout-state">Loading checkout…</main>
@@ -176,13 +222,13 @@ export default function Checkout() {
 
             <div className="fulfilment-options">
               {restaurant.accepts_delivery && (
-                <button className={method === 'delivery' ? 'selected' : ''} type="button" onClick={() => setMethod('delivery')}>
+                <button className={method === 'delivery' ? 'selected' : ''} type="button" onClick={() => setMethod('delivery')} disabled={submitting || Boolean(createdOrder)}>
                   <strong>Delivery</strong>
                   <span>Delivered to your address</span>
                 </button>
               )}
               {restaurant.accepts_collection && (
-                <button className={method === 'collection' ? 'selected' : ''} type="button" onClick={() => setMethod('collection')}>
+                <button className={method === 'collection' ? 'selected' : ''} type="button" onClick={() => setMethod('collection')} disabled={submitting || Boolean(createdOrder)}>
                   <strong>Collection</strong>
                   <span>Collect from the restaurant</span>
                 </button>
@@ -198,10 +244,10 @@ export default function Checkout() {
             </div>
 
             <div className="checkout-fields two-column">
-              <label>First name<input value={details.firstName} onChange={(event) => updateField('firstName', event.target.value)} required /></label>
-              <label>Last name<input value={details.lastName} onChange={(event) => updateField('lastName', event.target.value)} required /></label>
-              <label>Email<input type="email" value={details.email} onChange={(event) => updateField('email', event.target.value)} required /></label>
-              <label>Mobile number<input type="tel" value={details.phone} onChange={(event) => updateField('phone', event.target.value)} required /></label>
+              <label>First name<input value={details.firstName} onChange={(event) => updateField('firstName', event.target.value)} required disabled={submitting || Boolean(createdOrder)} /></label>
+              <label>Last name<input value={details.lastName} onChange={(event) => updateField('lastName', event.target.value)} required disabled={submitting || Boolean(createdOrder)} /></label>
+              <label>Email<input type="email" value={details.email} onChange={(event) => updateField('email', event.target.value)} required disabled={submitting || Boolean(createdOrder)} /></label>
+              <label>Mobile number<input type="tel" value={details.phone} onChange={(event) => updateField('phone', event.target.value)} required disabled={submitting || Boolean(createdOrder)} /></label>
             </div>
           </section>
 
@@ -214,13 +260,13 @@ export default function Checkout() {
               </div>
 
               <div className="checkout-fields">
-                <label>Address line 1<input value={details.addressLine1} onChange={(event) => updateField('addressLine1', event.target.value)} required /></label>
-                <label>Address line 2 <span>Optional</span><input value={details.addressLine2} onChange={(event) => updateField('addressLine2', event.target.value)} /></label>
+                <label>Address line 1<input value={details.addressLine1} onChange={(event) => updateField('addressLine1', event.target.value)} required disabled={submitting || Boolean(createdOrder)} /></label>
+                <label>Address line 2 <span>Optional</span><input value={details.addressLine2} onChange={(event) => updateField('addressLine2', event.target.value)} disabled={submitting || Boolean(createdOrder)} /></label>
                 <div className="two-column">
-                  <label>Town or city<input value={details.town} onChange={(event) => updateField('town', event.target.value)} required /></label>
-                  <label>Postcode<input value={details.postcode} onChange={(event) => updateField('postcode', formatPostcode(event.target.value))} required /></label>
+                  <label>Town or city<input value={details.town} onChange={(event) => updateField('town', event.target.value)} required disabled={submitting || Boolean(createdOrder)} /></label>
+                  <label>Postcode<input value={details.postcode} onChange={(event) => updateField('postcode', formatPostcode(event.target.value))} required disabled={submitting || Boolean(createdOrder)} /></label>
                 </div>
-                <label>Delivery instructions <span>Optional</span><textarea value={details.instructions} onChange={(event) => updateField('instructions', event.target.value)} rows={3} placeholder="Door number, access instructions or anything the driver should know" /></label>
+                <label>Delivery instructions <span>Optional</span><textarea value={details.instructions} onChange={(event) => updateField('instructions', event.target.value)} rows={3} placeholder="Door number, access instructions or anything the driver should know" disabled={submitting || Boolean(createdOrder)} /></label>
               </div>
             </section>
           )}
@@ -231,12 +277,15 @@ export default function Checkout() {
               <h2>Payment</h2>
               <p>Card, Apple Pay and Google Pay will be connected here.</p>
             </div>
-            <div className="payment-placeholder">Secure payment connection coming next</div>
+            <div className="payment-placeholder">{createdOrder ? `Order #${createdOrder.order_number} is awaiting payment` : 'Your order will be securely verified before payment'}</div>
           </section>
 
           {submitted && minimumShortfall > 0 && <p className="checkout-error">Add {money.format(minimumShortfall / 100)} more to meet the minimum order.</p>}
-          {error && restaurant && <p className="checkout-message">{error}</p>}
-          <button className="checkout-submit" type="submit" disabled={minimumShortfall > 0}>Continue to payment · {money.format(total / 100)}</button>
+          {error && <p className="checkout-error">{error}</p>}
+          {message && <p className="checkout-message">{message}</p>}
+          <button className="checkout-submit" type="submit" disabled={minimumShortfall > 0 || submitting || Boolean(createdOrder)}>
+            {submitting ? 'Creating order…' : createdOrder ? `Order #${createdOrder.order_number} created` : `Create order · ${money.format(total / 100)}`}
+          </button>
         </form>
 
         <aside className="checkout-summary">
@@ -251,9 +300,9 @@ export default function Checkout() {
             ))}
           </div>
           <div className="checkout-summary-costs">
-            <div><span>Subtotal</span><strong>{money.format(subtotal / 100)}</strong></div>
-            {method === 'delivery' && <div><span>Delivery</span><strong>{deliveryFee ? money.format(deliveryFee / 100) : 'Free'}</strong></div>}
-            <div className="checkout-summary-total"><span>Total</span><strong>{money.format(total / 100)}</strong></div>
+            <div><span>Subtotal</span><strong>{money.format((createdOrder?.subtotal_pence ?? subtotal) / 100)}</strong></div>
+            {method === 'delivery' && <div><span>Delivery</span><strong>{(createdOrder?.delivery_fee_pence ?? deliveryFee) ? money.format((createdOrder?.delivery_fee_pence ?? deliveryFee) / 100) : 'Free'}</strong></div>}
+            <div className="checkout-summary-total"><span>Total</span><strong>{money.format((createdOrder?.total_pence ?? total) / 100)}</strong></div>
           </div>
           {restaurant.preparation_time_minutes && <p>Estimated {method}: {restaurant.preparation_time_minutes} minutes</p>}
         </aside>
