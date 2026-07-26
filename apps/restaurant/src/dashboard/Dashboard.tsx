@@ -2,12 +2,12 @@ import { Link, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 
 const setupSteps = [
-  { label: 'Restaurant details', complete: true },
-  { label: 'Address and contact details', complete: true },
-  { label: 'Opening hours', complete: false },
-  { label: 'Add your first menu category', complete: false },
-  { label: 'Add your first product', complete: false },
-  { label: 'Connect payments', complete: false },
+  { label: 'Restaurant details', complete: true, to: '/onboarding' },
+  { label: 'Address and contact details', complete: true, to: '/onboarding' },
+  { label: 'Opening hours', complete: false, to: '/opening-hours' },
+  { label: 'Add your first menu category', complete: false, to: '/menu' },
+  { label: 'Add your first product', complete: false, to: '/menu' },
+  { label: 'Connect payments', complete: false, to: '/onboarding#payments' },
 ]
 
 export default function Dashboard() {
@@ -74,12 +74,13 @@ export default function Dashboard() {
 
           <div className="checklist">
             {setupSteps.map((step) => (
-              <div className="checklist-row" key={step.label}>
+              <Link className="checklist-row" key={step.label} to={step.to}>
                 <span className={step.complete ? 'check-icon complete' : 'check-icon'}>
                   {step.complete ? '✓' : '○'}
                 </span>
                 <span>{step.label}</span>
-              </div>
+                <span aria-hidden="true">→</span>
+              </Link>
             ))}
           </div>
         </article>
