@@ -49,6 +49,8 @@ type Order = {
   order_items: OrderItem[]
 }
 
+type PrinterStatus = 'offline' | 'online' | 'printing' | 'error'
+
 const requiredEnv = ['SUPABASE_URL', 'SUPABASE_SERVICE_ROLE_KEY', 'PRINTER_ID'] as const
 
 for (const key of requiredEnv) {
@@ -65,6 +67,7 @@ const supabase = createClient(
 
 const printerId = process.env.PRINTER_ID!
 const pollIntervalMs = Math.max(1_000, Number(process.env.POLL_INTERVAL_MS ?? 5_000))
+const heartbeatIntervalMs = Math.max(10_000, Number(process.env.HEARTBEAT_INTERVAL_MS ?? 20_000))
 const dryRun = (process.env.PRINT_DRY_RUN ?? 'true').toLowerCase() !== 'false'
 let stopping = false
 let working = false
@@ -198,6 +201,26 @@ async function sendToPrinter(printer: Printer, ticket: string) {
   throw new Error(`Printer driver not implemented for ${printer.printer_type}/${printer.connection_type}`)
 }
 
+async function updateHeartbeat(printerIdValue: string, status: PrinterStatus, errorMessage?: string) {
+  const { error } = await supabase.rpc('update_printer_heartbeat', {
+    p_printer_id: printerIdValue,
+    p_status: status,
+    p_error: errorMessage ?? null,
+  })
+
+  if (error) console.error(`Unable to update printer heartbeat: ${error.message}`)
+}
+
+async function recordPrinterResult(printerIdValue: string, success: boolean, errorMessage?: string) {
+  const { error } = await supabase.rpc('record_printer_result', {
+    p_printer_id: printerIdValue,
+    p_success: success,
+    p_error: errorMessage ?? null,
+  })
+
+  if (error) console.error(`Unable to record printer result: ${error.message}`)
+}
+
 async function completeJob(jobId: string, success: boolean, errorMessage?: string) {
   const { error } = await supabase.rpc('complete_print_job', {
     p_job_id: jobId,
@@ -222,6 +245,8 @@ async function processNextJob(printer: Printer) {
     const job = (data?.[0] ?? null) as ClaimedJob | null
     if (!job) return
 
+    await updateHeartbeat(printer.id, 'printing')
+
     try {
       let ticket: string
       let logLabel: string
@@ -241,10 +266,12 @@ async function processNextJob(printer: Printer) {
       }
 
       await completeJob(job.job_id, true)
+      await recordPrinterResult(printer.id, true)
       console.log(`Printed job ${job.job_id} for ${logLabel}`)
     } catch (caughtError) {
       const message = caughtError instanceof Error ? caughtError.message : 'Unknown print failure'
       await completeJob(job.job_id, false, message)
+      await recordPrinterResult(printer.id, false, message)
       console.error(`Print job ${job.job_id} failed: ${message}`)
     }
   } finally {
@@ -254,6 +281,7 @@ async function processNextJob(printer: Printer) {
 
 async function main() {
   const printer = await fetchPrinter()
+  await updateHeartbeat(printer.id, 'online')
   console.log(`Print worker started for ${printer.name}. Dry run: ${dryRun}`)
 
   const channel = supabase
@@ -270,14 +298,21 @@ async function main() {
     )
     .subscribe()
 
-  const timer = setInterval(() => void processNextJob(printer), pollIntervalMs)
+  const pollTimer = setInterval(() => void processNextJob(printer), pollIntervalMs)
+  const heartbeatTimer = setInterval(
+    () => void updateHeartbeat(printer.id, working ? 'printing' : 'online'),
+    heartbeatIntervalMs,
+  )
+
   await processNextJob(printer)
 
   const shutdown = async (signal: string) => {
     if (stopping) return
     stopping = true
     console.log(`Received ${signal}; shutting down print worker.`)
-    clearInterval(timer)
+    clearInterval(pollTimer)
+    clearInterval(heartbeatTimer)
+    await updateHeartbeat(printer.id, 'offline')
     await supabase.removeChannel(channel)
     process.exit(0)
   }
@@ -286,7 +321,9 @@ async function main() {
   process.on('SIGTERM', () => void shutdown('SIGTERM'))
 }
 
-main().catch((error) => {
+main().catch(async (error) => {
+  const message = error instanceof Error ? error.message : 'Unknown worker failure'
   console.error(error)
+  await updateHeartbeat(printerId, 'error', message)
   process.exit(1)
 })
