@@ -7,6 +7,7 @@ import ProtectedRoute from './components/ProtectedRoute'
 import Dashboard from './dashboard/Dashboard'
 import Onboarding from './onboarding/Onboarding'
 import MenuBuilder from './menu/MenuBuilder'
+import ModifierGroups from './menu/ModifierGroups'
 import OpeningHours from './opening-hours/OpeningHours'
 import Branding from './branding/Branding'
 import RestaurantSettings from './settings/RestaurantSettings'
@@ -41,6 +42,7 @@ export default function App() {
       <Route path="/print-history" element={<ProtectedRoute><PrintHistory /></ProtectedRoute>} />
       <Route path="/onboarding" element={<ProtectedRoute><Onboarding /></ProtectedRoute>} />
       <Route path="/menu" element={<ProtectedRoute><MenuBuilder /></ProtectedRoute>} />
+      <Route path="/menu/modifiers" element={<ProtectedRoute><ModifierGroups /></ProtectedRoute>} />
       <Route path="/opening-hours" element={<ProtectedRoute><OpeningHours /></ProtectedRoute>} />
       <Route path="/branding" element={<ProtectedRoute><Branding /></ProtectedRoute>} />
       <Route path="/settings" element={<ProtectedRoute><RestaurantSettings /></ProtectedRoute>} />
