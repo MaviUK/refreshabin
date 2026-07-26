@@ -4,6 +4,8 @@ import Register from './auth/Register'
 import ForgotPassword from './auth/ForgotPassword'
 import ResetPassword from './auth/ResetPassword'
 import ProtectedRoute from './components/ProtectedRoute'
+import Home from './home/Home'
+import Restaurants from './discovery/Restaurants'
 import Dashboard from './dashboard/Dashboard'
 import Onboarding from './onboarding/Onboarding'
 import MenuBuilder from './menu/MenuBuilder'
@@ -20,14 +22,11 @@ import KitchenDisplay from './kds/KitchenDisplay'
 import PrinterManagement from './printers/PrinterManagement'
 import PrintHistory from './printers/PrintHistory'
 
-function HomeRedirect() {
-  return <Navigate to="/dashboard" replace />
-}
-
 export default function App() {
   return (
     <Routes>
-      <Route path="/" element={<HomeRedirect />} />
+      <Route path="/" element={<Home />} />
+      <Route path="/restaurants" element={<Restaurants />} />
       <Route path="/r/:slug" element={<Storefront />} />
       <Route path="/r/:slug/checkout" element={<Checkout />} />
       <Route path="/login" element={<Login />} />
@@ -49,7 +48,7 @@ export default function App() {
       <Route path="/delivery-areas" element={<ProtectedRoute><DeliveryAreas /></ProtectedRoute>} />
       <Route path="/delivery-map" element={<ProtectedRoute><DeliveryMap /></ProtectedRoute>} />
 
-      <Route path="*" element={<Navigate to="/dashboard" replace />} />
+      <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   )
 }
