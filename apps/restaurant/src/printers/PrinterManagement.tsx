@@ -3,6 +3,8 @@ import { Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import './PrinterManagement.css'
 
+type WorkerStatus = 'offline' | 'online' | 'printing' | 'error'
+
 type Printer = {
   id: string
   name: string
@@ -13,6 +15,11 @@ type Printer = {
   print_customer_receipts: boolean
   copies: number
   is_active: boolean
+  worker_status: WorkerStatus
+  last_seen_at: string | null
+  last_printed_at: string | null
+  last_error: string | null
+  last_error_at: string | null
 }
 
 type FormState = {
@@ -39,6 +46,39 @@ const emptyForm: FormState = {
   active: true,
 }
 
+const STALE_AFTER_MS = 60_000
+
+function effectiveStatus(printer: Printer): WorkerStatus {
+  if (!printer.is_active) return 'offline'
+  if (!printer.last_seen_at) return 'offline'
+  if (Date.now() - new Date(printer.last_seen_at).getTime() > STALE_AFTER_MS) return 'offline'
+  return printer.worker_status
+}
+
+function statusLabel(status: WorkerStatus) {
+  if (status === 'online') return 'Online'
+  if (status === 'printing') return 'Printing'
+  if (status === 'error') return 'Error'
+  return 'Offline'
+}
+
+function formatRelativeTime(value: string | null) {
+  if (!value) return 'Never'
+
+  const difference = Date.now() - new Date(value).getTime()
+  if (difference < 10_000) return 'Just now'
+  if (difference < 60_000) return `${Math.floor(difference / 1_000)} seconds ago`
+  if (difference < 3_600_000) return `${Math.floor(difference / 60_000)} minutes ago`
+  if (difference < 86_400_000) return `${Math.floor(difference / 3_600_000)} hours ago`
+
+  return new Date(value).toLocaleString('en-GB', {
+    day: '2-digit',
+    month: 'short',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+}
+
 export default function PrinterManagement() {
   const [restaurantId, setRestaurantId] = useState<string | null>(null)
   const [restaurantName, setRestaurantName] = useState('Restaurant')
@@ -50,10 +90,38 @@ export default function PrinterManagement() {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [message, setMessage] = useState('')
+  const [, setClock] = useState(0)
 
   useEffect(() => {
     void loadPage()
   }, [])
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setClock((value) => value + 1), 15_000)
+    return () => window.clearInterval(timer)
+  }, [])
+
+  useEffect(() => {
+    if (!restaurantId) return
+
+    const channel = supabase
+      .channel(`restaurant-printers:${restaurantId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'restaurant_printers',
+          filter: `restaurant_id=eq.${restaurantId}`,
+        },
+        () => void loadPrinters(restaurantId),
+      )
+      .subscribe()
+
+    return () => {
+      void supabase.removeChannel(channel)
+    }
+  }, [restaurantId])
 
   async function loadPage() {
     setLoading(true)
@@ -96,7 +164,7 @@ export default function PrinterManagement() {
   async function loadPrinters(id: string) {
     const { data, error: printersError } = await supabase
       .from('restaurant_printers')
-      .select('id, name, printer_type, connection_type, connection_config, print_kitchen_tickets, print_customer_receipts, copies, is_active')
+      .select('id, name, printer_type, connection_type, connection_config, print_kitchen_tickets, print_customer_receipts, copies, is_active, worker_status, last_seen_at, last_printed_at, last_error, last_error_at')
       .eq('restaurant_id', id)
       .order('created_at', { ascending: true })
 
@@ -259,7 +327,7 @@ export default function PrinterManagement() {
         <div>
           <span className="eyebrow">Kitchen operations</span>
           <h1>Printer management</h1>
-          <p>Add kitchen and receipt printers, then choose what each one should print.</p>
+          <p>Add kitchen and receipt printers, monitor their connection, and test them before service.</p>
         </div>
       </section>
 
@@ -341,35 +409,61 @@ export default function PrinterManagement() {
               <h2>No printers yet</h2>
               <p>Add your first printer to automatically print paid orders.</p>
             </article>
-          ) : printers.map((printer) => (
-            <article className="settings-card printer-card" key={printer.id}>
-              <div className="printer-card-top">
-                <div>
-                  <span className={printer.is_active ? 'printer-status active' : 'printer-status'}>{printer.is_active ? 'Active' : 'Inactive'}</span>
-                  <h2>{printer.name}</h2>
-                  <p>{printer.printer_type.toUpperCase()} · {printer.connection_type}</p>
+          ) : printers.map((printer) => {
+            const status = effectiveStatus(printer)
+            return (
+              <article className="settings-card printer-card" key={printer.id}>
+                <div className="printer-card-top">
+                  <div>
+                    <span className={`printer-status ${status}`}>
+                      <span className="printer-status-dot" aria-hidden="true" />
+                      {statusLabel(status)}
+                    </span>
+                    <h2>{printer.name}</h2>
+                    <p>{printer.printer_type.toUpperCase()} · {printer.connection_type}</p>
+                  </div>
+                  <strong>{printer.copies}×</strong>
                 </div>
-                <strong>{printer.copies}×</strong>
-              </div>
-              <div className="printer-tags">
-                {printer.print_kitchen_tickets && <span>Kitchen tickets</span>}
-                {printer.print_customer_receipts && <span>Receipts</span>}
-                {typeof printer.connection_config.host === 'string' && <span>{printer.connection_config.host}:{String(printer.connection_config.port ?? 9100)}</span>}
-              </div>
-              <div className="printer-card-actions">
-                <button
-                  className="primary-button"
-                  type="button"
-                  disabled={!printer.is_active || testingId !== null}
-                  onClick={() => void testPrinter(printer)}
-                >
-                  {testingId === printer.id ? 'Queuing test…' : 'Print test ticket'}
-                </button>
-                <button className="secondary-button" type="button" onClick={() => editPrinter(printer)}>Edit</button>
-                <button className="danger-text-button" type="button" onClick={() => void deletePrinter(printer)}>Delete</button>
-              </div>
-            </article>
-          ))}
+
+                <div className="printer-health-grid">
+                  <div>
+                    <span>Last seen</span>
+                    <strong>{formatRelativeTime(printer.last_seen_at)}</strong>
+                  </div>
+                  <div>
+                    <span>Last printed</span>
+                    <strong>{formatRelativeTime(printer.last_printed_at)}</strong>
+                  </div>
+                </div>
+
+                {status === 'error' && printer.last_error && (
+                  <div className="printer-error-panel" role="alert">
+                    <strong>Latest printer error</strong>
+                    <p>{printer.last_error}</p>
+                    <span>{formatRelativeTime(printer.last_error_at)}</span>
+                  </div>
+                )}
+
+                <div className="printer-tags">
+                  {printer.print_kitchen_tickets && <span>Kitchen tickets</span>}
+                  {printer.print_customer_receipts && <span>Receipts</span>}
+                  {typeof printer.connection_config.host === 'string' && <span>{printer.connection_config.host}:{String(printer.connection_config.port ?? 9100)}</span>}
+                </div>
+                <div className="printer-card-actions">
+                  <button
+                    className="primary-button"
+                    type="button"
+                    disabled={!printer.is_active || testingId !== null}
+                    onClick={() => void testPrinter(printer)}
+                  >
+                    {testingId === printer.id ? 'Queuing test…' : 'Print test ticket'}
+                  </button>
+                  <button className="secondary-button" type="button" onClick={() => editPrinter(printer)}>Edit</button>
+                  <button className="danger-text-button" type="button" onClick={() => void deletePrinter(printer)}>Delete</button>
+                </div>
+              </article>
+            )
+          })}
         </div>
       </section>
     </main>
