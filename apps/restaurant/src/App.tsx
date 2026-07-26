@@ -17,6 +17,7 @@ import DeliveryAreas from './settings/DeliveryAreas'
 import DeliveryMap from './settings/DeliveryMap'
 import Storefront from './storefront/Storefront'
 import Checkout from './checkout/Checkout'
+import OrderStatus from './order/OrderStatus'
 import Orders from './orders/Orders'
 import KitchenDisplay from './kds/KitchenDisplay'
 import PrinterManagement from './printers/PrinterManagement'
@@ -29,6 +30,7 @@ export default function App() {
       <Route path="/restaurants" element={<Restaurants />} />
       <Route path="/r/:slug" element={<Storefront />} />
       <Route path="/r/:slug/checkout" element={<Checkout />} />
+      <Route path="/order/success" element={<OrderStatus />} />
       <Route path="/login" element={<Login />} />
       <Route path="/register" element={<Register />} />
       <Route path="/forgot-password" element={<ForgotPassword />} />
