@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import './Storefront.css'
 
 type MenuItem = {
   id: string
@@ -135,10 +136,25 @@ export default function Storefront() {
     })
   }
 
+  function scrollToCategory(categoryId: string) {
+    document.getElementById(`category-${categoryId}`)?.scrollIntoView({
+      behavior: 'smooth',
+      block: 'start',
+    })
+  }
+
   if (loading) return <main className="storefront-state">Loading menu…</main>
   if (error || !data) return <main className="storefront-state"><h1>Unable to load restaurant</h1><p>{error}</p></main>
 
   const { restaurant } = data
+  const deliveryFee = restaurant.accepts_delivery
+    && restaurant.delivery_fee_pence
+    && (!restaurant.free_delivery_threshold_pence || subtotal < restaurant.free_delivery_threshold_pence)
+    ? restaurant.delivery_fee_pence
+    : 0
+  const total = subtotal + deliveryFee
+  const minimumShortfall = Math.max((restaurant.minimum_order_pence ?? 0) - subtotal, 0)
+  const canContinue = basketLines.length > 0 && minimumShortfall === 0
 
   return (
     <main className="storefront-page">
@@ -168,8 +184,19 @@ export default function Storefront() {
         <div className="storefront-fees">
           {restaurant.minimum_order_pence != null && <span>Min. {money.format(restaurant.minimum_order_pence / 100)}</span>}
           {restaurant.delivery_fee_pence != null && <span>Delivery {money.format(restaurant.delivery_fee_pence / 100)}</span>}
+          {restaurant.free_delivery_threshold_pence != null && <span>Free over {money.format(restaurant.free_delivery_threshold_pence / 100)}</span>}
         </div>
       </section>
+
+      <nav className="storefront-category-nav" aria-label="Menu categories">
+        <div>
+          {data.categories.map((category) => (
+            <button key={category.id} type="button" onClick={() => scrollToCategory(category.id)}>
+              {category.name}
+            </button>
+          ))}
+        </div>
+      </nav>
 
       <div className="storefront-layout">
         <section className="storefront-menu">
@@ -238,8 +265,13 @@ export default function Storefront() {
                   </div>
                 ))}
               </div>
-              <div className="basket-total"><span>Subtotal</span><strong>{money.format(subtotal / 100)}</strong></div>
-              <button className="basket-checkout" type="button">Continue</button>
+              <div className="basket-costs">
+                <div><span>Subtotal</span><strong>{money.format(subtotal / 100)}</strong></div>
+                {restaurant.accepts_delivery && <div><span>Delivery</span><strong>{deliveryFee ? money.format(deliveryFee / 100) : 'Free'}</strong></div>}
+                <div className="basket-total"><span>Total</span><strong>{money.format(total / 100)}</strong></div>
+              </div>
+              {minimumShortfall > 0 && <p className="basket-warning">Add {money.format(minimumShortfall / 100)} more to reach the minimum order.</p>}
+              <button className="basket-checkout" type="button" disabled={!canContinue}>Continue</button>
               <p className="basket-note">Delivery details and payment are added in the next checkout step.</p>
             </>
           )}
@@ -249,7 +281,7 @@ export default function Storefront() {
       {itemCount > 0 && (
         <button className="mobile-basket-button" type="button" onClick={() => document.querySelector('.basket-panel')?.scrollIntoView({ behavior: 'smooth' })}>
           <span>{itemCount} item{itemCount === 1 ? '' : 's'}</span>
-          <strong>View basket · {money.format(subtotal / 100)}</strong>
+          <strong>View basket · {money.format(total / 100)}</strong>
         </button>
       )}
     </main>
