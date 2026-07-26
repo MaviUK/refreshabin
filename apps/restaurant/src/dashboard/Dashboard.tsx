@@ -93,9 +93,12 @@ export default function Dashboard() {
           </div>
 
           <div className="quick-actions">
+            <Link to="/orders">Manage orders <span>→</span></Link>
+            <Link to="/kds">Open kitchen display <span>→</span></Link>
+            <Link to="/printers">Manage printers <span>→</span></Link>
+            <Link to="/print-history">View print history <span>→</span></Link>
             <Link to="/onboarding">Complete restaurant setup <span>→</span></Link>
-            <Link to="/menu">Add a menu category <span>→</span></Link>
-            <Link to="/menu">Add your first product <span>→</span></Link>
+            <Link to="/menu">Build your menu <span>→</span></Link>
             <Link to="/opening-hours">Set opening hours <span>→</span></Link>
           </div>
         </article>
