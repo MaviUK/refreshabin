@@ -60,6 +60,32 @@
   color: #667069;
 }
 
+.orders-title-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.sound-toggle {
+  min-height: 42px;
+  border: 1px solid #cfd7d1;
+  border-radius: 999px;
+  background: white;
+  color: #526058;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 800;
+  padding: 0 14px;
+}
+
+.sound-toggle.enabled {
+  border-color: #86efac;
+  background: #dcfce7;
+  color: #166534;
+}
+
 .orders-eyebrow {
   color: #15803d;
   font-size: 0.75rem;
@@ -162,6 +188,15 @@
   text-transform: capitalize;
 }
 
+.order-card-header .ready-time {
+  width: max-content;
+  border-radius: 999px;
+  background: #fff7ed;
+  color: #9a3412;
+  font-weight: 900;
+  padding: 5px 9px;
+}
+
 .order-card-total {
   display: grid;
   justify-items: end;
@@ -207,7 +242,16 @@
 }
 
 .order-items small {
-  color: #7a847d;
+  color: #667069;
+  padding-left: 20px;
+}
+
+.order-items .kitchen-note {
+  margin-top: 4px;
+  border-left: 3px solid #f59e0b;
+  color: #92400e;
+  font-weight: 800;
+  padding: 5px 0 5px 10px;
 }
 
 .order-details {
@@ -241,6 +285,7 @@
 
 .order-actions {
   display: flex;
+  align-items: center;
   justify-content: flex-end;
   gap: 10px;
   padding: 0 22px 22px;
@@ -269,6 +314,38 @@
 .order-action:disabled {
   cursor: wait;
   opacity: 0.55;
+}
+
+.prep-time-picker {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-right: auto;
+}
+
+.prep-time-picker > span {
+  color: #667069;
+  font-size: 0.78rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.prep-time-picker button {
+  min-height: 42px;
+  border: 1px solid #cad2cc;
+  border-radius: 11px;
+  background: #17211b;
+  color: white;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 900;
+  padding: 0 13px;
+}
+
+.prep-time-picker button.cancel {
+  background: white;
+  color: #536058;
 }
 
 .orders-empty,
@@ -302,10 +379,12 @@
   .orders-page { padding: 0 14px 32px; }
   .orders-header { min-height: 68px; }
   .orders-header nav { display: none; }
-  .orders-title-row { margin-top: 28px; align-items: center; }
+  .orders-title-row { margin-top: 28px; align-items: flex-start; }
+  .orders-title-actions { justify-content: flex-start; }
   .order-card-header { padding: 18px; }
   .order-details { grid-template-columns: 1fr; padding: 18px; }
   .order-items { padding: 14px 18px; }
-  .order-actions { padding: 0 18px 18px; }
-  .order-action { flex: 1; }
+  .order-actions { align-items: stretch; flex-direction: column; padding: 0 18px 18px; }
+  .order-action { width: 100%; }
+  .prep-time-picker { width: 100%; margin: 0; }
 }
