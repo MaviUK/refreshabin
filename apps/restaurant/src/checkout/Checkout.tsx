@@ -8,16 +8,9 @@ type SelectedExtra = { id: string; name: string; price_pence: number; quantity: 
 type SelectedModifierOption = { id: string; name: string; price_pence: number; quantity: number }
 type SelectedModifierGroup = { group_id: string; group_name: string; options: SelectedModifierOption[] }
 type BasketLine = {
-  id: string
-  line_id: string
-  name: string
-  price_pence: number
-  unit_price_pence: number
-  quantity: number
-  removed_ingredients?: Ingredient[]
-  selected_extras?: SelectedExtra[]
-  selected_modifier_groups?: SelectedModifierGroup[]
-  special_instructions?: string
+  id: string; line_id: string; name: string; price_pence: number; unit_price_pence: number; quantity: number
+  removed_ingredients?: Ingredient[]; selected_extras?: SelectedExtra[]
+  selected_modifier_groups?: SelectedModifierGroup[]; special_instructions?: string
 }
 type Restaurant = {
   id: string; name: string; slug: string; accepts_delivery: boolean; accepts_collection: boolean
@@ -26,11 +19,16 @@ type Restaurant = {
 }
 type StorefrontData = { restaurant: Restaurant }
 type FulfilmentMethod = 'delivery' | 'collection'
+type AccountMode = 'create' | 'signin'
 type CreatedOrder = {
   order_id: string; order_number: number; restaurant_name: string; subtotal_pence: number
   delivery_fee_pence: number; total_pence: number; currency: string; payment_status: string; order_status: string
 }
 type CheckoutSessionResponse = { checkout_url?: string; session_id?: string; error?: string }
+type CustomerProfile = {
+  first_name: string | null; last_name: string | null; phone: string | null; address_line_1: string | null
+  address_line_2: string | null; town_city: string | null; postcode: string | null
+}
 
 const money = new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'GBP' })
 function formatPostcode(value: string) {
@@ -49,6 +47,9 @@ export default function Checkout() {
   const [message, setMessage] = useState('')
   const [submitted, setSubmitted] = useState(false)
   const [createdOrder, setCreatedOrder] = useState<CreatedOrder | null>(null)
+  const [accountMode, setAccountMode] = useState<AccountMode>('create')
+  const [password, setPassword] = useState('')
+  const [signedIn, setSignedIn] = useState(false)
   const [details, setDetails] = useState({ firstName: '', lastName: '', email: '', phone: '', addressLine1: '', addressLine2: '', town: '', postcode: '', instructions: '' })
 
   useEffect(() => {
@@ -65,9 +66,13 @@ export default function Checkout() {
         if (parsed.method) setMethod(parsed.method)
       } catch { window.localStorage.removeItem(`ordered-food-checkout:${slug}`) }
     }
-    async function loadRestaurant() {
+
+    async function loadPage() {
       setLoading(true)
-      const { data, error: rpcError } = await supabase.rpc('get_public_storefront', { storefront_slug: slug })
+      const [{ data, error: rpcError }, { data: sessionData }] = await Promise.all([
+        supabase.rpc('get_public_storefront', { storefront_slug: slug }),
+        supabase.auth.getSession(),
+      ])
       if (rpcError) setError(rpcError.message)
       else if (!data) setError('Restaurant not found.')
       else {
@@ -75,9 +80,28 @@ export default function Checkout() {
         setRestaurant(storefront.restaurant)
         if (!storefront.restaurant.accepts_delivery && storefront.restaurant.accepts_collection) setMethod('collection')
       }
+
+      const user = sessionData.session?.user
+      if (user) {
+        setSignedIn(true)
+        const { data: profile } = await supabase.from('customer_profiles').select('first_name,last_name,phone,address_line_1,address_line_2,town_city,postcode').eq('user_id', user.id).maybeSingle()
+        const saved = profile as CustomerProfile | null
+        setDetails((current) => ({
+          ...current,
+          firstName: saved?.first_name || current.firstName,
+          lastName: saved?.last_name || current.lastName,
+          email: user.email || current.email,
+          phone: saved?.phone || current.phone,
+          addressLine1: saved?.address_line_1 || current.addressLine1,
+          addressLine2: saved?.address_line_2 || current.addressLine2,
+          town: saved?.town_city || current.town,
+          postcode: saved?.postcode || current.postcode,
+        }))
+        await supabase.rpc('claim_customer_orders')
+      }
       setLoading(false)
     }
-    void loadRestaurant()
+    void loadPage()
   }, [slug])
 
   const basketLines = Object.values(basket)
@@ -92,6 +116,54 @@ export default function Checkout() {
 
   function updateField(field: keyof typeof details, value: string) { setDetails((current) => ({ ...current, [field]: value })) }
 
+  async function authenticateCustomer() {
+    if (signedIn) return true
+    if (password.length < 8) {
+      setError('Your password must be at least 8 characters.')
+      return false
+    }
+
+    if (accountMode === 'signin') {
+      const { error: signInError } = await supabase.auth.signInWithPassword({ email: details.email.trim(), password })
+      if (signInError) {
+        setError('We could not sign you in. Check your email and password, or choose Create account.')
+        return false
+      }
+      setSignedIn(true)
+      await supabase.rpc('claim_customer_orders')
+      return true
+    }
+
+    const { data, error: signUpError } = await supabase.auth.signUp({
+      email: details.email.trim(),
+      password,
+      options: { data: { full_name: `${details.firstName} ${details.lastName}`.trim(), account_type: 'customer' } },
+    })
+    if (signUpError) {
+      setError(signUpError.message)
+      return false
+    }
+    if (data.session) {
+      setSignedIn(true)
+      await supabase.rpc('claim_customer_orders')
+    }
+    return true
+  }
+
+  async function saveProfile() {
+    const { data } = await supabase.auth.getUser()
+    if (!data.user) return
+    await supabase.from('customer_profiles').upsert({
+      user_id: data.user.id,
+      first_name: details.firstName.trim(), last_name: details.lastName.trim(), phone: details.phone.trim(),
+      address_line_1: method === 'delivery' ? details.addressLine1.trim() : null,
+      address_line_2: method === 'delivery' ? details.addressLine2.trim() || null : null,
+      town_city: method === 'delivery' ? details.town.trim() : null,
+      postcode: method === 'delivery' ? details.postcode.trim() : null,
+      updated_at: new Date().toISOString(),
+    })
+  }
+
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     setSubmitted(true)
@@ -103,26 +175,24 @@ export default function Checkout() {
       setError('Please complete all required fields.')
       return
     }
-    window.localStorage.setItem(`ordered-food-checkout:${slug}`, JSON.stringify({ method, details }))
-    setSubmitting(true)
-    setMessage('Creating your order…')
 
+    setSubmitting(true)
+    setMessage(signedIn ? 'Creating your order…' : accountMode === 'signin' ? 'Signing in…' : 'Creating your account…')
+    const authenticated = await authenticateCustomer()
+    if (!authenticated) { setSubmitting(false); setMessage(''); return }
+
+    await saveProfile()
+    window.localStorage.setItem(`ordered-food-checkout:${slug}`, JSON.stringify({ method, details }))
+    setMessage('Creating your order…')
     const { data, error: orderError } = await supabase.rpc('create_order', {
-      storefront_slug: slug,
-      fulfilment_method: method,
-      customer_first_name: details.firstName,
-      customer_last_name: details.lastName,
-      customer_email: details.email,
-      customer_phone: details.phone,
+      storefront_slug: slug, fulfilment_method: method,
+      customer_first_name: details.firstName, customer_last_name: details.lastName,
+      customer_email: details.email, customer_phone: details.phone,
       basket_items: basketLines.map((line) => ({
-        id: line.id,
-        quantity: line.quantity,
+        id: line.id, quantity: line.quantity,
         removed_ingredients: (line.removed_ingredients || []).map((ingredient) => ({ id: ingredient.id })),
         selected_extras: (line.selected_extras || []).map((extra) => ({ id: extra.id, quantity: extra.quantity })),
-        selected_modifier_groups: (line.selected_modifier_groups || []).map((group) => ({
-          group_id: group.group_id,
-          options: group.options.map((option) => ({ id: option.id, quantity: option.quantity })),
-        })),
+        selected_modifier_groups: (line.selected_modifier_groups || []).map((group) => ({ group_id: group.group_id, options: group.options.map((option) => ({ id: option.id, quantity: option.quantity })) })),
         special_instructions: line.special_instructions || null,
       })),
       address_line_1: method === 'delivery' ? details.addressLine1 : null,
@@ -132,20 +202,14 @@ export default function Checkout() {
       delivery_instructions: details.instructions || null,
     })
 
-    if (orderError) {
-      setSubmitting(false)
-      setMessage('')
-      setError(orderError.message)
-      return
-    }
+    if (orderError) { setSubmitting(false); setMessage(''); setError(orderError.message); return }
     const order = data as CreatedOrder
     setCreatedOrder(order)
     window.localStorage.setItem(`ordered-food-pending-order:${slug}`, JSON.stringify(order))
     setMessage(`Order #${order.order_number} created. Opening secure payment…`)
     const { data: checkoutData, error: checkoutError } = await supabase.functions.invoke<CheckoutSessionResponse>('create-checkout-session', { body: { order_id: order.order_id } })
     if (checkoutError || !checkoutData?.checkout_url) {
-      setSubmitting(false)
-      setMessage('')
+      setSubmitting(false); setMessage('')
       setError(checkoutData?.error || checkoutError?.message || 'Unable to open secure payment. Please try again.')
       return
     }
@@ -157,15 +221,20 @@ export default function Checkout() {
   if (!restaurant || !slug) return null
   if (!basketLines.length) return <main className="checkout-state"><h1>Your basket is empty</h1><p>Add items before continuing to checkout.</p><Link className="checkout-back-link" to={`/r/${slug}`}>Return to menu</Link></main>
 
+  const addressStep = method === 'delivery' ? 3 : null
+  const accountStep = method === 'delivery' ? 4 : 3
+  const paymentStep = method === 'delivery' ? 5 : 4
+
   return (
     <main className="checkout-page">
-      <header className="checkout-header"><Link to={`/r/${slug}`}>← Back to menu</Link><strong>ordered.food</strong><span>Secure checkout</span></header>
+      <header className="checkout-header"><Link to={`/r/${slug}`}>← Back to menu</Link><strong>ordered.food</strong><Link to="/account/orders">My orders</Link></header>
       <div className="checkout-layout">
         <form className="checkout-form" onSubmit={handleSubmit} noValidate>
           <section className="checkout-card"><span className="checkout-step">1</span><div className="checkout-section-heading"><h1>How would you like your order?</h1><p>Choose delivery or collection from {restaurant.name}.</p></div><div className="fulfilment-options">{restaurant.accepts_delivery && <button className={method === 'delivery' ? 'selected' : ''} type="button" onClick={() => setMethod('delivery')} disabled={submitting || Boolean(createdOrder)}><strong>Delivery</strong><span>Delivered to your address</span></button>}{restaurant.accepts_collection && <button className={method === 'collection' ? 'selected' : ''} type="button" onClick={() => setMethod('collection')} disabled={submitting || Boolean(createdOrder)}><strong>Collection</strong><span>Collect from the restaurant</span></button>}</div></section>
-          <section className="checkout-card"><span className="checkout-step">2</span><div className="checkout-section-heading"><h2>Your details</h2><p>We will use these details for order updates.</p></div><div className="checkout-fields two-column"><label>First name<input value={details.firstName} onChange={(event) => updateField('firstName', event.target.value)} required disabled={submitting || Boolean(createdOrder)} /></label><label>Last name<input value={details.lastName} onChange={(event) => updateField('lastName', event.target.value)} required disabled={submitting || Boolean(createdOrder)} /></label><label>Email<input type="email" value={details.email} onChange={(event) => updateField('email', event.target.value)} required disabled={submitting || Boolean(createdOrder)} /></label><label>Mobile number<input type="tel" value={details.phone} onChange={(event) => updateField('phone', event.target.value)} required disabled={submitting || Boolean(createdOrder)} /></label></div></section>
-          {method === 'delivery' && <section className="checkout-card"><span className="checkout-step">3</span><div className="checkout-section-heading"><h2>Delivery address</h2><p>Enter the address where you would like your order delivered.</p></div><div className="checkout-fields"><label>Address line 1<input value={details.addressLine1} onChange={(event) => updateField('addressLine1', event.target.value)} required disabled={submitting || Boolean(createdOrder)} /></label><label>Address line 2 <span>Optional</span><input value={details.addressLine2} onChange={(event) => updateField('addressLine2', event.target.value)} disabled={submitting || Boolean(createdOrder)} /></label><div className="two-column"><label>Town or city<input value={details.town} onChange={(event) => updateField('town', event.target.value)} required disabled={submitting || Boolean(createdOrder)} /></label><label>Postcode<input value={details.postcode} onChange={(event) => updateField('postcode', formatPostcode(event.target.value))} required disabled={submitting || Boolean(createdOrder)} /></label></div><label>Delivery instructions <span>Optional</span><textarea value={details.instructions} onChange={(event) => updateField('instructions', event.target.value)} rows={3} placeholder="Door number, access instructions or anything the driver should know" disabled={submitting || Boolean(createdOrder)} /></label></div></section>}
-          <section className="checkout-card checkout-payment-placeholder"><span className="checkout-step">{method === 'delivery' ? '4' : '3'}</span><div className="checkout-section-heading"><h2>Payment</h2><p>You will be transferred to Stripe for secure card, Apple Pay or Google Pay payment.</p></div><div className="payment-placeholder">{createdOrder ? `Order #${createdOrder.order_number} is opening secure payment` : 'Payment details are entered securely on Stripe'}</div></section>
+          <section className="checkout-card"><span className="checkout-step">2</span><div className="checkout-section-heading"><h2>Your details</h2><p>We will use these details for order updates.</p></div><div className="checkout-fields two-column"><label>First name<input value={details.firstName} onChange={(event) => updateField('firstName', event.target.value)} required disabled={submitting || Boolean(createdOrder)} /></label><label>Last name<input value={details.lastName} onChange={(event) => updateField('lastName', event.target.value)} required disabled={submitting || Boolean(createdOrder)} /></label><label>Email<input type="email" value={details.email} onChange={(event) => updateField('email', event.target.value)} required disabled={signedIn || submitting || Boolean(createdOrder)} /></label><label>Mobile number<input type="tel" value={details.phone} onChange={(event) => updateField('phone', event.target.value)} required disabled={submitting || Boolean(createdOrder)} /></label></div></section>
+          {method === 'delivery' && <section className="checkout-card"><span className="checkout-step">{addressStep}</span><div className="checkout-section-heading"><h2>Delivery address</h2><p>We will save this address to your account for next time.</p></div><div className="checkout-fields"><label>Address line 1<input value={details.addressLine1} onChange={(event) => updateField('addressLine1', event.target.value)} required disabled={submitting || Boolean(createdOrder)} /></label><label>Address line 2 <span>Optional</span><input value={details.addressLine2} onChange={(event) => updateField('addressLine2', event.target.value)} disabled={submitting || Boolean(createdOrder)} /></label><div className="two-column"><label>Town or city<input value={details.town} onChange={(event) => updateField('town', event.target.value)} required disabled={submitting || Boolean(createdOrder)} /></label><label>Postcode<input value={details.postcode} onChange={(event) => updateField('postcode', formatPostcode(event.target.value))} required disabled={submitting || Boolean(createdOrder)} /></label></div><label>Delivery instructions <span>Optional</span><textarea value={details.instructions} onChange={(event) => updateField('instructions', event.target.value)} rows={3} placeholder="Door number, access instructions or anything the driver should know" disabled={submitting || Boolean(createdOrder)} /></label></div></section>}
+          <section className="checkout-card"><span className="checkout-step">{accountStep}</span><div className="checkout-section-heading"><h2>{signedIn ? 'Your account' : 'Save your details'}</h2><p>{signedIn ? 'You are signed in. This order will appear in My orders.' : 'Create an account to save your details and see your full order history.'}</p></div>{signedIn ? <div className="payment-placeholder">Signed in as {details.email}</div> : <div className="checkout-account"><div className="checkout-account-tabs"><button type="button" className={accountMode === 'create' ? 'selected' : ''} onClick={() => setAccountMode('create')}>Create account</button><button type="button" className={accountMode === 'signin' ? 'selected' : ''} onClick={() => setAccountMode('signin')}>Already registered</button></div><div className="checkout-fields"><label>Password<input type="password" minLength={8} autoComplete={accountMode === 'create' ? 'new-password' : 'current-password'} value={password} onChange={(event) => setPassword(event.target.value)} required disabled={submitting || Boolean(createdOrder)} /><span>At least 8 characters</span></label></div></div>}</section>
+          <section className="checkout-card checkout-payment-placeholder"><span className="checkout-step">{paymentStep}</span><div className="checkout-section-heading"><h2>Payment</h2><p>You will be transferred to Stripe for secure card, Apple Pay or Google Pay payment.</p></div><div className="payment-placeholder">{createdOrder ? `Order #${createdOrder.order_number} is opening secure payment` : 'Payment details are entered securely on Stripe'}</div></section>
           {submitted && minimumShortfall > 0 && <p className="checkout-error">Add {money.format(minimumShortfall / 100)} more to meet the minimum order.</p>}{error && <p className="checkout-error">{error}</p>}{message && <p className="checkout-message">{message}</p>}<button className="checkout-submit" type="submit" disabled={minimumShortfall > 0 || submitting || Boolean(createdOrder)}>{submitting ? 'Opening secure payment…' : createdOrder ? `Order #${createdOrder.order_number} created` : `Pay securely · ${money.format(total / 100)}`}</button>
         </form>
         <aside className="checkout-summary"><span>Your order from</span><h2>{restaurant.name}</h2><div className="checkout-summary-lines">{basketLines.map((line) => <div key={line.line_id || line.id}><span>{line.quantity} × {line.name}{line.removed_ingredients?.map((ingredient) => <small key={ingredient.id}>No {ingredient.name}</small>)}{line.selected_extras?.map((extra) => <small key={extra.id}>+ {extra.quantity > 1 ? `${extra.quantity} × ` : ''}{extra.name}</small>)}{line.selected_modifier_groups?.flatMap((group) => group.options.map((option) => <small key={`${group.group_id}-${option.id}`}>{group.group_name}: {option.quantity > 1 ? `${option.quantity} × ` : ''}{option.name}</small>))}{line.special_instructions && <small>Note: {line.special_instructions}</small>}</span><strong>{money.format(((line.unit_price_pence ?? line.price_pence) * line.quantity) / 100)}</strong></div>)}</div><div className="checkout-summary-costs"><div><span>Subtotal</span><strong>{money.format((createdOrder?.subtotal_pence ?? subtotal) / 100)}</strong></div>{method === 'delivery' && <div><span>Delivery</span><strong>{(createdOrder?.delivery_fee_pence ?? deliveryFee) ? money.format((createdOrder?.delivery_fee_pence ?? deliveryFee) / 100) : 'Free'}</strong></div>}<div className="checkout-summary-total"><span>Total</span><strong>{money.format((createdOrder?.total_pence ?? total) / 100)}</strong></div></div>{restaurant.preparation_time_minutes && <p>Estimated {method}: {restaurant.preparation_time_minutes} minutes</p>}</aside>
