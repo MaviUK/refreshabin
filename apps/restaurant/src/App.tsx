@@ -24,6 +24,7 @@ import PrinterManagement from './printers/PrinterManagement'
 import PrintHistory from './printers/PrintHistory'
 import CustomerLogin from './customer/CustomerLogin'
 import CustomerOrders from './customer/CustomerOrders'
+import './checkout/CheckoutAccount.css'
 
 export default function App() {
   return (
