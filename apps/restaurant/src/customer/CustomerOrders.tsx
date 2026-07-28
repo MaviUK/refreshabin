@@ -18,10 +18,31 @@ type CustomerOrder = {
   rejection_reason: string | null
 }
 
-type OrderStep = {
-  key: string
-  label: string
+type ReorderItem = {
+  id: string
+  line_id: string
+  name: string
+  price_pence: number
+  unit_price_pence: number
+  quantity: number
+  removed_ingredients?: Array<{ id: string; name: string }>
+  selected_extras?: Array<{ id: string; name: string; price_pence: number; quantity: number }>
+  selected_modifier_groups?: Array<{
+    group_id: string
+    group_name: string
+    options: Array<{ id: string; name: string; price_pence: number; quantity: number }>
+  }>
+  special_instructions?: string | null
 }
+
+type ReorderResponse = {
+  restaurant_slug: string
+  items: ReorderItem[]
+  unavailable_items: Array<{ name: string; quantity: number }>
+  price_changed_items: Array<{ name: string; old_price_pence: number; new_price_pence: number }>
+}
+
+type OrderStep = { key: string; label: string }
 
 const money = new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'GBP' })
 const dateTime = new Intl.DateTimeFormat('en-GB', { dateStyle: 'medium', timeStyle: 'short' })
@@ -45,7 +66,6 @@ function getSteps(order: CustomerOrder): OrderStep[] {
       { key: 'completed', label: 'Collected' },
     ]
   }
-
   return [
     { key: 'paid', label: 'Order received' },
     { key: 'accepted', label: 'Accepted' },
@@ -56,27 +76,18 @@ function getSteps(order: CustomerOrder): OrderStep[] {
 }
 
 function getStepIndex(order: CustomerOrder) {
-  const status = order.order_status
   const mapping: Record<string, number> = {
-    pending_payment: -1,
-    paid: 0,
-    received: 0,
-    accepted: 1,
-    preparing: 2,
+    pending_payment: -1, paid: 0, received: 0, accepted: 1, preparing: 2,
     ready: order.fulfilment_method === 'collection' ? 3 : 2,
-    ready_for_collection: 3,
-    out_for_delivery: 3,
-    completed: 4,
-    delivered: 4,
-    collected: 4,
+    ready_for_collection: 3, out_for_delivery: 3, completed: 4, delivered: 4, collected: 4,
   }
-  return mapping[status] ?? 0
+  return mapping[order.order_status] ?? 0
 }
 
 function statusMessage(order: CustomerOrder) {
   if (isCancelled(order)) return order.rejection_reason || 'This order was cancelled.'
   if (order.order_status === 'pending_payment') return 'Payment has not been completed yet.'
-  if (order.order_status === 'paid' || order.order_status === 'received') return 'The restaurant has received your order.'
+  if (['paid', 'received'].includes(order.order_status)) return 'The restaurant has received your order.'
   if (order.order_status === 'accepted') return 'The restaurant has accepted your order.'
   if (order.order_status === 'preparing') return 'Your food is being prepared.'
   if (['ready', 'ready_for_collection'].includes(order.order_status)) return 'Your order is ready to collect.'
@@ -99,6 +110,7 @@ export default function CustomerOrders() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [now, setNow] = useState(Date.now())
+  const [reorderingId, setReorderingId] = useState<string | null>(null)
   const navigate = useNavigate()
 
   useEffect(() => {
@@ -108,14 +120,12 @@ export default function CustomerOrders() {
         navigate('/account/login', { replace: true, state: { from: '/account/orders' } })
         return
       }
-
       await supabase.rpc('claim_customer_orders')
       const { data, error: historyError } = await supabase.rpc('get_customer_order_history')
       if (historyError) setError(historyError.message)
       else setOrders((data || []) as CustomerOrder[])
       setLoading(false)
     }
-
     void loadOrders()
   }, [navigate])
 
@@ -138,6 +148,43 @@ export default function CustomerOrders() {
     navigate('/', { replace: true })
   }
 
+  async function reorder(order: CustomerOrder) {
+    if (reorderingId) return
+    setError('')
+    setReorderingId(order.id)
+
+    const { data, error: reorderError } = await supabase.rpc('get_customer_reorder_basket', { target_order_id: order.id })
+    if (reorderError) {
+      setError(reorderError.message)
+      setReorderingId(null)
+      return
+    }
+
+    const result = data as ReorderResponse
+    if (!result.items.length) {
+      setError('None of the items from this order are currently available.')
+      setReorderingId(null)
+      return
+    }
+
+    const warnings: string[] = []
+    if (result.unavailable_items.length) {
+      warnings.push(`${result.unavailable_items.length} item${result.unavailable_items.length === 1 ? '' : 's'} are no longer available and will be left out.`)
+    }
+    if (result.price_changed_items.length) {
+      warnings.push(`${result.price_changed_items.length} item${result.price_changed_items.length === 1 ? ' has' : 's have'} changed price.`)
+    }
+
+    if (warnings.length && !window.confirm(`${warnings.join('\n')}\n\nContinue with the available items?`)) {
+      setReorderingId(null)
+      return
+    }
+
+    const basket = Object.fromEntries(result.items.map((item) => [item.line_id, item]))
+    window.localStorage.setItem(`ordered-food-basket:${result.restaurant_slug}`, JSON.stringify(basket))
+    navigate(`/r/${result.restaurant_slug}`)
+  }
+
   function renderOrder(order: CustomerOrder, active: boolean) {
     const steps = getSteps(order)
     const currentStep = getStepIndex(order)
@@ -147,43 +194,26 @@ export default function CustomerOrders() {
     return (
       <article className={`customer-order-card${active ? ' customer-order-card--active' : ''}${cancelled ? ' customer-order-card--cancelled' : ''}`} key={order.id}>
         <div className="customer-order-topline">
-          <div>
-            <span>Order #{order.order_number}</span>
-            <h2>{order.restaurant_name}</h2>
-          </div>
+          <div><span>Order #{order.order_number}</span><h2>{order.restaurant_name}</h2></div>
           <strong>{money.format(order.total_pence / 100)}</strong>
         </div>
-
         <div className="customer-order-summary-row">
           <span className={`customer-order-status-pill${cancelled ? ' customer-order-status-pill--cancelled' : ''}`}>{formatStatus(order.order_status)}</span>
           <span>{formatStatus(order.fulfilment_method)}</span>
           <span>{dateTime.format(new Date(order.created_at))}</span>
         </div>
-
         {active && !cancelled && (
           <div className="customer-order-tracker" aria-label="Order progress">
             {steps.map((step, index) => {
               const state = index < currentStep ? 'complete' : index === currentStep ? 'current' : 'upcoming'
-              return (
-                <div className={`customer-order-step customer-order-step--${state}`} key={step.key}>
-                  <span className="customer-order-step-dot" aria-hidden="true">{state === 'complete' ? '✓' : index + 1}</span>
-                  <span>{step.label}</span>
-                </div>
-              )
+              return <div className={`customer-order-step customer-order-step--${state}`} key={step.key}><span className="customer-order-step-dot" aria-hidden="true">{state === 'complete' ? '✓' : index + 1}</span><span>{step.label}</span></div>
             })}
           </div>
         )}
-
-        <div className={`customer-order-message${cancelled ? ' customer-order-message--cancelled' : ''}`}>
-          <strong>{statusMessage(order)}</strong>
-          {eta && <span>{eta}</span>}
-        </div>
-
+        <div className={`customer-order-message${cancelled ? ' customer-order-message--cancelled' : ''}`}><strong>{statusMessage(order)}</strong>{eta && <span>{eta}</span>}</div>
         <div className="customer-order-actions">
-          {order.stripe_checkout_session_id && (
-            <Link to={`/order/success?session_id=${encodeURIComponent(order.stripe_checkout_session_id)}`}>View order</Link>
-          )}
-          <Link to={`/r/${order.restaurant_slug}`}>Order again</Link>
+          {order.stripe_checkout_session_id && <Link to={`/order/success?session_id=${encodeURIComponent(order.stripe_checkout_session_id)}`}>View order</Link>}
+          <button type="button" onClick={() => void reorder(order)} disabled={reorderingId === order.id}>{reorderingId === order.id ? 'Building basket…' : 'Order again'}</button>
         </div>
       </article>
     )
@@ -192,48 +222,12 @@ export default function CustomerOrders() {
   return (
     <main className="customer-account-shell customer-account-shell--wide">
       <section className="customer-account-card">
-        <header className="customer-account-header">
-          <div>
-            <Link className="customer-account-brand" to="/">ordered.food</Link>
-            <span className="customer-account-eyebrow">Customer account</span>
-            <h1>My orders</h1>
-          </div>
-          <button className="customer-account-secondary" type="button" onClick={signOut}>Sign out</button>
-        </header>
-
+        <header className="customer-account-header"><div><Link className="customer-account-brand" to="/">ordered.food</Link><span className="customer-account-eyebrow">Customer account</span><h1>My orders</h1></div><button className="customer-account-secondary" type="button" onClick={signOut}>Sign out</button></header>
         {loading && <p>Loading your orders…</p>}
         {error && <div className="customer-account-error" role="alert">{error}</div>}
-        {!loading && !error && orders.length === 0 && (
-          <div className="customer-account-empty">
-            <h2>No orders yet</h2>
-            <p>Your paid orders will appear here.</p>
-            <Link to="/restaurants">Browse restaurants</Link>
-          </div>
-        )}
-
-        {!loading && !error && activeOrders.length > 0 && (
-          <section className="customer-order-section">
-            <div className="customer-order-section-heading">
-              <div>
-                <span className="customer-account-eyebrow">Live</span>
-                <h2>Current orders</h2>
-              </div>
-            </div>
-            <div className="customer-order-list">{activeOrders.map((order) => renderOrder(order, true))}</div>
-          </section>
-        )}
-
-        {!loading && !error && previousOrders.length > 0 && (
-          <section className="customer-order-section">
-            <div className="customer-order-section-heading">
-              <div>
-                <span className="customer-account-eyebrow">History</span>
-                <h2>Previous orders</h2>
-              </div>
-            </div>
-            <div className="customer-order-list">{previousOrders.map((order) => renderOrder(order, false))}</div>
-          </section>
-        )}
+        {!loading && !error && orders.length === 0 && <div className="customer-account-empty"><h2>No orders yet</h2><p>Your paid orders will appear here.</p><Link to="/restaurants">Browse restaurants</Link></div>}
+        {!loading && activeOrders.length > 0 && <section className="customer-order-section"><div className="customer-order-section-heading"><div><span className="customer-account-eyebrow">Live</span><h2>Current orders</h2></div></div><div className="customer-order-list">{activeOrders.map((order) => renderOrder(order, true))}</div></section>}
+        {!loading && previousOrders.length > 0 && <section className="customer-order-section"><div className="customer-order-section-heading"><div><span className="customer-account-eyebrow">History</span><h2>Previous orders</h2></div></div><div className="customer-order-list">{previousOrders.map((order) => renderOrder(order, false))}</div></section>}
       </section>
     </main>
   )
