@@ -25,6 +25,7 @@ import PrintHistory from './printers/PrintHistory'
 import CustomerLogin from './customer/CustomerLogin'
 import CustomerOrders from './customer/CustomerOrders'
 import CustomerAddresses from './customer/CustomerAddresses'
+import CustomerFavourites from './customer/CustomerFavourites'
 import './checkout/CheckoutAccount.css'
 import './checkout/CheckoutAddresses.css'
 
@@ -39,6 +40,7 @@ export default function App() {
       <Route path="/account/login" element={<CustomerLogin />} />
       <Route path="/account/orders" element={<CustomerOrders />} />
       <Route path="/account/addresses" element={<CustomerAddresses />} />
+      <Route path="/account/favourites" element={<CustomerFavourites />} />
       <Route path="/login" element={<Login />} />
       <Route path="/register" element={<Register />} />
       <Route path="/forgot-password" element={<ForgotPassword />} />
