@@ -26,6 +26,7 @@ import CustomerLogin from './customer/CustomerLogin'
 import CustomerOrders from './customer/CustomerOrders'
 import CustomerAddresses from './customer/CustomerAddresses'
 import './checkout/CheckoutAccount.css'
+import './checkout/CheckoutAddresses.css'
 
 export default function App() {
   return (
