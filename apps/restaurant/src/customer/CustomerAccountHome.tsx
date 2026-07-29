@@ -97,6 +97,7 @@ export default function CustomerAccountHome() {
         <Link to="/account/orders"><span className="customer-home-icon">↻</span><div><strong>Orders</strong><small>{summary.orderCount} order{summary.orderCount === 1 ? '' : 's'}</small></div><span>›</span></Link>
         <Link to="/account/favourites"><span className="customer-home-icon">♥</span><div><strong>Favourites</strong><small>{summary.favouriteCount} saved</small></div><span>›</span></Link>
         <Link to="/account/addresses"><span className="customer-home-icon">⌂</span><div><strong>Addresses</strong><small>{summary.addressCount} saved</small></div><span>›</span></Link>
+        <Link to="/account/profile"><span className="customer-home-icon">◉</span><div><strong>Your details</strong><small>Name and mobile number</small></div><span>›</span></Link>
         <Link to="/restaurants"><span className="customer-home-icon">＋</span><div><strong>Find food</strong><small>Browse restaurants</small></div><span>›</span></Link>
       </section>
 
