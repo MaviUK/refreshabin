@@ -24,6 +24,8 @@ import PrinterManagement from './printers/PrinterManagement'
 import PrintHistory from './printers/PrintHistory'
 import CustomerLogin from './customer/CustomerLogin'
 import CustomerRegister from './customer/CustomerRegister'
+import CustomerForgotPassword from './customer/CustomerForgotPassword'
+import CustomerResetPassword from './customer/CustomerResetPassword'
 import CustomerAccountHome from './customer/CustomerAccountHome'
 import CustomerProfile from './customer/CustomerProfile'
 import CustomerOrders from './customer/CustomerOrders'
@@ -42,6 +44,8 @@ export default function App() {
       <Route path="/order/success" element={<OrderStatus />} />
       <Route path="/account/login" element={<CustomerLogin />} />
       <Route path="/account/register" element={<CustomerRegister />} />
+      <Route path="/account/forgot-password" element={<CustomerForgotPassword />} />
+      <Route path="/account/reset-password" element={<CustomerResetPassword />} />
       <Route path="/account" element={<CustomerAccountHome />} />
       <Route path="/account/profile" element={<CustomerProfile />} />
       <Route path="/account/orders" element={<CustomerOrders />} />
