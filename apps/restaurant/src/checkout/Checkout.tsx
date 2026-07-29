@@ -29,6 +29,16 @@ type CustomerProfile = {
   first_name: string | null; last_name: string | null; phone: string | null; address_line_1: string | null
   address_line_2: string | null; town_city: string | null; postcode: string | null
 }
+type CustomerAddress = {
+  id: string
+  label: string
+  address_line_1: string
+  address_line_2: string | null
+  town_city: string
+  postcode: string
+  delivery_instructions: string | null
+  is_default: boolean
+}
 
 const money = new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'GBP' })
 function formatPostcode(value: string) {
@@ -50,7 +60,36 @@ export default function Checkout() {
   const [accountMode, setAccountMode] = useState<AccountMode>('create')
   const [password, setPassword] = useState('')
   const [signedIn, setSignedIn] = useState(false)
+  const [savedAddresses, setSavedAddresses] = useState<CustomerAddress[]>([])
+  const [selectedAddressId, setSelectedAddressId] = useState<string>('new')
   const [details, setDetails] = useState({ firstName: '', lastName: '', email: '', phone: '', addressLine1: '', addressLine2: '', town: '', postcode: '', instructions: '' })
+
+  function applyAddress(address: CustomerAddress) {
+    setSelectedAddressId(address.id)
+    setDetails((current) => ({
+      ...current,
+      addressLine1: address.address_line_1,
+      addressLine2: address.address_line_2 || '',
+      town: address.town_city,
+      postcode: address.postcode,
+      instructions: address.delivery_instructions || '',
+    }))
+  }
+
+  async function loadCustomerAddresses(userId: string) {
+    const { data } = await supabase
+      .from('customer_addresses')
+      .select('id,label,address_line_1,address_line_2,town_city,postcode,delivery_instructions,is_default')
+      .eq('user_id', userId)
+      .order('is_default', { ascending: false })
+      .order('created_at', { ascending: true })
+
+    const addresses = (data || []) as CustomerAddress[]
+    setSavedAddresses(addresses)
+    const preferred = addresses.find((address) => address.is_default) || addresses[0]
+    if (preferred) applyAddress(preferred)
+    else setSelectedAddressId('new')
+  }
 
   useEffect(() => {
     if (!slug) return
@@ -97,7 +136,7 @@ export default function Checkout() {
           town: saved?.town_city || current.town,
           postcode: saved?.postcode || current.postcode,
         }))
-        await supabase.rpc('claim_customer_orders')
+        await Promise.all([supabase.rpc('claim_customer_orders'), loadCustomerAddresses(user.id)])
       }
       setLoading(false)
     }
@@ -114,7 +153,15 @@ export default function Checkout() {
   const total = subtotal + deliveryFee
   const minimumShortfall = Math.max((restaurant?.minimum_order_pence ?? 0) - subtotal, 0)
 
-  function updateField(field: keyof typeof details, value: string) { setDetails((current) => ({ ...current, [field]: value })) }
+  function updateField(field: keyof typeof details, value: string) {
+    setDetails((current) => ({ ...current, [field]: value }))
+    if (['addressLine1', 'addressLine2', 'town', 'postcode', 'instructions'].includes(field)) setSelectedAddressId('new')
+  }
+
+  function chooseNewAddress() {
+    setSelectedAddressId('new')
+    setDetails((current) => ({ ...current, addressLine1: '', addressLine2: '', town: '', postcode: '', instructions: '' }))
+  }
 
   async function authenticateCustomer() {
     if (signedIn) return true
@@ -124,12 +171,13 @@ export default function Checkout() {
     }
 
     if (accountMode === 'signin') {
-      const { error: signInError } = await supabase.auth.signInWithPassword({ email: details.email.trim(), password })
+      const { data, error: signInError } = await supabase.auth.signInWithPassword({ email: details.email.trim(), password })
       if (signInError) {
         setError('We could not sign you in. Check your email and password, or choose Create account.')
         return false
       }
       setSignedIn(true)
+      if (data.user) await loadCustomerAddresses(data.user.id)
       await supabase.rpc('claim_customer_orders')
       return true
     }
@@ -162,6 +210,24 @@ export default function Checkout() {
       postcode: method === 'delivery' ? details.postcode.trim() : null,
       updated_at: new Date().toISOString(),
     })
+
+    if (method === 'delivery' && selectedAddressId === 'new') {
+      const address = {
+        user_id: data.user.id,
+        label: savedAddresses.length ? 'Other' : 'Home',
+        address_line_1: details.addressLine1.trim(),
+        address_line_2: details.addressLine2.trim() || null,
+        town_city: details.town.trim(),
+        postcode: details.postcode.trim(),
+        delivery_instructions: details.instructions.trim() || null,
+        is_default: savedAddresses.length === 0,
+      }
+      const duplicate = savedAddresses.some((saved) =>
+        saved.address_line_1.toLowerCase() === address.address_line_1.toLowerCase()
+        && saved.postcode.replace(/\s/g, '').toLowerCase() === address.postcode.replace(/\s/g, '').toLowerCase(),
+      )
+      if (!duplicate) await supabase.from('customer_addresses').insert(address)
+    }
   }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -232,7 +298,7 @@ export default function Checkout() {
         <form className="checkout-form" onSubmit={handleSubmit} noValidate>
           <section className="checkout-card"><span className="checkout-step">1</span><div className="checkout-section-heading"><h1>How would you like your order?</h1><p>Choose delivery or collection from {restaurant.name}.</p></div><div className="fulfilment-options">{restaurant.accepts_delivery && <button className={method === 'delivery' ? 'selected' : ''} type="button" onClick={() => setMethod('delivery')} disabled={submitting || Boolean(createdOrder)}><strong>Delivery</strong><span>Delivered to your address</span></button>}{restaurant.accepts_collection && <button className={method === 'collection' ? 'selected' : ''} type="button" onClick={() => setMethod('collection')} disabled={submitting || Boolean(createdOrder)}><strong>Collection</strong><span>Collect from the restaurant</span></button>}</div></section>
           <section className="checkout-card"><span className="checkout-step">2</span><div className="checkout-section-heading"><h2>Your details</h2><p>We will use these details for order updates.</p></div><div className="checkout-fields two-column"><label>First name<input value={details.firstName} onChange={(event) => updateField('firstName', event.target.value)} required disabled={submitting || Boolean(createdOrder)} /></label><label>Last name<input value={details.lastName} onChange={(event) => updateField('lastName', event.target.value)} required disabled={submitting || Boolean(createdOrder)} /></label><label>Email<input type="email" value={details.email} onChange={(event) => updateField('email', event.target.value)} required disabled={signedIn || submitting || Boolean(createdOrder)} /></label><label>Mobile number<input type="tel" value={details.phone} onChange={(event) => updateField('phone', event.target.value)} required disabled={submitting || Boolean(createdOrder)} /></label></div></section>
-          {method === 'delivery' && <section className="checkout-card"><span className="checkout-step">{addressStep}</span><div className="checkout-section-heading"><h2>Delivery address</h2><p>We will save this address to your account for next time.</p></div><div className="checkout-fields"><label>Address line 1<input value={details.addressLine1} onChange={(event) => updateField('addressLine1', event.target.value)} required disabled={submitting || Boolean(createdOrder)} /></label><label>Address line 2 <span>Optional</span><input value={details.addressLine2} onChange={(event) => updateField('addressLine2', event.target.value)} disabled={submitting || Boolean(createdOrder)} /></label><div className="two-column"><label>Town or city<input value={details.town} onChange={(event) => updateField('town', event.target.value)} required disabled={submitting || Boolean(createdOrder)} /></label><label>Postcode<input value={details.postcode} onChange={(event) => updateField('postcode', formatPostcode(event.target.value))} required disabled={submitting || Boolean(createdOrder)} /></label></div><label>Delivery instructions <span>Optional</span><textarea value={details.instructions} onChange={(event) => updateField('instructions', event.target.value)} rows={3} placeholder="Door number, access instructions or anything the driver should know" disabled={submitting || Boolean(createdOrder)} /></label></div></section>}
+          {method === 'delivery' && <section className="checkout-card"><span className="checkout-step">{addressStep}</span><div className="checkout-section-heading"><h2>Delivery address</h2><p>{signedIn && savedAddresses.length ? 'Choose a saved address or enter a different one.' : 'We will save this address to your account for next time.'}</p></div>{signedIn && savedAddresses.length > 0 && <div className="checkout-saved-addresses">{savedAddresses.map((address) => <button className={selectedAddressId === address.id ? 'selected' : ''} type="button" key={address.id} onClick={() => applyAddress(address)} disabled={submitting || Boolean(createdOrder)}><span className="checkout-address-radio" aria-hidden="true" /><span><strong>{address.label}{address.is_default ? ' · Default' : ''}</strong><small>{address.address_line_1}{address.address_line_2 ? `, ${address.address_line_2}` : ''}</small><small>{address.town_city}, {address.postcode}</small>{address.delivery_instructions && <small>Note: {address.delivery_instructions}</small>}</span></button>)}<button className={selectedAddressId === 'new' ? 'selected' : ''} type="button" onClick={chooseNewAddress} disabled={submitting || Boolean(createdOrder)}><span className="checkout-address-radio" aria-hidden="true" /><span><strong>Use a different address</strong><small>Enter another delivery address below</small></span></button><Link className="checkout-manage-addresses" to="/account/addresses">Manage saved addresses</Link></div>}<div className="checkout-fields"><label>Address line 1<input value={details.addressLine1} onChange={(event) => updateField('addressLine1', event.target.value)} required disabled={submitting || Boolean(createdOrder)} /></label><label>Address line 2 <span>Optional</span><input value={details.addressLine2} onChange={(event) => updateField('addressLine2', event.target.value)} disabled={submitting || Boolean(createdOrder)} /></label><div className="two-column"><label>Town or city<input value={details.town} onChange={(event) => updateField('town', event.target.value)} required disabled={submitting || Boolean(createdOrder)} /></label><label>Postcode<input value={details.postcode} onChange={(event) => updateField('postcode', formatPostcode(event.target.value))} required disabled={submitting || Boolean(createdOrder)} /></label></div><label>Delivery instructions <span>Optional</span><textarea value={details.instructions} onChange={(event) => updateField('instructions', event.target.value)} rows={3} placeholder="Door number, access instructions or anything the driver should know" disabled={submitting || Boolean(createdOrder)} /></label></div></section>}
           <section className="checkout-card"><span className="checkout-step">{accountStep}</span><div className="checkout-section-heading"><h2>{signedIn ? 'Your account' : 'Save your details'}</h2><p>{signedIn ? 'You are signed in. This order will appear in My orders.' : 'Create an account to save your details and see your full order history.'}</p></div>{signedIn ? <div className="payment-placeholder">Signed in as {details.email}</div> : <div className="checkout-account"><div className="checkout-account-tabs"><button type="button" className={accountMode === 'create' ? 'selected' : ''} onClick={() => setAccountMode('create')}>Create account</button><button type="button" className={accountMode === 'signin' ? 'selected' : ''} onClick={() => setAccountMode('signin')}>Already registered</button></div><div className="checkout-fields"><label>Password<input type="password" minLength={8} autoComplete={accountMode === 'create' ? 'new-password' : 'current-password'} value={password} onChange={(event) => setPassword(event.target.value)} required disabled={submitting || Boolean(createdOrder)} /><span>At least 8 characters</span></label></div></div>}</section>
           <section className="checkout-card checkout-payment-placeholder"><span className="checkout-step">{paymentStep}</span><div className="checkout-section-heading"><h2>Payment</h2><p>You will be transferred to Stripe for secure card, Apple Pay or Google Pay payment.</p></div><div className="payment-placeholder">{createdOrder ? `Order #${createdOrder.order_number} is opening secure payment` : 'Payment details are entered securely on Stripe'}</div></section>
           {submitted && minimumShortfall > 0 && <p className="checkout-error">Add {money.format(minimumShortfall / 100)} more to meet the minimum order.</p>}{error && <p className="checkout-error">{error}</p>}{message && <p className="checkout-message">{message}</p>}<button className="checkout-submit" type="submit" disabled={minimumShortfall > 0 || submitting || Boolean(createdOrder)}>{submitting ? 'Opening secure payment…' : createdOrder ? `Order #${createdOrder.order_number} created` : `Pay securely · ${money.format(total / 100)}`}</button>
