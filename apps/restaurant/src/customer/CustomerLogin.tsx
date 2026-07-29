@@ -68,6 +68,7 @@ export default function CustomerLogin() {
             Password
             <input type="password" value={password} onChange={(event) => setPassword(event.target.value)} autoComplete="current-password" required />
           </label>
+          <div className="customer-account-inline-link"><Link to="/account/forgot-password">Forgotten your password?</Link></div>
           {error && <div className="customer-account-error" role="alert">{error}</div>}
           <button type="submit" disabled={loading}>{loading ? 'Signing in…' : 'Sign in'}</button>
         </form>
