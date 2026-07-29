@@ -72,7 +72,7 @@ export default function CustomerLogin() {
           <button type="submit" disabled={loading}>{loading ? 'Signing in…' : 'Sign in'}</button>
         </form>
 
-        <p className="customer-account-note">New customer? Create your account during checkout.</p>
+        <p className="customer-account-note">New customer? <Link to="/account/register" state={{ from: destination }}>Create an account</Link></p>
       </section>
     </main>
   )
