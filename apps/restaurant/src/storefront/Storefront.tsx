@@ -96,6 +96,11 @@ export default function Storefront() {
   const [specialInstructions, setSpecialInstructions] = useState('')
   const [customisationError, setCustomisationError] = useState('')
   const [basketMessage, setBasketMessage] = useState('')
+  const [customerUserId, setCustomerUserId] = useState<string | null>(null)
+  const [favouriteRestaurant, setFavouriteRestaurant] = useState(false)
+  const [favouriteItemIds, setFavouriteItemIds] = useState<Set<string>>(new Set())
+  const [restaurantFavouriteBusy, setRestaurantFavouriteBusy] = useState(false)
+  const [itemFavouriteBusy, setItemFavouriteBusy] = useState<Set<string>>(new Set())
 
   useEffect(() => {
     if (!slug) return
@@ -121,6 +126,41 @@ export default function Storefront() {
 
     void loadStorefront()
   }, [slug])
+
+  useEffect(() => {
+    if (!data) return
+
+    async function loadFavourites() {
+      const { data: authData } = await supabase.auth.getUser()
+      const userId = authData.user?.id ?? null
+      setCustomerUserId(userId)
+      if (!userId) return
+
+      const itemIds = data?.categories.flatMap((category) => category.items.map((item) => item.id)) ?? []
+      const [restaurantResult, itemResult] = await Promise.all([
+        supabase
+          .from('customer_favourite_restaurants')
+          .select('restaurant_id')
+          .eq('user_id', userId)
+          .eq('restaurant_id', data!.restaurant.id)
+          .maybeSingle(),
+        itemIds.length
+          ? supabase
+            .from('customer_favourite_items')
+            .select('menu_item_id')
+            .eq('user_id', userId)
+            .in('menu_item_id', itemIds)
+          : Promise.resolve({ data: [], error: null }),
+      ])
+
+      if (!restaurantResult.error) setFavouriteRestaurant(Boolean(restaurantResult.data))
+      if (!itemResult.error) {
+        setFavouriteItemIds(new Set((itemResult.data ?? []).map((row) => row.menu_item_id as string)))
+      }
+    }
+
+    void loadFavourites()
+  }, [data])
 
   useEffect(() => {
     if (!slug) return
@@ -178,6 +218,85 @@ export default function Storefront() {
     + selectedExtras.reduce((sum, extra) => sum + extra.price_pence * extra.quantity, 0)
     + modifierTotal
   const customTotal = customUnitPrice * customQuantity
+
+  function requireCustomerLogin() {
+    navigate(`/account/login?redirect=${encodeURIComponent(window.location.pathname)}`)
+  }
+
+  async function toggleRestaurantFavourite() {
+    if (!data || restaurantFavouriteBusy) return
+    if (!customerUserId) {
+      requireCustomerLogin()
+      return
+    }
+
+    setRestaurantFavouriteBusy(true)
+    const wasFavourite = favouriteRestaurant
+    setFavouriteRestaurant(!wasFavourite)
+
+    const result = wasFavourite
+      ? await supabase
+        .from('customer_favourite_restaurants')
+        .delete()
+        .eq('user_id', customerUserId)
+        .eq('restaurant_id', data.restaurant.id)
+      : await supabase
+        .from('customer_favourite_restaurants')
+        .insert({ user_id: customerUserId, restaurant_id: data.restaurant.id })
+
+    if (result.error) {
+      setFavouriteRestaurant(wasFavourite)
+      setBasketMessage('Could not update your favourites')
+    } else {
+      setBasketMessage(wasFavourite ? 'Restaurant removed from favourites' : 'Restaurant saved to favourites')
+    }
+    setRestaurantFavouriteBusy(false)
+  }
+
+  async function toggleItemFavourite(item: MenuItem) {
+    if (itemFavouriteBusy.has(item.id)) return
+    if (!customerUserId) {
+      requireCustomerLogin()
+      return
+    }
+
+    const wasFavourite = favouriteItemIds.has(item.id)
+    setItemFavouriteBusy((current) => new Set(current).add(item.id))
+    setFavouriteItemIds((current) => {
+      const next = new Set(current)
+      if (wasFavourite) next.delete(item.id)
+      else next.add(item.id)
+      return next
+    })
+
+    const result = wasFavourite
+      ? await supabase
+        .from('customer_favourite_items')
+        .delete()
+        .eq('user_id', customerUserId)
+        .eq('menu_item_id', item.id)
+      : await supabase
+        .from('customer_favourite_items')
+        .insert({ user_id: customerUserId, menu_item_id: item.id })
+
+    if (result.error) {
+      setFavouriteItemIds((current) => {
+        const next = new Set(current)
+        if (wasFavourite) next.add(item.id)
+        else next.delete(item.id)
+        return next
+      })
+      setBasketMessage('Could not update your favourites')
+    } else {
+      setBasketMessage(wasFavourite ? `${item.name} removed from favourites` : `${item.name} saved to favourites`)
+    }
+
+    setItemFavouriteBusy((current) => {
+      const next = new Set(current)
+      next.delete(item.id)
+      return next
+    })
+  }
 
   function openCustomisation(item: MenuItem) {
     setCustomisingItem(item)
@@ -310,6 +429,16 @@ export default function Storefront() {
       <section className="storefront-hero">
         {restaurant.cover_url && <img className="storefront-cover" src={restaurant.cover_url} alt="" />}
         <div className="storefront-hero-overlay" />
+        <button
+          className={favouriteRestaurant ? 'storefront-favourite active' : 'storefront-favourite'}
+          type="button"
+          onClick={() => void toggleRestaurantFavourite()}
+          disabled={restaurantFavouriteBusy}
+          aria-label={favouriteRestaurant ? `Remove ${restaurant.name} from favourites` : `Save ${restaurant.name} to favourites`}
+          aria-pressed={favouriteRestaurant}
+        >
+          {favouriteRestaurant ? '♥' : '♡'}
+        </button>
         <div className="storefront-identity">
           {restaurant.logo_url
             ? <img className="storefront-logo" src={restaurant.logo_url} alt={`${restaurant.name} logo`} />
@@ -345,6 +474,16 @@ export default function Storefront() {
               <div className="menu-item-grid">
                 {category.items.map((item) => (
                   <article className="menu-item-card" key={item.id} onClick={() => openCustomisation(item)}>
+                    <button
+                      className={favouriteItemIds.has(item.id) ? 'menu-item-favourite active' : 'menu-item-favourite'}
+                      type="button"
+                      onClick={(event) => { event.stopPropagation(); void toggleItemFavourite(item) }}
+                      disabled={itemFavouriteBusy.has(item.id)}
+                      aria-label={favouriteItemIds.has(item.id) ? `Remove ${item.name} from favourites` : `Save ${item.name} to favourites`}
+                      aria-pressed={favouriteItemIds.has(item.id)}
+                    >
+                      {favouriteItemIds.has(item.id) ? '♥' : '♡'}
+                    </button>
                     <div className="menu-item-copy">
                       <div>
                         <h3>{item.name}</h3>
