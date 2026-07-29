@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Link, useSearchParams } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import './Restaurants.css'
 
@@ -21,6 +21,7 @@ const money = new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'GBP
 
 export default function Restaurants() {
   const [searchParams, setSearchParams] = useSearchParams()
+  const navigate = useNavigate()
   const [restaurants, setRestaurants] = useState<Restaurant[]>([])
   const [favourites, setFavourites] = useState<Set<string>>(new Set())
   const [signedIn, setSignedIn] = useState(false)
@@ -62,6 +63,8 @@ export default function Restaurants() {
     }
 
     void loadRestaurants()
+    const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => setSignedIn(Boolean(session?.user)))
+    return () => authListener.subscription.unsubscribe()
   }, [])
 
   const cuisineOptions = useMemo(() => {
@@ -84,7 +87,7 @@ export default function Restaurants() {
 
   async function toggleFavourite(restaurantId: string) {
     if (!signedIn) {
-      window.location.assign('/account/login')
+      navigate('/account/login', { state: { from: `${window.location.pathname}${window.location.search}` } })
       return
     }
     if (savingFavourite) return
@@ -95,6 +98,7 @@ export default function Restaurants() {
     const user = userData.user
     if (!user) {
       setSavingFavourite(null)
+      navigate('/account/login', { state: { from: `${window.location.pathname}${window.location.search}` } })
       return
     }
 
@@ -119,7 +123,7 @@ export default function Restaurants() {
       <header className="restaurants-header">
         <Link className="restaurants-logo" to="/">ordered.food</Link>
         <nav>
-          {signedIn ? <><Link to="/account/favourites">Favourites</Link><Link to="/account/orders">My orders</Link></> : <Link to="/account/login">Customer login</Link>}
+          {signedIn ? <><Link to="/account">My account</Link><Link to="/account/favourites">Favourites</Link><Link to="/account/orders">Orders</Link></> : <Link to="/account/login" state={{ from: `${window.location.pathname}${window.location.search}` }}>Customer login</Link>}
           <Link to="/login">Restaurant login</Link>
         </nav>
       </header>
