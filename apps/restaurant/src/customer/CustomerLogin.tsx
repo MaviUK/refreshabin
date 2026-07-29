@@ -1,7 +1,12 @@
-import { FormEvent, useState } from 'react'
-import { Link, useLocation, useNavigate } from 'react-router-dom'
+import { FormEvent, useEffect, useMemo, useState } from 'react'
+import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import './CustomerAccount.css'
+
+function safeDestination(value: string | null | undefined) {
+  if (!value || !value.startsWith('/') || value.startsWith('//')) return '/account'
+  return value
+}
 
 export default function CustomerLogin() {
   const [email, setEmail] = useState('')
@@ -10,6 +15,20 @@ export default function CustomerLogin() {
   const [loading, setLoading] = useState(false)
   const navigate = useNavigate()
   const location = useLocation()
+  const [searchParams] = useSearchParams()
+
+  const destination = useMemo(() => {
+    const stateDestination = (location.state as { from?: string } | null)?.from
+    return safeDestination(stateDestination || searchParams.get('redirect'))
+  }, [location.state, searchParams])
+
+  useEffect(() => {
+    async function redirectSignedInCustomer() {
+      const { data } = await supabase.auth.getSession()
+      if (data.session) navigate(destination, { replace: true })
+    }
+    void redirectSignedInCustomer()
+  }, [destination, navigate])
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -29,7 +48,6 @@ export default function CustomerLogin() {
 
     await supabase.rpc('claim_customer_orders')
     setLoading(false)
-    const destination = (location.state as { from?: string } | null)?.from || '/account/orders'
     navigate(destination, { replace: true })
   }
 
