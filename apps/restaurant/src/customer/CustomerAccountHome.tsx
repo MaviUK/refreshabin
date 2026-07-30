@@ -27,21 +27,23 @@ type ReorderResponse = {
   price_changed_items: Array<{ name: string; old_price_pence: number; new_price_pence: number }>
 }
 
+type CustomerOrderSummary = {
+  id: string
+  order_number: number
+  restaurant_name: string
+  restaurant_slug: string
+  order_status: string
+  total_pence: number
+  created_at: string
+}
+
 type AccountSummary = {
   firstName: string
   email: string
   orderCount: number
   addressCount: number
   favouriteCount: number
-  latestOrder: {
-    id: string
-    order_number: number
-    restaurant_name: string
-    restaurant_slug: string
-    order_status: string
-    total_pence: number
-    created_at: string
-  } | null
+  latestOrder: CustomerOrderSummary | null
 }
 
 const money = new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'GBP' })
@@ -60,41 +62,62 @@ export default function CustomerAccountHome() {
   const [reordering, setReordering] = useState(false)
 
   useEffect(() => {
+    let active = true
+
     async function loadAccount() {
-      const { data: sessionData } = await supabase.auth.getSession()
+      setLoading(true)
+      setError('')
+
+      const { data: sessionData, error: sessionError } = await supabase.auth.getSession()
       const user = sessionData.session?.user
-      if (!user) {
+      if (sessionError || !user) {
         navigate('/account/login', { replace: true, state: { from: '/account' } })
         return
       }
 
+      await supabase.rpc('claim_customer_orders')
+
       const [profileResult, ordersResult, addressesResult, restaurantFavouritesResult, itemFavouritesResult] = await Promise.all([
         supabase.from('customer_profiles').select('first_name').eq('user_id', user.id).maybeSingle(),
-        supabase.from('orders').select('id,order_number,restaurant_name,restaurant_slug,order_status,total_pence,created_at', { count: 'exact' }).eq('customer_user_id', user.id).order('created_at', { ascending: false }).limit(1),
+        supabase.rpc('get_customer_order_history'),
         supabase.from('customer_addresses').select('id', { count: 'exact', head: true }).eq('user_id', user.id),
         supabase.from('customer_favourite_restaurants').select('restaurant_id', { count: 'exact', head: true }).eq('user_id', user.id),
         supabase.from('customer_favourite_items').select('menu_item_id', { count: 'exact', head: true }).eq('user_id', user.id),
       ])
 
-      const firstError = profileResult.error || ordersResult.error || addressesResult.error || restaurantFavouritesResult.error || itemFavouritesResult.error
-      if (firstError) {
-        setError(firstError.message)
-        setLoading(false)
-        return
-      }
+      if (!active) return
+
+      const accountOrders = ((ordersResult.data || []) as CustomerOrderSummary[])
+        .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+
+      const nonFatalErrors = [
+        profileResult.error,
+        ordersResult.error,
+        addressesResult.error,
+        restaurantFavouritesResult.error,
+        itemFavouritesResult.error,
+      ].filter(Boolean)
 
       setSummary({
         firstName: profileResult.data?.first_name || '',
         email: user.email || '',
-        orderCount: ordersResult.count || 0,
-        addressCount: addressesResult.count || 0,
-        favouriteCount: (restaurantFavouritesResult.count || 0) + (itemFavouritesResult.count || 0),
-        latestOrder: ordersResult.data?.[0] || null,
+        orderCount: ordersResult.error ? 0 : accountOrders.length,
+        addressCount: addressesResult.error ? 0 : addressesResult.count || 0,
+        favouriteCount: (restaurantFavouritesResult.error ? 0 : restaurantFavouritesResult.count || 0)
+          + (itemFavouritesResult.error ? 0 : itemFavouritesResult.count || 0),
+        latestOrder: ordersResult.error ? null : accountOrders[0] || null,
       })
+
+      if (nonFatalErrors.length) {
+        setError('Some account information could not be loaded. Your account links will still work.')
+      }
       setLoading(false)
     }
 
     void loadAccount()
+    return () => {
+      active = false
+    }
   }, [navigate])
 
   async function signOut() {
@@ -136,7 +159,7 @@ export default function CustomerAccountHome() {
   }
 
   if (loading) return <main className="customer-home-state">Loading your account…</main>
-  if (!summary) return <main className="customer-home-state"><h1>Unable to load your account</h1><p>{error}</p></main>
+  if (!summary) return <main className="customer-home-state"><h1>Unable to load your account</h1><p>{error || 'Please sign in again and retry.'}</p><Link to="/account/login">Sign in</Link></main>
 
   return (
     <main className="customer-home-page">
