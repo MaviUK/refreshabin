@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import './PrintHistory.css'
 
 type PrintJobStatus = 'queued' | 'processing' | 'printed' | 'failed' | 'cancelled'
+type LiveStatus = 'connecting' | 'live' | 'offline'
 type PrintJob = {
   id: string
   order_id: string
@@ -69,11 +70,17 @@ export default function PrintHistory() {
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [actionId, setActionId] = useState('')
+  const [liveStatus, setLiveStatus] = useState<LiveStatus>('connecting')
   const [error, setError] = useState('')
   const [message, setMessage] = useState('')
+  const mountedRef = useRef(true)
+
+  useEffect(() => () => {
+    mountedRef.current = false
+  }, [])
 
   const loadJobs = useCallback(async (id: string, quiet = false) => {
-    if (!quiet) setRefreshing(true)
+    if (!quiet && mountedRef.current) setRefreshing(true)
     const { data, error: jobsError } = await supabase
       .from('print_jobs')
       .select(`
@@ -97,7 +104,8 @@ export default function PrintHistory() {
       .order('created_at', { ascending: false })
       .limit(100)
 
-    setRefreshing(false)
+    if (!mountedRef.current) return
+    if (!quiet) setRefreshing(false)
     if (jobsError) throw jobsError
     setJobs((data ?? []) as PrintJob[])
   }, [])
@@ -107,9 +115,11 @@ export default function PrintHistory() {
 
     async function initialise() {
       try {
+        setLoading(true)
+        setError('')
         const { data: userData, error: userError } = await supabase.auth.getUser()
         if (userError || !userData.user) {
-          navigate('/login', { replace: true })
+          navigate('/login', { replace: true, state: { from: '/print-history' } })
           return
         }
 
@@ -118,9 +128,14 @@ export default function PrintHistory() {
           .select('restaurant_id, restaurants(name)')
           .eq('user_id', userData.user.id)
           .limit(1)
-          .single()
+          .maybeSingle()
 
         if (membershipError) throw membershipError
+        if (!membership) {
+          navigate('/onboarding', { replace: true })
+          return
+        }
+
         const typed = membership as Membership
         setRestaurantId(typed.restaurant_id)
         setRestaurant(restaurantName(typed.restaurants))
@@ -133,12 +148,18 @@ export default function PrintHistory() {
             schema: 'public',
             table: 'print_jobs',
             filter: `restaurant_id=eq.${typed.restaurant_id}`,
-          }, () => void loadJobs(typed.restaurant_id, true))
-          .subscribe()
+          }, () => {
+            void loadJobs(typed.restaurant_id, true).catch(() => setLiveStatus('offline'))
+          })
+          .subscribe((status) => {
+            if (status === 'SUBSCRIBED') setLiveStatus('live')
+            else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') setLiveStatus('offline')
+            else setLiveStatus('connecting')
+          })
       } catch (caughtError) {
-        setError(caughtError instanceof Error ? caughtError.message : 'Unable to load print history.')
+        if (mountedRef.current) setError(caughtError instanceof Error ? caughtError.message : 'Unable to load print history.')
       } finally {
-        setLoading(false)
+        if (mountedRef.current) setLoading(false)
       }
     }
 
@@ -147,6 +168,20 @@ export default function PrintHistory() {
       if (channel) void supabase.removeChannel(channel)
     }
   }, [loadJobs, navigate])
+
+  useEffect(() => {
+    function refreshWhenVisible() {
+      if (document.visibilityState === 'visible' && restaurantId) {
+        void loadJobs(restaurantId, true).catch(() => setError('Unable to refresh print history.'))
+      }
+    }
+    document.addEventListener('visibilitychange', refreshWhenVisible)
+    window.addEventListener('focus', refreshWhenVisible)
+    return () => {
+      document.removeEventListener('visibilitychange', refreshWhenVisible)
+      window.removeEventListener('focus', refreshWhenVisible)
+    }
+  }, [loadJobs, restaurantId])
 
   const visibleJobs = useMemo(
     () => filter === 'all' ? jobs : jobs.filter((job) => job.status === filter),
@@ -159,6 +194,7 @@ export default function PrintHistory() {
     queued: jobs.filter((job) => job.status === 'queued').length,
     processing: jobs.filter((job) => job.status === 'processing').length,
     printed: jobs.filter((job) => job.status === 'printed').length,
+    cancelled: jobs.filter((job) => job.status === 'cancelled').length,
   }), [jobs])
 
   async function requeue(job: PrintJob) {
@@ -169,16 +205,16 @@ export default function PrintHistory() {
     setActionId(job.id)
     setError('')
     setMessage('')
-    const { error: retryError } = await supabase.rpc('retry_print_job', { p_job_id: job.id })
-    setActionId('')
-
-    if (retryError) {
-      setError(retryError.message)
-      return
+    try {
+      const { error: retryError } = await supabase.rpc('retry_print_job', { p_job_id: job.id })
+      if (retryError) throw retryError
+      setMessage(`${verb} queued for order ${orderNumber(job.orders)}.`)
+      if (restaurantId) await loadJobs(restaurantId, true)
+    } catch (caughtError) {
+      setError(caughtError instanceof Error ? caughtError.message : 'Unable to queue this print job.')
+    } finally {
+      if (mountedRef.current) setActionId('')
     }
-
-    setMessage(`${verb} queued for order ${orderNumber(job.orders)}.`)
-    if (restaurantId) await loadJobs(restaurantId, true)
   }
 
   if (loading) return <main className="portal-shell"><div className="menu-state-card">Loading print history…</div></main>
@@ -202,9 +238,14 @@ export default function PrintHistory() {
           <h1>Print history</h1>
           <p>Review recent tickets, retry failed jobs, and reprint completed orders.</p>
         </div>
-        <button className="secondary-button" type="button" disabled={refreshing} onClick={() => restaurantId && void loadJobs(restaurantId)}>
-          {refreshing ? 'Refreshing…' : 'Refresh'}
-        </button>
+        <div className="print-history-header-actions">
+          <span className={`print-job-status ${liveStatus === 'live' ? 'printed' : liveStatus === 'offline' ? 'failed' : 'processing'}`} role="status">
+            {liveStatus === 'live' ? 'Live' : liveStatus === 'offline' ? 'Offline' : 'Connecting'}
+          </span>
+          <button className="secondary-button" type="button" disabled={refreshing || !restaurantId} onClick={() => restaurantId && void loadJobs(restaurantId).catch((caughtError) => setError(caughtError instanceof Error ? caughtError.message : 'Unable to refresh print history.'))}>
+            {refreshing ? 'Refreshing…' : 'Refresh'}
+          </button>
+        </div>
       </section>
 
       {error && <div className="form-error" role="alert">{error}</div>}
@@ -217,22 +258,22 @@ export default function PrintHistory() {
         <article><span>Printed</span><strong>{counts.printed}</strong></article>
       </section>
 
-      <div className="print-history-filters" role="group" aria-label="Filter print jobs">
-        {(['all', 'failed', 'queued', 'processing', 'printed'] as const).map((status) => (
-          <button key={status} type="button" className={filter === status ? 'active' : ''} onClick={() => setFilter(status)}>
+      <div className="print-history-filters" role="tablist" aria-label="Filter print jobs">
+        {(['all', 'failed', 'queued', 'processing', 'printed', 'cancelled'] as const).map((status) => (
+          <button key={status} type="button" role="tab" aria-selected={filter === status} className={filter === status ? 'active' : ''} onClick={() => setFilter(status)}>
             {status === 'all' ? 'All' : statusLabels[status]} <span>{status === 'all' ? counts.all : counts[status]}</span>
           </button>
         ))}
       </div>
 
-      <section className="print-history-list">
+      <section className="print-history-list" aria-live="polite">
         {visibleJobs.length === 0 ? (
           <div className="settings-card print-history-empty">
             <h2>No print jobs found</h2>
             <p>{filter === 'all' ? 'Print jobs will appear here when paid orders are queued.' : `There are no ${filter} print jobs.`}</p>
           </div>
         ) : visibleJobs.map((job) => (
-          <article className="settings-card print-job-card" key={job.id}>
+          <article className="settings-card print-job-card" key={job.id} aria-busy={actionId === job.id}>
             <div className="print-job-main">
               <div>
                 <span className={`print-job-status ${job.status}`}>{statusLabels[job.status]}</span>
@@ -240,8 +281,8 @@ export default function PrintHistory() {
                 <p>{job.document_type === 'kitchen_ticket' ? 'Kitchen ticket' : 'Customer receipt'} · {joinedName(job.restaurant_printers)}</p>
               </div>
               <div className="print-job-time">
-                <span>{job.status === 'printed' ? 'Printed' : job.status === 'failed' ? 'Failed' : 'Queued'}</span>
-                <strong>{formatDate(job.printed_at ?? job.failed_at ?? job.queued_at)}</strong>
+                <span>{job.status === 'printed' ? 'Printed' : job.status === 'failed' ? 'Failed' : job.status === 'processing' ? 'Started' : 'Queued'}</span>
+                <strong>{formatDate(job.printed_at ?? job.failed_at ?? job.processing_at ?? job.queued_at)}</strong>
               </div>
             </div>
 
