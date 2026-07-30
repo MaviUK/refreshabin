@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import './CustomerAccount.css'
@@ -108,26 +108,51 @@ function etaLabel(order: CustomerOrder, now: number) {
 export default function CustomerOrders() {
   const [orders, setOrders] = useState<CustomerOrder[]>([])
   const [loading, setLoading] = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
   const [error, setError] = useState('')
   const [now, setNow] = useState(Date.now())
   const [reorderingId, setReorderingId] = useState<string | null>(null)
   const navigate = useNavigate()
 
+  const loadOrders = useCallback(async (showRefreshing = false) => {
+    if (showRefreshing) setRefreshing(true)
+    setError('')
+    const { data, error: historyError } = await supabase.rpc('get_customer_order_history')
+    if (historyError) setError(historyError.message)
+    else setOrders((data || []) as CustomerOrder[])
+    setLoading(false)
+    setRefreshing(false)
+  }, [])
+
   useEffect(() => {
-    async function loadOrders() {
+    let channel: ReturnType<typeof supabase.channel> | null = null
+
+    async function initialiseOrders() {
       const { data: sessionData } = await supabase.auth.getSession()
-      if (!sessionData.session) {
+      const user = sessionData.session?.user
+      if (!user) {
         navigate('/account/login', { replace: true, state: { from: '/account/orders' } })
         return
       }
+
       await supabase.rpc('claim_customer_orders')
-      const { data, error: historyError } = await supabase.rpc('get_customer_order_history')
-      if (historyError) setError(historyError.message)
-      else setOrders((data || []) as CustomerOrder[])
-      setLoading(false)
+      await loadOrders()
+
+      channel = supabase
+        .channel(`customer-orders-${user.id}`)
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'orders', filter: `customer_user_id=eq.${user.id}` },
+          () => void loadOrders(),
+        )
+        .subscribe()
     }
-    void loadOrders()
-  }, [navigate])
+
+    void initialiseOrders()
+    return () => {
+      if (channel) void supabase.removeChannel(channel)
+    }
+  }, [loadOrders, navigate])
 
   useEffect(() => {
     const timer = window.setInterval(() => setNow(Date.now()), 60000)
@@ -222,11 +247,17 @@ export default function CustomerOrders() {
   return (
     <main className="customer-account-shell customer-account-shell--wide">
       <section className="customer-account-card">
-        <header className="customer-account-header"><div><Link className="customer-account-brand" to="/">ordered.food</Link><span className="customer-account-eyebrow">Customer account</span><h1>My orders</h1></div><button className="customer-account-secondary" type="button" onClick={signOut}>Sign out</button></header>
+        <header className="customer-account-header">
+          <div><Link className="customer-account-brand" to="/account">← My account</Link><span className="customer-account-eyebrow">Customer account</span><h1>My orders</h1></div>
+          <div className="customer-account-header-actions">
+            <button className="customer-account-secondary" type="button" onClick={() => void loadOrders(true)} disabled={refreshing}>{refreshing ? 'Refreshing…' : 'Refresh'}</button>
+            <button className="customer-account-secondary" type="button" onClick={signOut}>Sign out</button>
+          </div>
+        </header>
         {loading && <p>Loading your orders…</p>}
         {error && <div className="customer-account-error" role="alert">{error}</div>}
         {!loading && !error && orders.length === 0 && <div className="customer-account-empty"><h2>No orders yet</h2><p>Your paid orders will appear here.</p><Link to="/restaurants">Browse restaurants</Link></div>}
-        {!loading && activeOrders.length > 0 && <section className="customer-order-section"><div className="customer-order-section-heading"><div><span className="customer-account-eyebrow">Live</span><h2>Current orders</h2></div></div><div className="customer-order-list">{activeOrders.map((order) => renderOrder(order, true))}</div></section>}
+        {!loading && activeOrders.length > 0 && <section className="customer-order-section"><div className="customer-order-section-heading"><div><span className="customer-account-eyebrow">Live updates</span><h2>Current orders</h2></div></div><div className="customer-order-list">{activeOrders.map((order) => renderOrder(order, true))}</div></section>}
         {!loading && previousOrders.length > 0 && <section className="customer-order-section"><div className="customer-order-section-heading"><div><span className="customer-account-eyebrow">History</span><h2>Previous orders</h2></div></div><div className="customer-order-list">{previousOrders.map((order) => renderOrder(order, false))}</div></section>}
       </section>
     </main>
