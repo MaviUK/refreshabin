@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import './CustomerAccount.css'
@@ -77,9 +77,17 @@ function getSteps(order: CustomerOrder): OrderStep[] {
 
 function getStepIndex(order: CustomerOrder) {
   const mapping: Record<string, number> = {
-    pending_payment: -1, paid: 0, received: 0, accepted: 1, preparing: 2,
+    pending_payment: -1,
+    paid: 0,
+    received: 0,
+    accepted: 1,
+    preparing: 2,
     ready: order.fulfilment_method === 'collection' ? 3 : 2,
-    ready_for_collection: 3, out_for_delivery: 3, completed: 4, delivered: 4, collected: 4,
+    ready_for_collection: 3,
+    out_for_delivery: 3,
+    completed: 4,
+    delivered: 4,
+    collected: 4,
   }
   return mapping[order.order_status] ?? 0
 }
@@ -105,54 +113,82 @@ function etaLabel(order: CustomerOrder, now: number) {
   return `Estimated time was ${timeOnly.format(eta)}`
 }
 
+function sortOrders(orders: CustomerOrder[]) {
+  return [...orders].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+}
+
 export default function CustomerOrders() {
   const [orders, setOrders] = useState<CustomerOrder[]>([])
   const [loading, setLoading] = useState(true)
-  const [refreshing, setRefreshing] = useState(false)
   const [error, setError] = useState('')
   const [now, setNow] = useState(Date.now())
   const [reorderingId, setReorderingId] = useState<string | null>(null)
+  const [customerUserId, setCustomerUserId] = useState<string | null>(null)
+  const [liveStatus, setLiveStatus] = useState<'connecting' | 'live' | 'offline'>('connecting')
+  const [updateNotice, setUpdateNotice] = useState('')
   const navigate = useNavigate()
 
-  const loadOrders = useCallback(async (showRefreshing = false) => {
-    if (showRefreshing) setRefreshing(true)
-    setError('')
-    const { data, error: historyError } = await supabase.rpc('get_customer_order_history')
-    if (historyError) setError(historyError.message)
-    else setOrders((data || []) as CustomerOrder[])
-    setLoading(false)
-    setRefreshing(false)
-  }, [])
-
   useEffect(() => {
-    let channel: ReturnType<typeof supabase.channel> | null = null
-
-    async function initialiseOrders() {
+    async function loadOrders() {
       const { data: sessionData } = await supabase.auth.getSession()
       const user = sessionData.session?.user
       if (!user) {
         navigate('/account/login', { replace: true, state: { from: '/account/orders' } })
         return
       }
-
+      setCustomerUserId(user.id)
       await supabase.rpc('claim_customer_orders')
-      await loadOrders()
-
-      channel = supabase
-        .channel(`customer-orders-${user.id}`)
-        .on(
-          'postgres_changes',
-          { event: '*', schema: 'public', table: 'orders', filter: `customer_user_id=eq.${user.id}` },
-          () => void loadOrders(),
-        )
-        .subscribe()
+      const { data, error: historyError } = await supabase.rpc('get_customer_order_history')
+      if (historyError) setError(historyError.message)
+      else setOrders(sortOrders((data || []) as CustomerOrder[]))
+      setLoading(false)
     }
+    void loadOrders()
+  }, [navigate])
 
-    void initialiseOrders()
+  useEffect(() => {
+    if (!customerUserId) return
+
+    const channel = supabase
+      .channel(`customer-orders:${customerUserId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'orders',
+          filter: `customer_user_id=eq.${customerUserId}`,
+        },
+        (payload) => {
+          if (payload.eventType === 'DELETE') {
+            const removed = payload.old as Pick<CustomerOrder, 'id'>
+            setOrders((current) => current.filter((order) => order.id !== removed.id))
+            return
+          }
+
+          const changed = payload.new as CustomerOrder
+          setOrders((current) => {
+            const exists = current.some((order) => order.id === changed.id)
+            const next = exists
+              ? current.map((order) => (order.id === changed.id ? { ...order, ...changed } : order))
+              : [changed, ...current]
+            return sortOrders(next)
+          })
+          setNow(Date.now())
+          setUpdateNotice(`Order #${changed.order_number} is now ${formatStatus(changed.order_status).toLowerCase()}.`)
+          window.setTimeout(() => setUpdateNotice(''), 6000)
+        },
+      )
+      .subscribe((status) => {
+        if (status === 'SUBSCRIBED') setLiveStatus('live')
+        else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') setLiveStatus('offline')
+        else setLiveStatus('connecting')
+      })
+
     return () => {
-      if (channel) void supabase.removeChannel(channel)
+      void supabase.removeChannel(channel)
     }
-  }, [loadOrders, navigate])
+  }, [customerUserId])
 
   useEffect(() => {
     const timer = window.setInterval(() => setNow(Date.now()), 60000)
@@ -248,16 +284,18 @@ export default function CustomerOrders() {
     <main className="customer-account-shell customer-account-shell--wide">
       <section className="customer-account-card">
         <header className="customer-account-header">
-          <div><Link className="customer-account-brand" to="/account">← My account</Link><span className="customer-account-eyebrow">Customer account</span><h1>My orders</h1></div>
-          <div className="customer-account-header-actions">
-            <button className="customer-account-secondary" type="button" onClick={() => void loadOrders(true)} disabled={refreshing}>{refreshing ? 'Refreshing…' : 'Refresh'}</button>
-            <button className="customer-account-secondary" type="button" onClick={signOut}>Sign out</button>
-          </div>
+          <div><Link className="customer-account-brand" to="/">ordered.food</Link><span className="customer-account-eyebrow">Customer account</span><h1>My orders</h1></div>
+          <button className="customer-account-secondary" type="button" onClick={signOut}>Sign out</button>
         </header>
+        <div className={`customer-order-live customer-order-live--${liveStatus}`} role="status">
+          <span aria-hidden="true" />
+          {liveStatus === 'live' ? 'Live updates on' : liveStatus === 'offline' ? 'Live updates unavailable' : 'Connecting live updates…'}
+        </div>
+        {updateNotice && <div className="customer-order-update-notice" role="status">{updateNotice}</div>}
         {loading && <p>Loading your orders…</p>}
         {error && <div className="customer-account-error" role="alert">{error}</div>}
         {!loading && !error && orders.length === 0 && <div className="customer-account-empty"><h2>No orders yet</h2><p>Your paid orders will appear here.</p><Link to="/restaurants">Browse restaurants</Link></div>}
-        {!loading && activeOrders.length > 0 && <section className="customer-order-section"><div className="customer-order-section-heading"><div><span className="customer-account-eyebrow">Live updates</span><h2>Current orders</h2></div></div><div className="customer-order-list">{activeOrders.map((order) => renderOrder(order, true))}</div></section>}
+        {!loading && activeOrders.length > 0 && <section className="customer-order-section"><div className="customer-order-section-heading"><div><span className="customer-account-eyebrow">Live</span><h2>Current orders</h2></div></div><div className="customer-order-list">{activeOrders.map((order) => renderOrder(order, true))}</div></section>}
         {!loading && previousOrders.length > 0 && <section className="customer-order-section"><div className="customer-order-section-heading"><div><span className="customer-account-eyebrow">History</span><h2>Previous orders</h2></div></div><div className="customer-order-list">{previousOrders.map((order) => renderOrder(order, false))}</div></section>}
       </section>
     </main>
