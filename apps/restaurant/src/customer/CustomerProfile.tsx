@@ -166,10 +166,10 @@ export default function CustomerProfile() {
       return
     }
 
-    const { error: updateError } = await supabase.auth.updateUser({
-      email: normalisedEmail,
-      options: { emailRedirectTo: `${window.location.origin}/account/profile` },
-    })
+    const { error: updateError } = await supabase.auth.updateUser(
+      { email: normalisedEmail },
+      { emailRedirectTo: `${window.location.origin}/account/profile` },
+    )
     setChangingEmail(false)
     if (updateError) {
       setEmailError(updateError.message)
