@@ -60,8 +60,11 @@ type RestaurantMembership = {
   restaurants: { name: string } | { name: string }[] | null
 }
 
+type LiveStatus = 'connecting' | 'live' | 'offline'
+
 const activeStatuses = ['placed', 'accepted', 'preparing', 'ready', 'out_for_delivery']
 const preparationChoices = [15, 20, 30, 45]
+const soundStorageKey = 'ordered-food-restaurant-order-sound'
 const statusLabels: Record<string, string> = {
   pending_payment: 'Awaiting payment',
   placed: 'New',
@@ -97,24 +100,39 @@ function modifierLines(item: OrderItem) {
   return lines
 }
 
+function initialSoundPreference() {
+  if (typeof window === 'undefined') return false
+  return window.localStorage.getItem(soundStorageKey) === 'enabled'
+}
+
 export default function Orders() {
   const navigate = useNavigate()
   const [restaurantId, setRestaurantId] = useState('')
   const [restaurant, setRestaurant] = useState('Restaurant')
   const [orders, setOrders] = useState<Order[]>([])
   const [loading, setLoading] = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
   const [error, setError] = useState('')
   const [updatingId, setUpdatingId] = useState('')
   const [view, setView] = useState<'active' | 'completed'>('active')
-  const [soundEnabled, setSoundEnabled] = useState(false)
+  const [soundEnabled, setSoundEnabled] = useState(initialSoundPreference)
   const [choosingTimeFor, setChoosingTimeFor] = useState('')
-  const soundEnabledRef = useRef(false)
+  const [liveStatus, setLiveStatus] = useState<LiveStatus>('connecting')
+  const soundEnabledRef = useRef(soundEnabled)
+  const mountedRef = useRef(true)
 
   useEffect(() => {
     soundEnabledRef.current = soundEnabled
+    if (soundEnabled) window.localStorage.setItem(soundStorageKey, 'enabled')
+    else window.localStorage.removeItem(soundStorageKey)
   }, [soundEnabled])
 
-  const loadOrders = useCallback(async (id: string) => {
+  useEffect(() => () => {
+    mountedRef.current = false
+  }, [])
+
+  const loadOrders = useCallback(async (id: string, silent = false) => {
+    if (!silent) setRefreshing(true)
     const { data, error: ordersError } = await supabase
       .from('orders')
       .select(`
@@ -153,6 +171,8 @@ export default function Orders() {
       .order('created_at', { ascending: false })
       .limit(100)
 
+    if (!mountedRef.current) return
+    if (!silent) setRefreshing(false)
     if (ordersError) throw ordersError
     setOrders((data ?? []) as Order[])
   }, [])
@@ -185,7 +205,7 @@ export default function Orders() {
     }
   }
 
-  async function enableSound() {
+  function enableSound() {
     setSoundEnabled(true)
     soundEnabledRef.current = true
     playOrderAlert()
@@ -197,9 +217,10 @@ export default function Orders() {
     async function initialise() {
       try {
         setLoading(true)
+        setError('')
         const { data: userData, error: userError } = await supabase.auth.getUser()
         if (userError || !userData.user) {
-          navigate('/login', { replace: true })
+          navigate('/login', { replace: true, state: { from: '/orders' } })
           return
         }
 
@@ -208,14 +229,18 @@ export default function Orders() {
           .select('restaurant_id, restaurants(name)')
           .eq('user_id', userData.user.id)
           .limit(1)
-          .single()
+          .maybeSingle()
 
         if (membershipError) throw membershipError
+        if (!membership) {
+          navigate('/onboarding', { replace: true })
+          return
+        }
 
         const typedMembership = membership as RestaurantMembership
         setRestaurantId(typedMembership.restaurant_id)
         setRestaurant(restaurantName(typedMembership.restaurants))
-        await loadOrders(typedMembership.restaurant_id)
+        await loadOrders(typedMembership.restaurant_id, true)
 
         channel = supabase
           .channel(`restaurant-orders:${typedMembership.restaurant_id}`)
@@ -228,16 +253,20 @@ export default function Orders() {
               filter: `restaurant_id=eq.${typedMembership.restaurant_id}`,
             },
             (payload) => {
-              const nextOrder = payload.new as { order_status?: string } | undefined
+              const nextOrder = payload.new as Partial<Order> | undefined
               if (payload.eventType === 'INSERT' || nextOrder?.order_status === 'placed') playOrderAlert()
-              void loadOrders(typedMembership.restaurant_id)
+              void loadOrders(typedMembership.restaurant_id, true).catch(() => setLiveStatus('offline'))
             },
           )
-          .subscribe()
+          .subscribe((status) => {
+            if (status === 'SUBSCRIBED') setLiveStatus('live')
+            else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') setLiveStatus('offline')
+            else setLiveStatus('connecting')
+          })
       } catch (caughtError) {
         setError(caughtError instanceof Error ? caughtError.message : 'Unable to load orders.')
       } finally {
-        setLoading(false)
+        if (mountedRef.current) setLoading(false)
       }
     }
 
@@ -246,6 +275,20 @@ export default function Orders() {
       if (channel) void supabase.removeChannel(channel)
     }
   }, [loadOrders, navigate])
+
+  useEffect(() => {
+    function refreshWhenVisible() {
+      if (document.visibilityState === 'visible' && restaurantId) {
+        void loadOrders(restaurantId, true).catch(() => setError('Unable to refresh orders.'))
+      }
+    }
+    document.addEventListener('visibilitychange', refreshWhenVisible)
+    window.addEventListener('focus', refreshWhenVisible)
+    return () => {
+      document.removeEventListener('visibilitychange', refreshWhenVisible)
+      window.removeEventListener('focus', refreshWhenVisible)
+    }
+  }, [loadOrders, restaurantId])
 
   const visibleOrders = useMemo(() => orders.filter((order) => {
     const isActive = activeStatuses.includes(order.order_status)
@@ -256,6 +299,8 @@ export default function Orders() {
 
   async function setOrderStatus(order: Order, orderStatus: string, preparationMinutes?: number) {
     if (!restaurantId || updatingId) return
+    if ((orderStatus === 'rejected' || orderStatus === 'cancelled') && !window.confirm(`Are you sure you want to ${orderStatus === 'rejected' ? 'reject' : 'cancel'} order #${order.order_number}?`)) return
+
     setUpdatingId(order.id)
     setError('')
 
@@ -268,18 +313,22 @@ export default function Orders() {
     if (orderStatus === 'completed') patch.completed_at = now
     if (orderStatus === 'rejected' || orderStatus === 'cancelled') patch.cancelled_at = now
 
-    const { error: updateError } = await supabase
+    const { data, error: updateError } = await supabase
       .from('orders')
       .update(patch)
       .eq('id', order.id)
       .eq('restaurant_id', restaurantId)
+      .eq('order_status', order.order_status)
+      .select('id')
+      .maybeSingle()
 
     if (updateError) {
       setError(updateError.message)
+    } else if (!data) {
+      setError(`Order #${order.order_number} changed on another device. The latest status has been loaded.`)
+      await loadOrders(restaurantId, true).catch(() => undefined)
     } else {
-      setOrders((current) => current.map((item) => item.id === order.id
-        ? { ...item, ...patch }
-        : item))
+      setOrders((current) => current.map((item) => item.id === order.id ? { ...item, ...patch } : item))
       setChoosingTimeFor('')
     }
     setUpdatingId('')
@@ -294,26 +343,26 @@ export default function Orders() {
               <div className="prep-time-picker">
                 <span>Ready in</span>
                 {preparationChoices.map((minutes) => (
-                  <button key={minutes} type="button" onClick={() => setOrderStatus(order, 'accepted', minutes)} disabled={updatingId === order.id}>{minutes} min</button>
+                  <button key={minutes} type="button" onClick={() => void setOrderStatus(order, 'accepted', minutes)} disabled={updatingId === order.id}>{minutes} min</button>
                 ))}
                 <button className="cancel" type="button" onClick={() => setChoosingTimeFor('')}>Cancel</button>
               </div>
             ) : (
-              <button className="order-action primary" onClick={() => setChoosingTimeFor(order.id)} disabled={updatingId === order.id}>Accept order</button>
+              <button className="order-action primary" type="button" onClick={() => setChoosingTimeFor(order.id)} disabled={Boolean(updatingId)}>Accept order</button>
             )}
-            <button className="order-action danger" onClick={() => setOrderStatus(order, 'rejected')} disabled={updatingId === order.id}>Reject</button>
+            <button className="order-action danger" type="button" onClick={() => void setOrderStatus(order, 'rejected')} disabled={Boolean(updatingId)}>Reject</button>
           </>
         )
       case 'accepted':
-        return <button className="order-action primary" onClick={() => setOrderStatus(order, 'preparing')} disabled={updatingId === order.id}>Start preparing</button>
+        return <button className="order-action primary" type="button" onClick={() => void setOrderStatus(order, 'preparing')} disabled={Boolean(updatingId)}>Start preparing</button>
       case 'preparing':
-        return <button className="order-action primary" onClick={() => setOrderStatus(order, 'ready')} disabled={updatingId === order.id}>Mark ready</button>
+        return <button className="order-action primary" type="button" onClick={() => void setOrderStatus(order, 'ready')} disabled={Boolean(updatingId)}>Mark ready</button>
       case 'ready':
         return order.fulfilment_method === 'delivery'
-          ? <button className="order-action primary" onClick={() => setOrderStatus(order, 'out_for_delivery')} disabled={updatingId === order.id}>Out for delivery</button>
-          : <button className="order-action primary" onClick={() => setOrderStatus(order, 'completed')} disabled={updatingId === order.id}>Collected</button>
+          ? <button className="order-action primary" type="button" onClick={() => void setOrderStatus(order, 'out_for_delivery')} disabled={Boolean(updatingId)}>Out for delivery</button>
+          : <button className="order-action primary" type="button" onClick={() => void setOrderStatus(order, 'completed')} disabled={Boolean(updatingId)}>Collected</button>
       case 'out_for_delivery':
-        return <button className="order-action primary" onClick={() => setOrderStatus(order, 'completed')} disabled={updatingId === order.id}>Mark delivered</button>
+        return <button className="order-action primary" type="button" onClick={() => void setOrderStatus(order, 'completed')} disabled={Boolean(updatingId)}>Mark delivered</button>
       default:
         return null
     }
@@ -341,17 +390,21 @@ export default function Orders() {
           <p>New paid orders appear here automatically.</p>
         </div>
         <div className="orders-title-actions">
+          <div className={`order-live-status order-live-status--${liveStatus}`} role="status">
+            {liveStatus === 'live' ? 'Live' : liveStatus === 'offline' ? 'Offline' : 'Connecting'}
+          </div>
           <button className={soundEnabled ? 'sound-toggle enabled' : 'sound-toggle'} type="button" onClick={soundEnabled ? () => setSoundEnabled(false) : enableSound}>{soundEnabled ? '🔔 Sound on' : '🔕 Enable sound'}</button>
+          <button className="sound-toggle" type="button" disabled={refreshing || !restaurantId} onClick={() => restaurantId && void loadOrders(restaurantId).catch((caughtError) => setError(caughtError instanceof Error ? caughtError.message : 'Unable to refresh orders.'))}>{refreshing ? 'Refreshing…' : 'Refresh'}</button>
           {newCount > 0 && <div className="new-order-count">{newCount} new</div>}
         </div>
       </section>
 
-      <div className="orders-tabs" role="tablist">
-        <button className={view === 'active' ? 'active' : ''} onClick={() => setView('active')}>Active</button>
-        <button className={view === 'completed' ? 'active' : ''} onClick={() => setView('completed')}>History</button>
+      <div className="orders-tabs" role="tablist" aria-label="Order views">
+        <button type="button" role="tab" aria-selected={view === 'active'} className={view === 'active' ? 'active' : ''} onClick={() => setView('active')}>Active</button>
+        <button type="button" role="tab" aria-selected={view === 'completed'} className={view === 'completed' ? 'active' : ''} onClick={() => setView('completed')}>History</button>
       </div>
 
-      {error && <p className="orders-error">{error}</p>}
+      {error && <p className="orders-error" role="alert">{error}</p>}
 
       {!visibleOrders.length ? (
         <section className="orders-empty">
@@ -362,7 +415,7 @@ export default function Orders() {
       ) : (
         <section className="orders-list">
           {visibleOrders.map((order) => (
-            <article className={`order-card status-${order.order_status}`} key={order.id}>
+            <article className={`order-card status-${order.order_status}`} key={order.id} aria-busy={updatingId === order.id}>
               <div className="order-card-header">
                 <div>
                   <span className="order-number">Order #{order.order_number}</span>
@@ -387,6 +440,7 @@ export default function Orders() {
                     <strong>{money.format((item.unit_price_pence * item.quantity) / 100)}</strong>
                   </div>
                 ))}
+                {order.discount_pence > 0 && <div><span>Discount</span><strong>−{money.format(order.discount_pence / 100)}</strong></div>}
                 {order.delivery_fee_pence > 0 && <div><span>Delivery fee</span><strong>{money.format(order.delivery_fee_pence / 100)}</strong></div>}
               </div>
 
