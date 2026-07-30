@@ -43,18 +43,24 @@ export default function CustomerFavourites() {
   const [removing, setRemoving] = useState<string | null>(null)
 
   useEffect(() => {
+    let active = true
+
     async function loadFavourites() {
       setLoading(true)
       setError('')
-      const { data: sessionData } = await supabase.auth.getSession()
-      if (!sessionData.session?.user) {
-        navigate('/account/login', { replace: true })
+
+      const { data: sessionData, error: sessionError } = await supabase.auth.getSession()
+      if (sessionError || !sessionData.session?.user) {
+        navigate('/account/login', { replace: true, state: { from: '/account/favourites' } })
         return
       }
 
       const { data, error: favouritesError } = await supabase.rpc('get_customer_favourites')
-      if (favouritesError) setError(favouritesError.message)
-      else {
+      if (!active) return
+
+      if (favouritesError) {
+        setError('We could not load your favourites. Please refresh and try again.')
+      } else {
         const favourites = data as FavouritesResponse | null
         setRestaurants(favourites?.restaurants ?? [])
         setItems(favourites?.items ?? [])
@@ -63,42 +69,67 @@ export default function CustomerFavourites() {
     }
 
     void loadFavourites()
+    return () => {
+      active = false
+    }
   }, [navigate])
 
   async function removeRestaurant(restaurantId: string) {
     if (removing) return
-    setRemoving(`restaurant:${restaurantId}`)
-    const { data } = await supabase.auth.getUser()
-    if (!data.user) return
-    const { error: deleteError } = await supabase
-      .from('customer_favourite_restaurants')
-      .delete()
-      .eq('user_id', data.user.id)
-      .eq('restaurant_id', restaurantId)
-    if (deleteError) setError(deleteError.message)
-    else setRestaurants((current) => current.filter((restaurant) => restaurant.id !== restaurantId))
-    setRemoving(null)
+    const removalKey = `restaurant:${restaurantId}`
+    setRemoving(removalKey)
+    setError('')
+
+    try {
+      const { data, error: userError } = await supabase.auth.getUser()
+      if (userError || !data.user) {
+        navigate('/account/login', { replace: true, state: { from: '/account/favourites' } })
+        return
+      }
+
+      const { error: deleteError } = await supabase
+        .from('customer_favourite_restaurants')
+        .delete()
+        .eq('user_id', data.user.id)
+        .eq('restaurant_id', restaurantId)
+
+      if (deleteError) setError('We could not remove that restaurant. Please try again.')
+      else setRestaurants((current) => current.filter((restaurant) => restaurant.id !== restaurantId))
+    } finally {
+      setRemoving((current) => (current === removalKey ? null : current))
+    }
   }
 
   async function removeItem(itemId: string) {
     if (removing) return
-    setRemoving(`item:${itemId}`)
-    const { data } = await supabase.auth.getUser()
-    if (!data.user) return
-    const { error: deleteError } = await supabase
-      .from('customer_favourite_items')
-      .delete()
-      .eq('user_id', data.user.id)
-      .eq('menu_item_id', itemId)
-    if (deleteError) setError(deleteError.message)
-    else setItems((current) => current.filter((item) => item.id !== itemId))
-    setRemoving(null)
+    const removalKey = `item:${itemId}`
+    setRemoving(removalKey)
+    setError('')
+
+    try {
+      const { data, error: userError } = await supabase.auth.getUser()
+      if (userError || !data.user) {
+        navigate('/account/login', { replace: true, state: { from: '/account/favourites' } })
+        return
+      }
+
+      const { error: deleteError } = await supabase
+        .from('customer_favourite_items')
+        .delete()
+        .eq('user_id', data.user.id)
+        .eq('menu_item_id', itemId)
+
+      if (deleteError) setError('We could not remove that dish. Please try again.')
+      else setItems((current) => current.filter((item) => item.id !== itemId))
+    } finally {
+      setRemoving((current) => (current === removalKey ? null : current))
+    }
   }
 
   return (
     <main className="customer-favourites-page">
       <header className="customer-favourites-header">
-        <Link to="/restaurants">← Restaurants</Link>
+        <Link to="/account">← My account</Link>
         <strong>ordered.food</strong>
         <nav><Link to="/account/orders">Orders</Link><Link to="/account/addresses">Addresses</Link></nav>
       </header>
@@ -110,7 +141,7 @@ export default function CustomerFavourites() {
           <p>Keep your regular restaurants and dishes close at hand.</p>
         </div>
 
-        {error && <p className="customer-favourites-error">{error}</p>}
+        {error && <p className="customer-favourites-error" role="alert">{error}</p>}
         {loading ? <div className="customer-favourites-state">Loading your favourites…</div> : (
           <>
             <section className="customer-favourites-section">
@@ -136,7 +167,7 @@ export default function CustomerFavourites() {
                           </div>
                         </div>
                       </Link>
-                      <button type="button" onClick={() => void removeRestaurant(restaurant.id)} disabled={removing === `restaurant:${restaurant.id}`}>Remove</button>
+                      <button type="button" onClick={() => void removeRestaurant(restaurant.id)} disabled={removing !== null}>{removing === `restaurant:${restaurant.id}` ? 'Removing…' : 'Remove'}</button>
                     </article>
                   ))}
                 </div>
@@ -153,7 +184,7 @@ export default function CustomerFavourites() {
                         {item.image_url ? <img src={item.image_url} alt={item.name} /> : <div className="customer-favourite-item-placeholder">{item.name.charAt(0)}</div>}
                         <div><span>{item.restaurant_name}</span><h3>{item.name}</h3>{item.description && <p>{item.description}</p>}<strong>{money.format(item.price_pence / 100)}</strong></div>
                       </Link>
-                      <button type="button" onClick={() => void removeItem(item.id)} disabled={removing === `item:${item.id}`}>Remove</button>
+                      <button type="button" onClick={() => void removeItem(item.id)} disabled={removing !== null}>{removing === `item:${item.id}` ? 'Removing…' : 'Remove'}</button>
                     </article>
                   ))}
                 </div>
