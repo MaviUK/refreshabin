@@ -3,11 +3,26 @@ import { Link, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import './KitchenDisplay.css'
 
+type SnapshotOption = {
+  id: string
+  name: string
+  quantity: number
+}
+
 type OrderItem = {
   id: string
   item_name: string
   quantity: number
   customer_notes: string | null
+  item_snapshot: {
+    removed_ingredients?: Array<{ id: string; name: string }>
+    selected_extras?: SnapshotOption[]
+    modifier_groups?: Array<{
+      group_id: string
+      group_name: string
+      options: SnapshotOption[]
+    }>
+  } | null
 }
 
 type KitchenOrder = {
@@ -27,7 +42,10 @@ type Membership = {
   restaurants: { name: string } | { name: string }[] | null
 }
 
+type LiveStatus = 'connecting' | 'live' | 'offline'
+
 const kitchenStatuses = ['placed', 'accepted', 'preparing', 'ready']
+const soundStorageKey = 'ordered-food-kds-sound'
 
 function getRestaurantName(value: Membership['restaurants']) {
   if (Array.isArray(value)) return value[0]?.name ?? 'Kitchen'
@@ -38,35 +56,80 @@ function elapsedMinutes(createdAt: string, now: number) {
   return Math.max(0, Math.floor((now - new Date(createdAt).getTime()) / 60000))
 }
 
+function initialSoundPreference() {
+  if (typeof window === 'undefined') return false
+  return window.localStorage.getItem(soundStorageKey) === 'enabled'
+}
+
+function modifierLines(item: OrderItem) {
+  const snapshot = item.item_snapshot
+  if (!snapshot) return []
+
+  const lines: string[] = []
+  for (const ingredient of snapshot.removed_ingredients ?? []) lines.push(`No ${ingredient.name}`)
+  for (const extra of snapshot.selected_extras ?? []) lines.push(`+ ${extra.quantity > 1 ? `${extra.quantity} × ` : ''}${extra.name}`)
+  for (const group of snapshot.modifier_groups ?? []) {
+    for (const option of group.options ?? []) {
+      lines.push(`${group.group_name}: ${option.quantity > 1 ? `${option.quantity} × ` : ''}${option.name}`)
+    }
+  }
+  return lines
+}
+
 export default function KitchenDisplay() {
   const navigate = useNavigate()
   const [restaurantId, setRestaurantId] = useState('')
   const [restaurantName, setRestaurantName] = useState('Kitchen')
   const [orders, setOrders] = useState<KitchenOrder[]>([])
   const [loading, setLoading] = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
   const [error, setError] = useState('')
   const [updatingId, setUpdatingId] = useState('')
   const [now, setNow] = useState(Date.now())
-  const [soundEnabled, setSoundEnabled] = useState(false)
+  const [soundEnabled, setSoundEnabled] = useState(initialSoundPreference)
+  const [liveStatus, setLiveStatus] = useState<LiveStatus>('connecting')
   const knownOrderIds = useRef<Set<string>>(new Set())
+  const soundEnabledRef = useRef(soundEnabled)
+  const mountedRef = useRef(true)
 
-  const playAlert = useCallback(() => {
-    if (!soundEnabled) return
-    const AudioContextClass = window.AudioContext || (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext
-    if (!AudioContextClass) return
-    const context = new AudioContextClass()
-    const oscillator = context.createOscillator()
-    const gain = context.createGain()
-    oscillator.frequency.value = 880
-    gain.gain.setValueAtTime(0.15, context.currentTime)
-    gain.gain.exponentialRampToValueAtTime(0.001, context.currentTime + 0.8)
-    oscillator.connect(gain)
-    gain.connect(context.destination)
-    oscillator.start()
-    oscillator.stop(context.currentTime + 0.8)
+  useEffect(() => {
+    soundEnabledRef.current = soundEnabled
+    if (soundEnabled) window.localStorage.setItem(soundStorageKey, 'enabled')
+    else window.localStorage.removeItem(soundStorageKey)
   }, [soundEnabled])
 
-  const loadOrders = useCallback(async (id: string, announceNew = false) => {
+  useEffect(() => () => {
+    mountedRef.current = false
+  }, [])
+
+  const playAlert = useCallback(() => {
+    if (!soundEnabledRef.current) return
+    try {
+      const AudioContextClass = window.AudioContext || (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext
+      if (!AudioContextClass) return
+      const context = new AudioContextClass()
+      const ring = (start: number, frequency: number) => {
+        const oscillator = context.createOscillator()
+        const gain = context.createGain()
+        oscillator.frequency.value = frequency
+        gain.gain.setValueAtTime(0.0001, start)
+        gain.gain.exponentialRampToValueAtTime(0.25, start + 0.02)
+        gain.gain.exponentialRampToValueAtTime(0.0001, start + 0.35)
+        oscillator.connect(gain)
+        gain.connect(context.destination)
+        oscillator.start(start)
+        oscillator.stop(start + 0.38)
+      }
+      ring(context.currentTime, 880)
+      ring(context.currentTime + 0.42, 1100)
+      window.setTimeout(() => void context.close(), 1200)
+    } catch {
+      // Audio can be blocked until the screen has been interacted with.
+    }
+  }, [])
+
+  const loadOrders = useCallback(async (id: string, options: { announceNew?: boolean; showRefresh?: boolean } = {}) => {
+    if (options.showRefresh) setRefreshing(true)
     const { data, error: ordersError } = await supabase
       .from('orders')
       .select(`
@@ -82,17 +145,20 @@ export default function KitchenDisplay() {
           id,
           item_name,
           quantity,
-          customer_notes
+          customer_notes,
+          item_snapshot
         )
       `)
       .eq('restaurant_id', id)
       .in('order_status', kitchenStatuses)
       .order('created_at', { ascending: true })
 
+    if (!mountedRef.current) return
+    if (options.showRefresh) setRefreshing(false)
     if (ordersError) throw ordersError
-    const nextOrders = (data ?? []) as KitchenOrder[]
 
-    if (announceNew) {
+    const nextOrders = (data ?? []) as KitchenOrder[]
+    if (options.announceNew) {
       const hasNewPlacedOrder = nextOrders.some((order) => order.order_status === 'placed' && !knownOrderIds.current.has(order.id))
       if (hasNewPlacedOrder) playAlert()
     }
@@ -112,9 +178,10 @@ export default function KitchenDisplay() {
     async function initialise() {
       try {
         setLoading(true)
+        setError('')
         const { data: userData, error: userError } = await supabase.auth.getUser()
         if (userError || !userData.user) {
-          navigate('/login', { replace: true })
+          navigate('/login', { replace: true, state: { from: '/kds' } })
           return
         }
 
@@ -123,9 +190,14 @@ export default function KitchenDisplay() {
           .select('restaurant_id, restaurants(name)')
           .eq('user_id', userData.user.id)
           .limit(1)
-          .single()
+          .maybeSingle()
 
         if (membershipError) throw membershipError
+        if (!membership) {
+          navigate('/onboarding', { replace: true })
+          return
+        }
+
         const typedMembership = membership as Membership
         setRestaurantId(typedMembership.restaurant_id)
         setRestaurantName(getRestaurantName(typedMembership.restaurants))
@@ -141,21 +213,41 @@ export default function KitchenDisplay() {
               table: 'orders',
               filter: `restaurant_id=eq.${typedMembership.restaurant_id}`,
             },
-            () => loadOrders(typedMembership.restaurant_id, true),
+            () => {
+              void loadOrders(typedMembership.restaurant_id, { announceNew: true }).catch(() => setLiveStatus('offline'))
+            },
           )
-          .subscribe()
+          .subscribe((status) => {
+            if (status === 'SUBSCRIBED') setLiveStatus('live')
+            else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') setLiveStatus('offline')
+            else setLiveStatus('connecting')
+          })
       } catch (caughtError) {
         setError(caughtError instanceof Error ? caughtError.message : 'Unable to load kitchen orders.')
       } finally {
-        setLoading(false)
+        if (mountedRef.current) setLoading(false)
       }
     }
 
-    initialise()
+    void initialise()
     return () => {
-      if (channel) supabase.removeChannel(channel)
+      if (channel) void supabase.removeChannel(channel)
     }
   }, [loadOrders, navigate])
+
+  useEffect(() => {
+    function refreshWhenVisible() {
+      if (document.visibilityState === 'visible' && restaurantId) {
+        void loadOrders(restaurantId).catch(() => setError('Unable to refresh kitchen orders.'))
+      }
+    }
+    document.addEventListener('visibilitychange', refreshWhenVisible)
+    window.addEventListener('focus', refreshWhenVisible)
+    return () => {
+      document.removeEventListener('visibilitychange', refreshWhenVisible)
+      window.removeEventListener('focus', refreshWhenVisible)
+    }
+  }, [loadOrders, restaurantId])
 
   const columns = useMemo(() => ({
     new: orders.filter((order) => order.order_status === 'placed'),
@@ -168,26 +260,43 @@ export default function KitchenDisplay() {
     setUpdatingId(order.id)
     setError('')
 
-    const { error: updateError } = await supabase
+    const timestamp = new Date().toISOString()
+    const patch: Record<string, string> = { order_status: status }
+    if (status === 'accepted') patch.accepted_at = timestamp
+    if (status === 'completed') patch.completed_at = timestamp
+
+    const { data, error: updateError } = await supabase
       .from('orders')
-      .update({ order_status: status })
+      .update(patch)
       .eq('id', order.id)
       .eq('restaurant_id', restaurantId)
+      .eq('order_status', order.order_status)
+      .select('id')
+      .maybeSingle()
 
     if (updateError) {
       setError(updateError.message)
-    } else {
-      await loadOrders(restaurantId)
+    } else if (!data) {
+      setError(`Order #${order.order_number} changed on another screen. The latest status has been loaded.`)
     }
-    setUpdatingId('')
+
+    await loadOrders(restaurantId).catch(() => setError('The order changed, but the kitchen board could not be refreshed.'))
+    if (mountedRef.current) setUpdatingId('')
   }
 
   async function enterFullscreen() {
     try {
-      await document.documentElement.requestFullscreen()
+      if (document.fullscreenElement) await document.exitFullscreen()
+      else await document.documentElement.requestFullscreen()
     } catch {
-      setError('Fullscreen mode could not be opened on this device.')
+      setError('Fullscreen mode could not be changed on this device.')
     }
+  }
+
+  function enableSound() {
+    setSoundEnabled(true)
+    soundEnabledRef.current = true
+    playAlert()
   }
 
   function ticket(order: KitchenOrder) {
@@ -199,7 +308,7 @@ export default function KitchenDisplay() {
         ? 'preparing'
         : order.order_status === 'preparing'
           ? 'ready'
-          : 'completed'
+          : order.fulfilment_method === 'collection' ? 'completed' : 'out_for_delivery'
     const actionLabel = order.order_status === 'placed'
       ? 'Accept'
       : order.order_status === 'accepted'
@@ -209,27 +318,31 @@ export default function KitchenDisplay() {
           : order.fulfilment_method === 'collection' ? 'Collected' : 'Dispatched'
 
     return (
-      <article className={`kds-ticket ${urgency}`} key={order.id}>
+      <article className={`kds-ticket ${urgency}`} key={order.id} aria-busy={updatingId === order.id}>
         <header>
           <div>
             <strong>#{order.order_number}</strong>
             <span>{order.customer_first_name} · {order.fulfilment_method}</span>
           </div>
-          <time>{age}m</time>
+          <time dateTime={order.created_at}>{age}m</time>
         </header>
 
         <div className="kds-items">
           {order.order_items.map((item) => (
             <div key={item.id}>
               <b>{item.quantity}</b>
-              <span>{item.item_name}{item.customer_notes ? <small>{item.customer_notes}</small> : null}</span>
+              <span>
+                {item.item_name}
+                {modifierLines(item).map((line, index) => <small key={`${item.id}-${index}`}>{line}</small>)}
+                {item.customer_notes ? <small className="kitchen-note">Note: {item.customer_notes}</small> : null}
+              </span>
             </div>
           ))}
         </div>
 
-        {order.delivery_instructions && <p className="kds-note">{order.delivery_instructions}</p>}
+        {order.delivery_instructions && <p className="kds-note">Delivery: {order.delivery_instructions}</p>}
 
-        <button onClick={() => updateStatus(order, nextStatus)} disabled={updatingId === order.id}>
+        <button type="button" onClick={() => void updateStatus(order, nextStatus)} disabled={Boolean(updatingId)}>
           {updatingId === order.id ? 'Updating…' : actionLabel}
         </button>
       </article>
@@ -246,16 +359,22 @@ export default function KitchenDisplay() {
           <strong>{restaurantName} Kitchen</strong>
         </div>
         <div className="kds-controls">
-          <button className={soundEnabled ? 'enabled' : ''} onClick={() => setSoundEnabled((current) => !current)}>
-            {soundEnabled ? 'Sound on' : 'Sound off'}
+          <span className={`kds-live-status kds-live-status--${liveStatus}`} role="status">
+            {liveStatus === 'live' ? 'Live' : liveStatus === 'offline' ? 'Offline' : 'Connecting'}
+          </span>
+          <button type="button" className={soundEnabled ? 'enabled' : ''} onClick={soundEnabled ? () => setSoundEnabled(false) : enableSound}>
+            {soundEnabled ? 'Sound on' : 'Enable sound'}
           </button>
-          <button onClick={enterFullscreen}>Fullscreen</button>
+          <button type="button" disabled={refreshing || !restaurantId} onClick={() => restaurantId && void loadOrders(restaurantId, { showRefresh: true }).catch((caughtError) => setError(caughtError instanceof Error ? caughtError.message : 'Unable to refresh kitchen orders.'))}>
+            {refreshing ? 'Refreshing…' : 'Refresh'}
+          </button>
+          <button type="button" onClick={() => void enterFullscreen()}>{document.fullscreenElement ? 'Exit fullscreen' : 'Fullscreen'}</button>
         </div>
       </header>
 
-      {error && <p className="kds-error">{error}</p>}
+      {error && <p className="kds-error" role="alert">{error}</p>}
 
-      <section className="kds-board">
+      <section className="kds-board" aria-label="Kitchen order board">
         <div className="kds-column new">
           <header><h1>New</h1><span>{columns.new.length}</span></header>
           <div>{columns.new.map(ticket)}</div>
