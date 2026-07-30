@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import './CustomerAccount.css'
@@ -43,10 +43,12 @@ type ReorderResponse = {
 }
 
 type OrderStep = { key: string; label: string }
+type NotificationState = 'unsupported' | 'default' | 'denied' | 'enabled'
 
 const money = new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'GBP' })
 const dateTime = new Intl.DateTimeFormat('en-GB', { dateStyle: 'medium', timeStyle: 'short' })
 const timeOnly = new Intl.DateTimeFormat('en-GB', { hour: '2-digit', minute: '2-digit' })
+const notificationStorageKey = 'ordered-food-order-notifications'
 
 function formatStatus(status: string) {
   return status.replaceAll('_', ' ').replace(/\b\w/g, (letter) => letter.toUpperCase())
@@ -117,6 +119,13 @@ function sortOrders(orders: CustomerOrder[]) {
   return [...orders].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
 }
 
+function getInitialNotificationState(): NotificationState {
+  if (typeof window === 'undefined' || !('Notification' in window)) return 'unsupported'
+  if (Notification.permission === 'denied') return 'denied'
+  if (Notification.permission === 'granted' && window.localStorage.getItem(notificationStorageKey) === 'enabled') return 'enabled'
+  return 'default'
+}
+
 export default function CustomerOrders() {
   const [orders, setOrders] = useState<CustomerOrder[]>([])
   const [loading, setLoading] = useState(true)
@@ -126,6 +135,9 @@ export default function CustomerOrders() {
   const [customerUserId, setCustomerUserId] = useState<string | null>(null)
   const [liveStatus, setLiveStatus] = useState<'connecting' | 'live' | 'offline'>('connecting')
   const [updateNotice, setUpdateNotice] = useState('')
+  const [notificationState, setNotificationState] = useState<NotificationState>(getInitialNotificationState)
+  const orderStatuses = useRef<Record<string, string>>({})
+  const noticeTimer = useRef<number | null>(null)
   const navigate = useNavigate()
 
   useEffect(() => {
@@ -140,7 +152,11 @@ export default function CustomerOrders() {
       await supabase.rpc('claim_customer_orders')
       const { data, error: historyError } = await supabase.rpc('get_customer_order_history')
       if (historyError) setError(historyError.message)
-      else setOrders(sortOrders((data || []) as CustomerOrder[]))
+      else {
+        const loadedOrders = sortOrders((data || []) as CustomerOrder[])
+        orderStatuses.current = Object.fromEntries(loadedOrders.map((order) => [order.id, order.order_status]))
+        setOrders(loadedOrders)
+      }
       setLoading(false)
     }
     void loadOrders()
@@ -162,11 +178,14 @@ export default function CustomerOrders() {
         (payload) => {
           if (payload.eventType === 'DELETE') {
             const removed = payload.old as Pick<CustomerOrder, 'id'>
+            delete orderStatuses.current[removed.id]
             setOrders((current) => current.filter((order) => order.id !== removed.id))
             return
           }
 
           const changed = payload.new as CustomerOrder
+          const previousStatus = orderStatuses.current[changed.id]
+          orderStatuses.current[changed.id] = changed.order_status
           setOrders((current) => {
             const exists = current.some((order) => order.id === changed.id)
             const next = exists
@@ -175,8 +194,25 @@ export default function CustomerOrders() {
             return sortOrders(next)
           })
           setNow(Date.now())
-          setUpdateNotice(`Order #${changed.order_number} is now ${formatStatus(changed.order_status).toLowerCase()}.`)
-          window.setTimeout(() => setUpdateNotice(''), 6000)
+
+          const statusChanged = previousStatus !== undefined && previousStatus !== changed.order_status
+          const notice = `Order #${changed.order_number} is now ${formatStatus(changed.order_status).toLowerCase()}.`
+          if (statusChanged) {
+            setUpdateNotice(notice)
+            if (noticeTimer.current) window.clearTimeout(noticeTimer.current)
+            noticeTimer.current = window.setTimeout(() => setUpdateNotice(''), 6000)
+
+            if (notificationState === 'enabled' && Notification.permission === 'granted' && document.visibilityState !== 'visible') {
+              const notification = new Notification(`${changed.restaurant_name} order update`, {
+                body: `${notice} ${statusMessage(changed)}`,
+                tag: `ordered-food-order-${changed.id}`,
+              })
+              notification.onclick = () => {
+                window.focus()
+                notification.close()
+              }
+            }
+          }
         },
       )
       .subscribe((status) => {
@@ -186,9 +222,10 @@ export default function CustomerOrders() {
       })
 
     return () => {
+      if (noticeTimer.current) window.clearTimeout(noticeTimer.current)
       void supabase.removeChannel(channel)
     }
-  }, [customerUserId])
+  }, [customerUserId, notificationState])
 
   useEffect(() => {
     const timer = window.setInterval(() => setNow(Date.now()), 60000)
@@ -203,6 +240,23 @@ export default function CustomerOrders() {
     () => orders.filter((order) => !activeOrders.some((activeOrder) => activeOrder.id === order.id)),
     [activeOrders, orders],
   )
+
+  async function toggleNotifications() {
+    if (notificationState === 'unsupported' || notificationState === 'denied') return
+    if (notificationState === 'enabled') {
+      window.localStorage.removeItem(notificationStorageKey)
+      setNotificationState('default')
+      return
+    }
+
+    const permission = await Notification.requestPermission()
+    if (permission === 'granted') {
+      window.localStorage.setItem(notificationStorageKey, 'enabled')
+      setNotificationState('enabled')
+    } else {
+      setNotificationState(permission === 'denied' ? 'denied' : 'default')
+    }
+  }
 
   async function signOut() {
     await supabase.auth.signOut()
@@ -229,12 +283,8 @@ export default function CustomerOrders() {
     }
 
     const warnings: string[] = []
-    if (result.unavailable_items.length) {
-      warnings.push(`${result.unavailable_items.length} item${result.unavailable_items.length === 1 ? '' : 's'} are no longer available and will be left out.`)
-    }
-    if (result.price_changed_items.length) {
-      warnings.push(`${result.price_changed_items.length} item${result.price_changed_items.length === 1 ? ' has' : 's have'} changed price.`)
-    }
+    if (result.unavailable_items.length) warnings.push(`${result.unavailable_items.length} item${result.unavailable_items.length === 1 ? '' : 's'} are no longer available and will be left out.`)
+    if (result.price_changed_items.length) warnings.push(`${result.price_changed_items.length} item${result.price_changed_items.length === 1 ? ' has' : 's have'} changed price.`)
 
     if (warnings.length && !window.confirm(`${warnings.join('\n')}\n\nContinue with the available items?`)) {
       setReorderingId(null)
@@ -287,9 +337,16 @@ export default function CustomerOrders() {
           <div><Link className="customer-account-brand" to="/">ordered.food</Link><span className="customer-account-eyebrow">Customer account</span><h1>My orders</h1></div>
           <button className="customer-account-secondary" type="button" onClick={signOut}>Sign out</button>
         </header>
-        <div className={`customer-order-live customer-order-live--${liveStatus}`} role="status">
-          <span aria-hidden="true" />
-          {liveStatus === 'live' ? 'Live updates on' : liveStatus === 'offline' ? 'Live updates unavailable' : 'Connecting live updates…'}
+        <div className="customer-order-tools">
+          <div className={`customer-order-live customer-order-live--${liveStatus}`} role="status">
+            <span aria-hidden="true" />
+            {liveStatus === 'live' ? 'Live updates on' : liveStatus === 'offline' ? 'Live updates unavailable' : 'Connecting live updates…'}
+          </div>
+          {notificationState !== 'unsupported' && (
+            <button className="customer-order-notification-toggle" type="button" onClick={() => void toggleNotifications()} disabled={notificationState === 'denied'}>
+              {notificationState === 'enabled' ? 'Notifications on' : notificationState === 'denied' ? 'Notifications blocked' : 'Turn on notifications'}
+            </button>
+          )}
         </div>
         {updateNotice && <div className="customer-order-update-notice" role="status">{updateNotice}</div>}
         {loading && <p>Loading your orders…</p>}
