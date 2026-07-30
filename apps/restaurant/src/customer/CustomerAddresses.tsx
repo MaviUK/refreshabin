@@ -36,24 +36,27 @@ export default function CustomerAddresses() {
   const [editingId, setEditingId] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [busyAddressId, setBusyAddressId] = useState<string | null>(null)
   const [error, setError] = useState('')
+  const [message, setMessage] = useState('')
 
   async function loadAddresses() {
+    setError('')
     const { data, error: addressError } = await supabase
       .from('customer_addresses')
       .select('id,label,address_line_1,address_line_2,town_city,postcode,delivery_instructions,is_default')
       .order('is_default', { ascending: false })
       .order('created_at', { ascending: true })
 
-    if (addressError) setError(addressError.message)
+    if (addressError) setError('We could not load your saved addresses. Please refresh and try again.')
     else setAddresses((data || []) as CustomerAddress[])
     setLoading(false)
   }
 
   useEffect(() => {
     async function initialise() {
-      const { data } = await supabase.auth.getSession()
-      if (!data.session) {
+      const { data, error: sessionError } = await supabase.auth.getSession()
+      if (sessionError || !data.session) {
         navigate('/account/login', { replace: true, state: { from: '/account/addresses' } })
         return
       }
@@ -68,6 +71,7 @@ export default function CustomerAddresses() {
 
   function editAddress(address: CustomerAddress) {
     setEditingId(address.id)
+    setMessage('')
     setForm({
       label: address.label,
       addressLine1: address.address_line_1,
@@ -87,59 +91,96 @@ export default function CustomerAddresses() {
   async function saveAddress(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     setError('')
+    setMessage('')
     if (!form.label.trim() || !form.addressLine1.trim() || !form.townCity.trim() || !form.postcode.trim()) {
       setError('Please complete all required address fields.')
       return
     }
 
     setSaving(true)
-    const { data: userData } = await supabase.auth.getUser()
-    if (!userData.user) {
-      navigate('/account/login', { replace: true })
-      return
-    }
+    try {
+      const { data: userData, error: userError } = await supabase.auth.getUser()
+      if (userError || !userData.user) {
+        navigate('/account/login', { replace: true, state: { from: '/account/addresses' } })
+        return
+      }
 
-    const payload = {
-      user_id: userData.user.id,
-      label: form.label.trim(),
-      address_line_1: form.addressLine1.trim(),
-      address_line_2: form.addressLine2.trim() || null,
-      town_city: form.townCity.trim(),
-      postcode: formatPostcode(form.postcode),
-      delivery_instructions: form.deliveryInstructions.trim() || null,
-      updated_at: new Date().toISOString(),
-      ...(!editingId && addresses.length === 0 ? { is_default: true } : {}),
-    }
+      const payload = {
+        user_id: userData.user.id,
+        label: form.label.trim(),
+        address_line_1: form.addressLine1.trim(),
+        address_line_2: form.addressLine2.trim() || null,
+        town_city: form.townCity.trim(),
+        postcode: formatPostcode(form.postcode),
+        delivery_instructions: form.deliveryInstructions.trim() || null,
+        updated_at: new Date().toISOString(),
+        ...(!editingId && addresses.length === 0 ? { is_default: true } : {}),
+      }
 
-    const result = editingId
-      ? await supabase.from('customer_addresses').update(payload).eq('id', editingId)
-      : await supabase.from('customer_addresses').insert(payload)
+      const result = editingId
+        ? await supabase.from('customer_addresses').update(payload).eq('id', editingId).eq('user_id', userData.user.id)
+        : await supabase.from('customer_addresses').insert(payload)
 
-    if (result.error) setError(result.error.message)
-    else {
-      resetForm()
-      await loadAddresses()
+      if (result.error) {
+        setError('We could not save that address. Please check the details and try again.')
+      } else {
+        const action = editingId ? 'updated' : 'saved'
+        resetForm()
+        await loadAddresses()
+        setMessage(`Address ${action}.`)
+      }
+    } finally {
+      setSaving(false)
     }
-    setSaving(false)
   }
 
   async function setDefault(addressId: string) {
+    if (busyAddressId) return
     setError('')
-    const { error: defaultError } = await supabase.rpc('set_customer_address_default', { target_address_id: addressId })
-    if (defaultError) setError(defaultError.message)
-    else await loadAddresses()
+    setMessage('')
+    setBusyAddressId(addressId)
+    try {
+      const { error: defaultError } = await supabase.rpc('set_customer_address_default', { target_address_id: addressId })
+      if (defaultError) setError('We could not change your default address. Please try again.')
+      else {
+        await loadAddresses()
+        setMessage('Default address updated.')
+      }
+    } finally {
+      setBusyAddressId(null)
+    }
   }
 
   async function removeAddress(address: CustomerAddress) {
-    if (!window.confirm(`Delete ${address.label}?`)) return
+    if (busyAddressId || !window.confirm(`Delete ${address.label}?`)) return
     setError('')
-    const { error: deleteError } = await supabase.from('customer_addresses').delete().eq('id', address.id)
-    if (deleteError) {
-      setError(deleteError.message)
-      return
+    setMessage('')
+    setBusyAddressId(address.id)
+
+    try {
+      const { data: userData, error: userError } = await supabase.auth.getUser()
+      if (userError || !userData.user) {
+        navigate('/account/login', { replace: true, state: { from: '/account/addresses' } })
+        return
+      }
+
+      const { error: deleteError } = await supabase
+        .from('customer_addresses')
+        .delete()
+        .eq('id', address.id)
+        .eq('user_id', userData.user.id)
+
+      if (deleteError) {
+        setError('We could not delete that address. Please try again.')
+        return
+      }
+
+      await loadAddresses()
+      if (editingId === address.id) resetForm()
+      setMessage('Address deleted.')
+    } finally {
+      setBusyAddressId(null)
     }
-    await loadAddresses()
-    if (editingId === address.id) resetForm()
   }
 
   return (
@@ -147,7 +188,7 @@ export default function CustomerAddresses() {
       <section className="customer-account-card">
         <header className="customer-account-header">
           <div>
-            <Link className="customer-account-brand" to="/">ordered.food</Link>
+            <Link className="customer-account-brand" to="/account">← My account</Link>
             <span className="customer-account-eyebrow">Customer account</span>
             <h1>Saved addresses</h1>
           </div>
@@ -155,6 +196,7 @@ export default function CustomerAddresses() {
         </header>
 
         {error && <div className="customer-account-error" role="alert">{error}</div>}
+        {message && <div className="customer-account-success" role="status">{message}</div>}
 
         <form className="customer-address-form" onSubmit={saveAddress}>
           <div className="customer-address-form-heading">
@@ -163,12 +205,12 @@ export default function CustomerAddresses() {
           </div>
           <div className="customer-address-fields customer-address-fields--two">
             <label>Label<input value={form.label} onChange={(event) => updateField('label', event.target.value)} placeholder="Home or Work" maxLength={40} required /></label>
-            <label>Postcode<input value={form.postcode} onChange={(event) => updateField('postcode', formatPostcode(event.target.value))} placeholder="BT20 4AA" required /></label>
+            <label>Postcode<input value={form.postcode} onChange={(event) => updateField('postcode', formatPostcode(event.target.value))} placeholder="BT20 4AA" autoComplete="postal-code" required /></label>
           </div>
           <div className="customer-address-fields">
-            <label>Address line 1<input value={form.addressLine1} onChange={(event) => updateField('addressLine1', event.target.value)} required /></label>
-            <label>Address line 2 <span>Optional</span><input value={form.addressLine2} onChange={(event) => updateField('addressLine2', event.target.value)} /></label>
-            <label>Town or city<input value={form.townCity} onChange={(event) => updateField('townCity', event.target.value)} required /></label>
+            <label>Address line 1<input value={form.addressLine1} onChange={(event) => updateField('addressLine1', event.target.value)} autoComplete="address-line1" required /></label>
+            <label>Address line 2 <span>Optional</span><input value={form.addressLine2} onChange={(event) => updateField('addressLine2', event.target.value)} autoComplete="address-line2" /></label>
+            <label>Town or city<input value={form.townCity} onChange={(event) => updateField('townCity', event.target.value)} autoComplete="address-level2" required /></label>
             <label>Delivery instructions <span>Optional</span><textarea value={form.deliveryInstructions} onChange={(event) => updateField('deliveryInstructions', event.target.value)} placeholder="Gate code, landmark or where to leave the order" rows={3} /></label>
           </div>
           <button className="customer-address-save" type="submit" disabled={saving}>{saving ? 'Saving…' : editingId ? 'Save changes' : 'Add address'}</button>
@@ -183,13 +225,13 @@ export default function CustomerAddresses() {
               <article className={`customer-address-card${address.is_default ? ' customer-address-card--default' : ''}`} key={address.id}>
                 <div className="customer-address-card-topline">
                   <div><h3>{address.label}</h3>{address.is_default && <span>Default</span>}</div>
-                  <button type="button" onClick={() => editAddress(address)}>Edit</button>
+                  <button type="button" onClick={() => editAddress(address)} disabled={busyAddressId !== null}>Edit</button>
                 </div>
                 <p>{address.address_line_1}{address.address_line_2 ? `, ${address.address_line_2}` : ''}<br />{address.town_city}<br />{address.postcode}</p>
                 {address.delivery_instructions && <small>{address.delivery_instructions}</small>}
                 <div className="customer-address-actions">
-                  {!address.is_default && <button type="button" onClick={() => void setDefault(address.id)}>Set as default</button>}
-                  <button type="button" className="customer-address-delete" onClick={() => void removeAddress(address)}>Delete</button>
+                  {!address.is_default && <button type="button" onClick={() => void setDefault(address.id)} disabled={busyAddressId !== null}>{busyAddressId === address.id ? 'Updating…' : 'Set as default'}</button>}
+                  <button type="button" className="customer-address-delete" onClick={() => void removeAddress(address)} disabled={busyAddressId !== null}>{busyAddressId === address.id ? 'Working…' : 'Delete'}</button>
                 </div>
               </article>
             ))}
