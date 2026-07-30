@@ -2,6 +2,7 @@ import { FormEvent, useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import './CustomerAccount.css'
+import './CustomerProfile.css'
 
 type ProfileForm = {
   firstName: string
