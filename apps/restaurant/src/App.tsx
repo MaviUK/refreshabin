@@ -4,6 +4,8 @@ import Register from './auth/Register'
 import ForgotPassword from './auth/ForgotPassword'
 import ResetPassword from './auth/ResetPassword'
 import ProtectedRoute from './components/ProtectedRoute'
+import AdminRoute from './components/AdminRoute'
+import RestaurantApplications from './admin/RestaurantApplications'
 import Home from './home/Home'
 import Restaurants from './discovery/Restaurants'
 import Dashboard from './dashboard/Dashboard'
@@ -69,6 +71,7 @@ export default function App() {
       <Route path="/settings" element={<ProtectedRoute><RestaurantSettings /></ProtectedRoute>} />
       <Route path="/delivery-areas" element={<ProtectedRoute><DeliveryAreas /></ProtectedRoute>} />
       <Route path="/delivery-map" element={<ProtectedRoute><DeliveryMap /></ProtectedRoute>} />
+      <Route path="/admin/applications" element={<AdminRoute><RestaurantApplications /></AdminRoute>} />
 
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
