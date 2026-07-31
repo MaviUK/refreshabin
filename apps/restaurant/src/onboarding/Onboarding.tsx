@@ -226,6 +226,24 @@ function safeFileName(value: string) {
   return value.toLowerCase().replace(/[^a-z0-9._-]+/g, '-').replace(/^-+|-+$/g, '')
 }
 
+function browserCompatibleUuid() {
+  const webCrypto = globalThis.crypto
+  if (typeof webCrypto?.randomUUID === 'function') return webCrypto.randomUUID()
+
+  if (typeof webCrypto?.getRandomValues === 'function') {
+    const bytes = webCrypto.getRandomValues(new Uint8Array(16))
+    bytes[6] = (bytes[6] & 0x0f) | 0x40
+    bytes[8] = (bytes[8] & 0x3f) | 0x80
+    const hex = Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('')
+    return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`
+  }
+
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (character) => {
+    const value = Math.floor(Math.random() * 16)
+    return (character === 'x' ? value : (value & 0x3) | 0x8).toString(16)
+  })
+}
+
 function slugPreview(value: string) {
   return value.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'your-restaurant'
 }
@@ -700,7 +718,7 @@ export default function Onboarding() {
     try {
       const { data: userData } = await supabase.auth.getUser()
       if (!userData.user) throw new Error('Your session has expired.')
-      const path = `${restaurant.id}/${crypto.randomUUID()}-${safeFileName(file.name) || 'menu'}`
+      const path = `${restaurant.id}/${browserCompatibleUuid()}-${safeFileName(file.name) || 'menu'}`
       const { data: createdImport, error: importError } = await supabase
         .from('menu_imports')
         .insert({
