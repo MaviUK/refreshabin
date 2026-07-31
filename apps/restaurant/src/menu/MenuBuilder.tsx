@@ -60,6 +60,7 @@ export default function MenuBuilder() {
   const [categoryName, setCategoryName] = useState('')
   const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null)
   const [editingCategoryName, setEditingCategoryName] = useState('')
+  const [latestSnapshotId, setLatestSnapshotId] = useState<string | null>(null)
   const [activeCategoryId, setActiveCategoryId] = useState<string | null>(null)
   const [itemName, setItemName] = useState('')
   const [itemDescription, setItemDescription] = useState('')
@@ -114,6 +115,9 @@ export default function MenuBuilder() {
     const restaurant = membership.restaurants as { name?: string } | null
     setRestaurantId(id)
     setRestaurantName(restaurant?.name || 'Your restaurant')
+
+    const { data: latestSnapshot } = await supabase.from('menu_snapshots').select('id').eq('restaurant_id', id).order('created_at', { ascending: false }).limit(1).maybeSingle()
+    setLatestSnapshotId(latestSnapshot?.id || null)
 
     const { data, error: menuError } = await supabase
       .from('menu_categories')
@@ -206,15 +210,59 @@ export default function MenuBuilder() {
     if (editingCategoryId === category.id) setEditingCategoryId(null)
   }
 
+  async function moveCategory(categoryId: string, direction: -1 | 1) {
+    const index = categories.findIndex((category) => category.id === categoryId)
+    const targetIndex = index + direction
+    if (index < 0 || targetIndex < 0 || targetIndex >= categories.length) return
+    const reordered = [...categories]
+    ;[reordered[index], reordered[targetIndex]] = [reordered[targetIndex]!, reordered[index]!]
+    const normalized = reordered.map((category, sortOrder) => ({ ...category, sort_order: sortOrder }))
+    setCategories(normalized)
+    setSaving(true)
+    const results = await Promise.all(normalized.map((category) => supabase.from('menu_categories').update({ sort_order: category.sort_order }).eq('id', category.id)))
+    setSaving(false)
+    const failed = results.find((result) => result.error)
+    if (failed?.error) { setError(failed.error.message); await loadMenu() }
+  }
+
+  async function moveItem(categoryId: string, itemId: string, direction: -1 | 1) {
+    const category = categories.find((entry) => entry.id === categoryId)
+    if (!category) return
+    const index = category.menu_items.findIndex((item) => item.id === itemId)
+    const targetIndex = index + direction
+    if (index < 0 || targetIndex < 0 || targetIndex >= category.menu_items.length) return
+    const reordered = [...category.menu_items]
+    ;[reordered[index], reordered[targetIndex]] = [reordered[targetIndex]!, reordered[index]!]
+    const normalized = reordered.map((item, sortOrder) => ({ ...item, sort_order: sortOrder }))
+    setCategories((current) => current.map((entry) => entry.id === categoryId ? { ...entry, menu_items: normalized } : entry))
+    setSaving(true)
+    const results = await Promise.all(normalized.map((item) => supabase.from('menu_items').update({ sort_order: item.sort_order }).eq('id', item.id)))
+    setSaving(false)
+    const failed = results.find((result) => result.error)
+    if (failed?.error) { setError(failed.error.message); await loadMenu() }
+  }
+
   async function replaceEntireMenu() {
     if (!restaurantId) return
     if (!window.confirm('Delete the entire current menu and start a new PDF import? All categories, products, extras and choices will be removed. Existing order history will remain.')) return
     setSaving(true)
     setError('')
-    const { error: resetError } = await supabase.rpc('reset_restaurant_menu', { p_restaurant_id: restaurantId })
+    const { data: resetResult, error: resetError } = await supabase.rpc('reset_restaurant_menu', { p_restaurant_id: restaurantId })
     setSaving(false)
     if (resetError) return setError(resetError.message)
+    const snapshotId = (resetResult as { snapshot_id?: string } | null)?.snapshot_id
+    if (snapshotId) window.sessionStorage.setItem('ordered.menuSnapshotId', snapshotId)
     navigate('/onboarding?menu-reupload=1')
+  }
+
+  async function restoreLatestMenu() {
+    if (!latestSnapshotId || !window.confirm('Restore the most recent saved menu? Your current menu will be replaced, and a safety copy of it will be kept.')) return
+    setSaving(true)
+    setError('')
+    const { error: restoreError } = await supabase.rpc('restore_restaurant_menu_snapshot', { p_snapshot_id: latestSnapshotId })
+    setSaving(false)
+    if (restoreError) return setError(restoreError.message)
+    await loadMenu()
   }
 
   function updateIngredient(index: number, value: string) {
@@ -372,7 +420,10 @@ export default function MenuBuilder() {
 
       <section className="menu-title-row">
         <div><span className="eyebrow">Build your menu</span><h1>Products, ingredients and extras</h1><p>{categories.length} categories · {itemCount} products</p></div>
-        <button className="danger-outline-button" type="button" onClick={() => void replaceEntireMenu()} disabled={saving || !categories.length}>Delete menu &amp; reupload PDF</button>
+        <div className="menu-title-actions">
+          {latestSnapshotId && <button className="secondary-button" type="button" onClick={() => void restoreLatestMenu()} disabled={saving}>Restore previous menu</button>}
+          <button className="danger-outline-button" type="button" onClick={() => void replaceEntireMenu()} disabled={saving || !categories.length}>Delete menu &amp; reupload PDF</button>
+        </div>
       </section>
 
       {error && <div className="form-error" role="alert">{error}</div>}
@@ -398,6 +449,8 @@ export default function MenuBuilder() {
                   <>
                     <button className="category-select-button" type="button" onClick={() => setActiveCategoryId(category.id)}><span>{category.name}</span><small>{category.menu_items.length}</small></button>
                     <div className="category-row-actions">
+                      <button type="button" onClick={() => void moveCategory(category.id, -1)} disabled={saving || category === categories[0]} aria-label={`Move ${category.name} up`}>↑</button>
+                      <button type="button" onClick={() => void moveCategory(category.id, 1)} disabled={saving || category === categories[categories.length - 1]} aria-label={`Move ${category.name} down`}>↓</button>
                       <button type="button" onClick={() => startEditingCategory(category)} aria-label={`Edit ${category.name}`}>Edit</button>
                       <button className="danger-text-button" type="button" onClick={() => void deleteCategory(category)} aria-label={`Delete ${category.name}`}>Delete</button>
                     </div>
@@ -469,7 +522,7 @@ export default function MenuBuilder() {
                           <div className="dietary-badges">{item.is_vegan && <span>Vegan</span>}{!item.is_vegan && item.is_vegetarian && <span>Vegetarian</span>}{!item.is_available && <span>Unavailable</span>}</div>
                           <strong>{money.format(item.price_pence / 100)}</strong>
                         </div>
-                        <div className="item-actions"><button type="button" onClick={() => toggleAvailability(item)}>{item.is_available ? 'Pause' : 'Enable'}</button><button type="button" onClick={() => deleteItem(item.id)}>Delete</button></div>
+                        <div className="item-actions"><button type="button" onClick={() => void moveItem(category.id, item.id, -1)} disabled={saving || item === category.menu_items[0]}>↑ Up</button><button type="button" onClick={() => void moveItem(category.id, item.id, 1)} disabled={saving || item === category.menu_items[category.menu_items.length - 1]}>↓ Down</button><button type="button" onClick={() => toggleAvailability(item)}>{item.is_available ? 'Pause' : 'Enable'}</button><button type="button" onClick={() => deleteItem(item.id)}>Delete</button></div>
                       </article>
                     ))}
                     {!category.menu_items.length && <p className="empty-copy">No products in this category yet.</p>}
