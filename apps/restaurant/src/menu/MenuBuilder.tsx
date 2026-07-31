@@ -47,6 +47,18 @@ type DraftExtra = {
   maxQuantity: string
 }
 
+type MenuSnapshot = {
+  id: string
+  reason: string
+  label: string | null
+  created_at: string
+  snapshot: {
+    categories?: unknown[]
+    items?: unknown[]
+    groups?: unknown[]
+  }
+}
+
 const money = new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'GBP' })
 
 export default function MenuBuilder() {
@@ -60,7 +72,9 @@ export default function MenuBuilder() {
   const [categoryName, setCategoryName] = useState('')
   const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null)
   const [editingCategoryName, setEditingCategoryName] = useState('')
-  const [latestSnapshotId, setLatestSnapshotId] = useState<string | null>(null)
+  const [snapshots, setSnapshots] = useState<MenuSnapshot[]>([])
+  const [historyOpen, setHistoryOpen] = useState(false)
+  const [backupName, setBackupName] = useState('')
   const [activeCategoryId, setActiveCategoryId] = useState<string | null>(null)
   const [itemName, setItemName] = useState('')
   const [itemDescription, setItemDescription] = useState('')
@@ -116,8 +130,14 @@ export default function MenuBuilder() {
     setRestaurantId(id)
     setRestaurantName(restaurant?.name || 'Your restaurant')
 
-    const { data: latestSnapshot } = await supabase.from('menu_snapshots').select('id').eq('restaurant_id', id).order('created_at', { ascending: false }).limit(1).maybeSingle()
-    setLatestSnapshotId(latestSnapshot?.id || null)
+    const { data: snapshotRows, error: snapshotError } = await supabase
+      .from('menu_snapshots')
+      .select('id, reason, label, created_at, snapshot')
+      .eq('restaurant_id', id)
+      .order('created_at', { ascending: false })
+      .limit(20)
+    if (snapshotError) setError(snapshotError.message)
+    setSnapshots((snapshotRows || []) as MenuSnapshot[])
 
     const { data, error: menuError } = await supabase
       .from('menu_categories')
@@ -255,14 +275,37 @@ export default function MenuBuilder() {
     navigate('/onboarding?menu-reupload=1')
   }
 
-  async function restoreLatestMenu() {
-    if (!latestSnapshotId || !window.confirm('Restore the most recent saved menu? Your current menu will be replaced, and a safety copy of it will be kept.')) return
+  async function createBackup(event: FormEvent) {
+    event.preventDefault()
+    if (!restaurantId) return
     setSaving(true)
     setError('')
-    const { error: restoreError } = await supabase.rpc('restore_restaurant_menu_snapshot', { p_snapshot_id: latestSnapshotId })
+    const { error: backupError } = await supabase.rpc('create_restaurant_menu_snapshot', {
+      p_restaurant_id: restaurantId,
+      p_label: backupName.trim() || null,
+    })
+    setSaving(false)
+    if (backupError) return setError(backupError.message)
+    setBackupName('')
+    await loadMenu()
+    setHistoryOpen(true)
+  }
+
+  async function restoreMenu(snapshot: MenuSnapshot) {
+    const name = snapshot.label || snapshotReason(snapshot.reason)
+    if (!window.confirm(`Restore “${name}”? Your current menu will be replaced, and a safety copy of it will be kept.`)) return
+    setSaving(true)
+    setError('')
+    const { error: restoreError } = await supabase.rpc('restore_restaurant_menu_snapshot', { p_snapshot_id: snapshot.id })
     setSaving(false)
     if (restoreError) return setError(restoreError.message)
     await loadMenu()
+  }
+
+  function snapshotReason(reason: string) {
+    if (reason === 'before_menu_replacement') return 'Before menu replacement'
+    if (reason === 'before_restore') return 'Before another version was restored'
+    return 'Manual backup'
   }
 
   function updateIngredient(index: number, value: string) {
@@ -421,12 +464,38 @@ export default function MenuBuilder() {
       <section className="menu-title-row">
         <div><span className="eyebrow">Build your menu</span><h1>Products, ingredients and extras</h1><p>{categories.length} categories · {itemCount} products</p></div>
         <div className="menu-title-actions">
-          {latestSnapshotId && <button className="secondary-button" type="button" onClick={() => void restoreLatestMenu()} disabled={saving}>Restore previous menu</button>}
+          <button className="secondary-button" type="button" onClick={() => setHistoryOpen((open) => !open)} disabled={saving}>Version history{snapshots.length ? ` (${snapshots.length})` : ''}</button>
           <button className="danger-outline-button" type="button" onClick={() => void replaceEntireMenu()} disabled={saving || !categories.length}>Delete menu &amp; reupload PDF</button>
         </div>
       </section>
 
       {error && <div className="form-error" role="alert">{error}</div>}
+
+      {historyOpen && (
+        <section className="menu-history-panel" aria-labelledby="menu-history-title">
+          <div className="menu-panel-heading">
+            <div><span className="eyebrow">Rollback protection</span><h2 id="menu-history-title">Menu version history</h2><p>Save a named copy before seasonal changes, price updates or a new import.</p></div>
+          </div>
+          <form className="menu-backup-form" onSubmit={createBackup}>
+            <label>Backup name <span>Optional</span><input maxLength={80} value={backupName} onChange={(event) => setBackupName(event.target.value)} placeholder="e.g. Summer menu before price update" /></label>
+            <button className="primary-button" type="submit" disabled={saving || !categories.length}>{saving ? 'Saving…' : 'Save current menu'}</button>
+          </form>
+          <div className="menu-history-list">
+            {snapshots.map((snapshot) => {
+              const categoryCount = snapshot.snapshot?.categories?.length || 0
+              const productCount = snapshot.snapshot?.items?.length || 0
+              const choiceCount = snapshot.snapshot?.groups?.length || 0
+              return (
+                <article className="menu-history-item" key={snapshot.id}>
+                  <div><strong>{snapshot.label || snapshotReason(snapshot.reason)}</strong><time dateTime={snapshot.created_at}>{new Intl.DateTimeFormat('en-GB', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(snapshot.created_at))}</time><p>{categoryCount} categories · {productCount} products · {choiceCount} choice groups</p></div>
+                  <button className="secondary-button" type="button" disabled={saving} onClick={() => void restoreMenu(snapshot)}>Restore</button>
+                </article>
+              )
+            })}
+            {!snapshots.length && <p className="empty-copy">No saved versions yet. Save the current menu to create the first one.</p>}
+          </div>
+        </section>
+      )}
 
       <section className="menu-builder-grid">
         <aside className="menu-editor-panel">
