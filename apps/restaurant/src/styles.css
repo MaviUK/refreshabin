@@ -402,6 +402,16 @@ p {
   cursor: pointer;
 }
 
+.menu-section-setup {
+  display: grid;
+  gap: 1rem;
+  margin: 1.25rem 0;
+  padding: 1.2rem;
+  border: 1px solid rgba(74, 47, 60, 0.12);
+  border-radius: 18px;
+  background: #fff8fb;
+}
+
 .menu-dropzone:hover,
 .menu-dropzone.dragging {
   border-color: #d94479;

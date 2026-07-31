@@ -82,6 +82,13 @@ type MenuImport = {
   created_at: string
 }
 
+type MenuSectionMeta = {
+  section_name: string
+  scan_instructions: string
+  section_confirmed: boolean
+  menu_complete: boolean
+}
+
 type Counts = {
   categories: number
   items: number
@@ -213,6 +220,16 @@ function serialiseExtractedMenu(menu: ExtractedMenu) {
   }
 }
 
+function menuSectionMeta(value: unknown): MenuSectionMeta {
+  const record = asRecord(value)
+  return {
+    section_name: typeof record.section_name === 'string' ? record.section_name : '',
+    scan_instructions: typeof record.scan_instructions === 'string' ? record.scan_instructions : '',
+    section_confirmed: Boolean(record.section_confirmed),
+    menu_complete: Boolean(record.menu_complete),
+  }
+}
+
 function pounds(value: number | null | undefined) {
   return ((value ?? 0) / 100).toFixed(2)
 }
@@ -327,6 +344,8 @@ export default function Onboarding() {
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
   const [missingRequirements, setMissingRequirements] = useState<string[]>([])
+  const [sectionName, setSectionName] = useState('')
+  const [sectionInstructions, setSectionInstructions] = useState('')
 
   const [name, setName] = useState('')
   const [cuisines, setCuisines] = useState<string[]>([])
@@ -463,14 +482,20 @@ export default function Onboarding() {
 
       const latestImport = importResult.data as MenuImport | null
       setMenuImport(latestImport)
-      if (latestImport) setExtractedMenu(normaliseExtractedMenu(latestImport.extracted_menu, latestImport.confidence_notes))
+      const latestSection = menuSectionMeta(latestImport?.confidence_notes)
+      if (latestImport) {
+        setExtractedMenu(normaliseExtractedMenu(latestImport.extracted_menu, latestImport.confidence_notes))
+        setSectionName(latestSection.section_name)
+        setSectionInstructions(latestSection.scan_instructions)
+      }
       setCounts({ categories: categoryResult.count ?? 0, items: itemResult.count ?? 0 })
 
       if (nextRestaurant.status === 'pending_approval') {
         setStep(STEP.submit)
       } else {
         const savedStep = Math.max(STEP.welcome, Math.min(nextRestaurant.onboarding_step ?? STEP.welcome, STEP.applicationReview))
-        if (latestImport?.status === 'processing' || latestImport?.status === 'queued') setStep(STEP.scanning)
+        if (latestImport?.status === 'imported' && latestSection.section_confirmed && !latestSection.menu_complete) setStep(STEP.upload)
+        else if (latestImport?.status === 'processing' || latestImport?.status === 'queued') setStep(STEP.scanning)
         else if (latestImport?.status === 'review' && savedStep <= STEP.menuReview) setStep(STEP.menuReview)
         else setStep(savedStep)
       }
@@ -711,6 +736,7 @@ export default function Onboarding() {
   async function handleMenuFile(file: File) {
     clearMessages()
     if (!restaurant) return
+    if (!sectionName.trim()) return setError('Name this menu section before uploading its file.')
     if (!acceptedMenuTypes.includes(file.type)) return setError('Choose a PDF, JPG, PNG or WebP menu file.')
     if (file.size > maxMenuBytes) return setError('Choose a menu file smaller than 15 MB.')
     setSaving(true)
@@ -729,6 +755,13 @@ export default function Onboarding() {
           mime_type: file.type,
           file_size_bytes: file.size,
           status: 'queued',
+          confidence_notes: {
+            section_name: sectionName.trim(),
+            scan_instructions: sectionInstructions.trim(),
+            section_confirmed: false,
+            menu_complete: false,
+            warnings: [],
+          },
         })
         .select('id,file_name,file_path,mime_type,file_size_bytes,status,extracted_menu,confidence_notes,error_message,created_at')
         .single()
@@ -746,7 +779,11 @@ export default function Onboarding() {
       setUploadProgress(80)
       await advance(STEP.scanning)
       const { error: invokeError } = await supabase.functions.invoke('scan-menu-import', {
-        body: { import_id: createdImport.id },
+        body: {
+          import_id: createdImport.id,
+          section_name: sectionName.trim(),
+          scan_instructions: sectionInstructions.trim(),
+        },
       })
       if (invokeError) throw invokeError
       setUploadProgress(100)
@@ -771,7 +808,17 @@ export default function Onboarding() {
     const nextImport = data as MenuImport
     setMenuImport(nextImport)
     if (nextImport.status === 'review') {
-      setExtractedMenu(normaliseExtractedMenu(nextImport.extracted_menu, nextImport.confidence_notes))
+      const section = menuSectionMeta(nextImport.confidence_notes)
+      const scanned = normaliseExtractedMenu(nextImport.extracted_menu, nextImport.confidence_notes)
+      setSectionName(section.section_name)
+      setSectionInstructions(section.scan_instructions)
+      setExtractedMenu({
+        ...scanned,
+        categories: [{
+          name: section.section_name || scanned.categories[0]?.name || 'Menu section',
+          items: scanned.categories.flatMap((category) => category.items),
+        }],
+      })
       setStep(STEP.menuReview)
     }
     if (nextImport.status === 'failed') setStep(STEP.upload)
@@ -787,7 +834,12 @@ export default function Onboarding() {
         .update({ status: 'queued', error_message: null })
         .eq('id', menuImport.id)
       if (updateError) throw updateError
-      const { error: invokeError } = await supabase.functions.invoke('scan-menu-import', { body: { import_id: menuImport.id } })
+      const section = menuSectionMeta(menuImport.confidence_notes)
+      const { error: invokeError } = await supabase.functions.invoke('scan-menu-import', { body: {
+        import_id: menuImport.id,
+        section_name: section.section_name || sectionName.trim(),
+        scan_instructions: section.scan_instructions || sectionInstructions.trim(),
+      } })
       if (invokeError) throw invokeError
       setMenuImport({ ...menuImport, status: 'processing', error_message: null })
       setStep(STEP.scanning)
@@ -824,7 +876,16 @@ export default function Onboarding() {
     try {
       const { error: saveError } = await supabase
         .from('menu_imports')
-        .update({ extracted_menu: serialiseExtractedMenu(extractedMenu) })
+        .update({
+          extracted_menu: serialiseExtractedMenu(extractedMenu),
+          confidence_notes: {
+            section_name: extractedMenu.categories[0]?.name.trim() || sectionName.trim(),
+            scan_instructions: sectionInstructions.trim(),
+            section_confirmed: false,
+            menu_complete: false,
+            warnings: extractedMenu.warnings,
+          },
+        })
         .eq('id', menuImport.id)
       if (saveError) throw saveError
       const { data, error: applyError } = await supabase.rpc('apply_scanned_menu_import', {
@@ -838,8 +899,21 @@ export default function Onboarding() {
         categories: current.categories + createdCategories,
         items: current.items + createdItems,
       }))
-      setMenuImport({ ...menuImport, status: 'imported', extracted_menu: extractedMenu })
-      await advance(STEP.branding)
+      const confirmedNotes = {
+        section_name: extractedMenu.categories[0]?.name.trim() || sectionName.trim(),
+        scan_instructions: sectionInstructions.trim(),
+        section_confirmed: true,
+        menu_complete: false,
+        warnings: extractedMenu.warnings,
+      }
+      const { error: confirmError } = await supabase.from('menu_imports').update({ confidence_notes: confirmedNotes }).eq('id', menuImport.id)
+      if (confirmError) throw confirmError
+      setMenuImport({ ...menuImport, status: 'imported', extracted_menu: extractedMenu, confidence_notes: confirmedNotes })
+      setSectionName('')
+      setSectionInstructions('')
+      setExtractedMenu({ restaurant_name: undefined, categories: [], warnings: [] })
+      setSuccess('Section confirmed. Add the next section, or finish your menu.')
+      setStep(STEP.upload)
     } catch (caughtError) {
       setError(caughtError instanceof Error ? caughtError.message : 'Unable to import the reviewed menu.')
     } finally {
@@ -847,13 +921,21 @@ export default function Onboarding() {
     }
   }
 
-  async function continueWithExistingMenu() {
+  async function completeMenu() {
     clearMessages()
+    if (!counts.items) return setError('Import at least one menu section before finishing.')
     setSaving(true)
     try {
+      if (menuImport?.status === 'imported') {
+        const notes = menuSectionMeta(menuImport.confidence_notes)
+        const { error: updateError } = await supabase.from('menu_imports').update({
+          confidence_notes: { ...notes, menu_complete: true },
+        }).eq('id', menuImport.id)
+        if (updateError) throw updateError
+      }
       await advance(STEP.branding)
     } catch (caughtError) {
-      setError(caughtError instanceof Error ? caughtError.message : 'Unable to continue.')
+      setError(caughtError instanceof Error ? caughtError.message : 'Unable to finish the menu import.')
     } finally {
       setSaving(false)
     }
@@ -1087,14 +1169,19 @@ export default function Onboarding() {
 
         {!pending && step === STEP.upload && (
           <div className="onboarding-step">
-            <span className="eyebrow">Upload menu</span>
-            <h1>Let AI build your first menu.</h1>
-            <p>Upload one PDF or menu image at a time. You will review and edit everything before it is imported.</p>
+            <span className="eyebrow">Menu sections</span>
+            <h1>Add your menu one section at a time.</h1>
+            <p>Name this section yourself, add any instructions for the AI, then upload the page or image that contains it.</p>
             {counts.items > 0 && (
-              <div className="existing-menu-summary"><strong>You already have a menu</strong><span>{counts.categories} categories · {counts.items} items</span><button className="secondary-button" type="button" onClick={() => void continueWithExistingMenu()} disabled={saving}>Continue with existing menu</button></div>
+              <div className="existing-menu-summary"><strong>Menu so far</strong><span>{counts.categories} confirmed sections · {counts.items} items</span><button className="primary-button" type="button" onClick={() => void completeMenu()} disabled={saving}>My menu is complete</button></div>
             )}
+            {success && <div className="form-success" role="status">{success}</div>}
+            <div className="menu-section-setup">
+              <label className="large-field full-width">Section name<input value={sectionName} onChange={(event) => setSectionName(event.target.value)} placeholder="e.g. Starters, Beginnings or Chef's Specials" /></label>
+              <label className="large-field full-width">Instructions for the AI <span className="optional-label">Optional</span><textarea rows={3} value={sectionInstructions} onChange={(event) => setSectionInstructions(event.target.value)} placeholder="e.g. Every dish can be chicken, beef or pork. Beef costs £1 extra." /><span className="field-help">These instructions apply only to this section. You can check the result before confirming it.</span></label>
+            </div>
             <div className={dragging ? 'menu-dropzone dragging' : 'menu-dropzone'} onDragOver={(event) => { event.preventDefault(); setDragging(true) }} onDragLeave={() => setDragging(false)} onDrop={onDrop} onClick={() => fileInputRef.current?.click()} role="button" tabIndex={0}>
-              <span aria-hidden="true">↑</span><strong>Drop your menu here</strong><p>or choose a PDF, JPG, PNG or WebP file · maximum 15 MB</p>
+              <span aria-hidden="true">↑</span><strong>Upload this section</strong><p>Choose a PDF, JPG, PNG or WebP file · maximum 15 MB</p>
               <input ref={fileInputRef} hidden type="file" accept=".pdf,.jpg,.jpeg,.png,.webp,application/pdf,image/jpeg,image/png,image/webp" onChange={(event) => { const file = event.target.files?.[0]; event.target.value = ''; if (file) void handleMenuFile(file) }} />
             </div>
             {saving && <div className="upload-progress"><span style={{ width: `${uploadProgress}%` }} /><small>{uploadProgress < 70 ? 'Uploading menu…' : 'Starting AI scan…'}</small></div>}
@@ -1108,8 +1195,8 @@ export default function Onboarding() {
           <div className="onboarding-step onboarding-welcome">
             <div className="scan-spinner" aria-hidden="true" />
             <span className="eyebrow">AI menu scan</span>
-            <h1>Reading {menuImport?.file_name || 'your menu'}…</h1>
-            <p>We are identifying categories, products, descriptions, prices and dietary information. You can safely leave this page and return later.</p>
+            <h1>Reading {sectionName || 'this section'}…</h1>
+            <p>We are extracting the products, descriptions, prices and dietary information from {menuImport?.file_name || 'your upload'}. You can safely leave this page and return later.</p>
             <div className="success-reference">The original upload and scan progress are saved</div>
             {menuImport?.status === 'queued' && <button className="primary-button" type="button" onClick={() => void retryScan()} disabled={saving}>{saving ? 'Starting scan…' : 'Resume AI scan'}</button>}
             {error && <div className="form-error" role="alert">{error}</div>}
@@ -1118,9 +1205,9 @@ export default function Onboarding() {
 
         {!pending && step === STEP.menuReview && (
           <div className="onboarding-step">
-            <span className="eyebrow">Review AI menu</span>
-            <h1>Check every category and item.</h1>
-            <p>Correct uncertain text and prices before importing this menu into your restaurant.</p>
+            <span className="eyebrow">Review section</span>
+            <h1>Check {extractedMenu.categories[0]?.name || sectionName || 'this section'}.</h1>
+            <p>Correct the name, items and prices. Confirming saves this section, then you can add another.</p>
             {extractedMenu.warnings.length > 0 && <div className="confidence-warning"><strong>Scan notes</strong>{extractedMenu.warnings.map((warning, index) => <p key={`${warning}-${index}`}>{warning}</p>)}</div>}
             <div className="scanned-menu-editor">
               {extractedMenu.categories.map((category, categoryIndex) => (
@@ -1147,9 +1234,8 @@ export default function Onboarding() {
                 </article>
               ))}
             </div>
-            <button className="secondary-button add-category-button" type="button" onClick={() => setExtractedMenu((current) => ({ ...current, categories: [...current.categories, { name: 'New category', items: [] }] }))}>+ Add category</button>
             {error && <div className="form-error" role="alert">{error}</div>}
-            <StepActions onBack={() => setStep(STEP.upload)} onContinue={() => void importScannedMenu()} saving={saving} continueLabel="Save and import menu" />
+            <StepActions onBack={() => setStep(STEP.upload)} onContinue={() => void importScannedMenu()} saving={saving} continueLabel="Confirm this section" />
           </div>
         )}
 
