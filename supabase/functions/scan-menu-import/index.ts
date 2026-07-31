@@ -26,7 +26,7 @@ function toBase64(bytes: Uint8Array) {
 const menuSchema = {
   type: "object",
   additionalProperties: false,
-  required: ["restaurant_name", "currency", "categories", "warnings"],
+  required: ["restaurant_name", "currency", "categories", "modifier_groups", "warnings"],
   properties: {
     restaurant_name: { type: ["string", "null"] },
     currency: { type: "string", enum: ["GBP"] },
@@ -56,6 +56,34 @@ const menuSchema = {
               },
             },
           },
+        },
+      },
+    },
+    modifier_groups: {
+      type: "array",
+      items: {
+        type: "object",
+        additionalProperties: false,
+        required: ["name", "description", "selection_type", "minimum_selections", "maximum_selections", "options", "applies_to_item_names"],
+        properties: {
+          name: { type: "string" },
+          description: { type: ["string", "null"] },
+          selection_type: { type: "string", enum: ["single", "multiple"] },
+          minimum_selections: { type: "integer", minimum: 0 },
+          maximum_selections: { type: ["integer", "null"], minimum: 1 },
+          options: {
+            type: "array",
+            items: {
+              type: "object",
+              additionalProperties: false,
+              required: ["name", "price_pence"],
+              properties: {
+                name: { type: "string" },
+                price_pence: { type: "integer", minimum: 0 },
+              },
+            },
+          },
+          applies_to_item_names: { type: "array", items: { type: "string" } },
         },
       },
     },
@@ -159,7 +187,7 @@ Deno.serve(async (req: Request) => {
             fileContent,
             {
               type: "input_text",
-              text: `Extract only the restaurant menu section named "${sectionName}" into structured data. Return exactly one category named "${sectionName}". Ignore products that clearly belong to other sections. Preserve item wording, descriptions, and prices exactly where readable. Convert GBP prices to integer pence. Do not invent missing prices or descriptions. Use null when uncertain or absent. Identify vegetarian or vegan items only when explicitly indicated or unambiguous. Put ambiguity, unreadable text, multiple-size prices, meal-deal complexity, and anything requiring human review in warnings and item notes.${scanInstructions ? ` Follow these restaurant-provided instructions for this section: ${scanInstructions}` : ""}`,
+              text: `Extract only the restaurant menu section named "${sectionName}" into structured data. Return exactly one category named "${sectionName}". Ignore products that clearly belong to other sections. Preserve item wording, descriptions, and prices exactly where readable. Convert GBP prices to integer pence. Do not invent missing prices or descriptions. Use null when uncertain or absent. Identify vegetarian or vegan items only when explicitly indicated or unambiguous. Convert choices described by the restaurant (such as meat, size, heat, rice, toppings or upgrades) into reusable modifier_groups instead of adding them to descriptions. Use single with minimum 1 and maximum 1 for a required choose-one choice. Put the exact extracted item names in applies_to_item_names; use every item in this section when the instruction says all dishes. Extra charges belong in option price_pence. Do not invent choices. Put ambiguity, unreadable text, meal-deal complexity, and anything requiring human review in warnings and item notes.${scanInstructions ? ` Follow these restaurant-provided instructions for this section: ${scanInstructions}` : ""}`,
             },
           ],
         }],
@@ -185,7 +213,7 @@ Deno.serve(async (req: Request) => {
     if (!outputText) throw new Error("The AI service returned no menu data.");
 
     const extracted = JSON.parse(outputText);
-    const confidenceNotes = [
+    const reviewNotes = [
       ...(Array.isArray(extracted.warnings) ? extracted.warnings : []),
       ...((extracted.categories || []).flatMap((category: any) =>
         (category.items || [])
@@ -202,7 +230,15 @@ Deno.serve(async (req: Request) => {
     const { error: updateError } = await admin.from("menu_imports").update({
       status: "review",
       extracted_menu: extracted,
-      confidence_notes: confidenceNotes,
+      confidence_notes: {
+        ...savedNotes,
+        section_name: sectionName,
+        scan_instructions: scanInstructions,
+        section_confirmed: false,
+        menu_complete: false,
+        warnings: reviewNotes.map((note) => typeof note === "string" ? note : note.note),
+        review_notes: reviewNotes,
+      },
       error_message: null,
       updated_at: new Date().toISOString(),
     }).eq("id", importId);
@@ -213,7 +249,7 @@ Deno.serve(async (req: Request) => {
       import_id: importId,
       status: "review",
       menu: extracted,
-      confidence_notes: confidenceNotes,
+      confidence_notes: reviewNotes,
     });
   } catch (error) {
     console.error(error);
