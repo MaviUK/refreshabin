@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import './Storefront.css'
@@ -102,6 +102,17 @@ export default function Storefront() {
   const [restaurantFavouriteBusy, setRestaurantFavouriteBusy] = useState(false)
   const [itemFavouriteBusy, setItemFavouriteBusy] = useState<Set<string>>(new Set())
 
+  const loadStorefront = useCallback(async (silent = false) => {
+    if (!slug) return
+    if (!silent) setLoading(true)
+    setError('')
+    const { data: storefront, error: rpcError } = await supabase.rpc('get_public_storefront', { storefront_slug: slug })
+    if (rpcError) setError(rpcError.message)
+    else if (!storefront) setError('Restaurant not found.')
+    else setData(storefront as StorefrontData)
+    if (!silent) setLoading(false)
+  }, [slug])
+
   useEffect(() => {
     if (!slug) return
     const storageKey = `ordered-food-basket:${slug}`
@@ -114,18 +125,21 @@ export default function Storefront() {
       }
     }
 
-    async function loadStorefront() {
-      setLoading(true)
-      setError('')
-      const { data: storefront, error: rpcError } = await supabase.rpc('get_public_storefront', { storefront_slug: slug })
-      if (rpcError) setError(rpcError.message)
-      else if (!storefront) setError('Restaurant not found.')
-      else setData(storefront as StorefrontData)
-      setLoading(false)
+    void loadStorefront()
+  }, [loadStorefront, slug])
+
+  useEffect(() => {
+    function refreshVisibleStorefront() {
+      if (document.visibilityState === 'visible') void loadStorefront(true)
     }
 
-    void loadStorefront()
-  }, [slug])
+    window.addEventListener('focus', refreshVisibleStorefront)
+    document.addEventListener('visibilitychange', refreshVisibleStorefront)
+    return () => {
+      window.removeEventListener('focus', refreshVisibleStorefront)
+      document.removeEventListener('visibilitychange', refreshVisibleStorefront)
+    }
+  }, [loadStorefront])
 
   useEffect(() => {
     if (!data) return
@@ -467,7 +481,12 @@ export default function Storefront() {
       <div className="storefront-layout">
         <section className="storefront-menu">
           <div className="storefront-search-wrap"><input className="storefront-search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search the menu" aria-label="Search the menu" /></div>
-          {!filteredCategories.length && <p className="storefront-empty">No menu items match your search.</p>}
+          {!filteredCategories.length && (
+            <div className="storefront-empty">
+              <p>{search.trim() ? 'No menu items match your search.' : 'The menu has no available items yet.'}</p>
+              {!search.trim() && <button type="button" onClick={() => void loadStorefront()}>Refresh menu</button>}
+            </div>
+          )}
           {filteredCategories.map((category) => (
             <section className="menu-category" id={`category-${category.id}`} key={category.id}>
               <header><h2>{category.name}</h2>{category.description && <p>{category.description}</p>}</header>

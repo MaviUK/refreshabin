@@ -235,7 +235,9 @@
   box-shadow: 0 12px 25px rgba(215,63,120,.24);
 }
 .basket-note { margin-top: 12px; text-align: center; font-size: .76rem; line-height: 1.4; }
-.storefront-empty { padding: 45px 0; }
+.storefront-empty { padding: 45px 0; text-align: center; }
+.storefront-empty p { margin: 0 0 14px; color: #6f6469; }
+.storefront-empty button { min-height: 44px; padding: 0 20px; border: 0; border-radius: 12px; background: #d73f78; color: #fff; font-weight: 800; cursor: pointer; }
 .mobile-basket-button { display: none; }
 
 @media (max-width: 900px) {
