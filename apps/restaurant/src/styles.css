@@ -1814,3 +1814,119 @@ p {
   .item-actions { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .item-actions button { min-height: 40px; }
 }
+
+
+/* Menu category management and full-menu replacement */
+.menu-title-row {
+  align-items: flex-end;
+}
+
+.danger-outline-button,
+.danger-text-button {
+  border: 0;
+  color: #a52635;
+  font-weight: 800;
+}
+
+.danger-outline-button {
+  min-height: 48px;
+  padding: 0 18px;
+  border: 1px solid #df9da5;
+  border-radius: 14px;
+  background: #fff;
+}
+
+.danger-outline-button:hover:not(:disabled) {
+  border-color: #b93646;
+  background: #fff3f4;
+}
+
+.category-row {
+  padding: 0;
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.category-select-button {
+  min-width: 0;
+  padding: 14px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border: 0;
+  color: inherit;
+  background: transparent;
+  text-align: left;
+}
+
+.category-select-button span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.category-row-actions {
+  padding-right: 8px;
+  display: flex;
+  gap: 4px;
+}
+
+.category-row-actions button,
+.category-edit-form button {
+  min-height: 38px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 10px;
+  color: #654d5a;
+  background: transparent;
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.category-row-actions button:hover,
+.category-edit-form button:hover {
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.category-row-actions .danger-text-button {
+  color: #a52635;
+}
+
+.category-edit-form {
+  grid-column: 1 / -1;
+  padding: 8px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 6px;
+}
+
+.category-edit-form input {
+  width: 100%;
+  min-width: 0;
+  min-height: 42px;
+  padding: 0 12px;
+  border: 1px solid #d9cbd2;
+  border-radius: 10px;
+  background: #fff;
+}
+
+@media (max-width: 620px) {
+  .menu-title-row {
+    align-items: stretch;
+  }
+
+  .danger-outline-button {
+    width: 100%;
+  }
+
+  .category-row {
+    min-width: min(88vw, 420px);
+  }
+
+  .category-edit-form {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .category-edit-form button:last-child {
+    grid-column: 1 / -1;
+  }
+}
