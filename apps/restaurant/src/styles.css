@@ -1821,6 +1821,9 @@ p {
   align-items: flex-end;
 }
 
+.menu-title-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 10px; }
+.category-row-actions button:disabled, .item-actions button:disabled { cursor: not-allowed; opacity: .35; }
+
 .danger-outline-button,
 .danger-text-button {
   border: 0;
