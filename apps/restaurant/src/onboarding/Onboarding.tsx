@@ -907,11 +907,54 @@ export default function Onboarding() {
         ...category,
         items: category.items.map((item, position) => position === itemIndex ? { ...item, ...patch } : item),
       } : category),
+      modifier_groups: typeof patch.name === 'string'
+        ? current.modifier_groups.map((group) => ({
+            ...group,
+            applies_to_item_names: group.applies_to_item_names.map((name) => (
+              name.trim().toLocaleLowerCase() === current.categories[categoryIndex]?.items[itemIndex]?.name.trim().toLocaleLowerCase()
+                ? patch.name!.trim()
+                : name
+            )).filter(Boolean),
+          }))
+        : current.modifier_groups,
     }))
+  }
+
+  function removeItem(categoryIndex: number, itemIndex: number) {
+    setExtractedMenu((current) => {
+      const removedName = current.categories[categoryIndex]?.items[itemIndex]?.name.trim().toLocaleLowerCase()
+      return {
+        ...current,
+        categories: current.categories.map((category, index) => index === categoryIndex ? {
+          ...category,
+          items: category.items.filter((_, position) => position !== itemIndex),
+        } : category),
+        modifier_groups: current.modifier_groups.map((group) => ({
+          ...group,
+          applies_to_item_names: group.applies_to_item_names.filter((name) => name.trim().toLocaleLowerCase() !== removedName),
+        })),
+      }
+    })
   }
 
   function updateModifierGroup(groupIndex: number, patch: Partial<ScannedModifierGroup>) {
     setExtractedMenu((current) => ({ ...current, modifier_groups: current.modifier_groups.map((group, index) => index === groupIndex ? { ...group, ...patch } : group) }))
+  }
+
+  function toggleModifierDish(groupIndex: number, itemName: string) {
+    setExtractedMenu((current) => ({
+      ...current,
+      modifier_groups: current.modifier_groups.map((group, index) => {
+        if (index !== groupIndex) return group
+        const selected = group.applies_to_item_names.some((name) => name.trim().toLocaleLowerCase() === itemName.trim().toLocaleLowerCase())
+        return {
+          ...group,
+          applies_to_item_names: selected
+            ? group.applies_to_item_names.filter((name) => name.trim().toLocaleLowerCase() !== itemName.trim().toLocaleLowerCase())
+            : [...group.applies_to_item_names, itemName],
+        }
+      }),
+    }))
   }
 
   async function applyImportedModifierGroups(categoryName: string, groups: ScannedModifierGroup[]) {
@@ -1299,7 +1342,7 @@ export default function Onboarding() {
                           <label className="large-field">Price (£)<input inputMode="decimal" value={item.price} onChange={(event) => updateItem(categoryIndex, itemIndex, { price: event.target.value })} /></label>
                           <label className="large-field full-width">Description<textarea rows={2} value={item.description} onChange={(event) => updateItem(categoryIndex, itemIndex, { description: event.target.value })} /></label>
                         </div>
-                        <div className="dietary-options"><label><input type="checkbox" checked={item.vegetarian} onChange={(event) => updateItem(categoryIndex, itemIndex, { vegetarian: event.target.checked })} /> Vegetarian</label><label><input type="checkbox" checked={item.vegan} onChange={(event) => updateItem(categoryIndex, itemIndex, { vegan: event.target.checked, vegetarian: event.target.checked || item.vegetarian })} /> Vegan</label><button className="danger-text-button" type="button" onClick={() => updateCategory(categoryIndex, { items: category.items.filter((_, index) => index !== itemIndex) })}>Remove item</button></div>
+                        <div className="dietary-options"><label><input type="checkbox" checked={item.vegetarian} onChange={(event) => updateItem(categoryIndex, itemIndex, { vegetarian: event.target.checked })} /> Vegetarian</label><label><input type="checkbox" checked={item.vegan} onChange={(event) => updateItem(categoryIndex, itemIndex, { vegan: event.target.checked, vegetarian: event.target.checked || item.vegetarian })} /> Vegan</label><button className="danger-text-button" type="button" onClick={() => removeItem(categoryIndex, itemIndex)}>Remove item</button></div>
                         {item.warnings.map((warning, index) => <small className="item-warning" key={`${warning}-${index}`}>{warning}</small>)}
                       </div>
                     ))}
@@ -1308,7 +1351,11 @@ export default function Onboarding() {
                 </article>
               ))}
             </div>
-            {extractedMenu.modifier_groups.length > 0 && <div className="scanned-modifiers"><h2>Customer choices</h2><p>These choices will be attached to the dishes listed below.</p>{extractedMenu.modifier_groups.map((group, groupIndex) => <article className="scanned-category" key={`modifier-${groupIndex}`}><div className="form-grid"><label className="large-field">Choice name<input value={group.name} onChange={(event) => updateModifierGroup(groupIndex, { name: event.target.value })} /></label><label className="large-field">Type<select value={group.selection_type} onChange={(event) => updateModifierGroup(groupIndex, { selection_type: event.target.value as 'single' | 'multiple' })}><option value="single">Choose one</option><option value="multiple">Choose several</option></select></label><label className="large-field full-width">Applies to<input value={group.applies_to_item_names.join(', ')} onChange={(event) => updateModifierGroup(groupIndex, { applies_to_item_names: event.target.value.split(',').map((value) => value.trim()).filter(Boolean) })} /><span className="field-help">Comma-separated dish names. Leave empty to apply to every dish in this section.</span></label></div><div className="scanned-items">{group.options.map((option, optionIndex) => <div className="scanned-item" key={`option-${optionIndex}`}><div className="form-grid"><label className="large-field">Option<input value={option.name} onChange={(event) => updateModifierGroup(groupIndex, { options: group.options.map((value, index) => index === optionIndex ? { ...value, name: event.target.value } : value) })} /></label><label className="large-field">Extra charge (£)<input inputMode="decimal" value={option.price} onChange={(event) => updateModifierGroup(groupIndex, { options: group.options.map((value, index) => index === optionIndex ? { ...value, price: event.target.value } : value) })} /></label></div></div>)}</div><button className="danger-text-button" type="button" onClick={() => setExtractedMenu((current) => ({ ...current, modifier_groups: current.modifier_groups.filter((_, index) => index !== groupIndex) }))}>Remove choice</button></article>)}</div>}
+            {extractedMenu.modifier_groups.length > 0 && <div className="scanned-modifiers"><h2>Customer choices</h2><p>Choose exactly which dishes each option belongs to.</p>{extractedMenu.modifier_groups.map((group, groupIndex) => {
+              const dishNames = extractedMenu.categories.flatMap((category) => category.items.map((item) => item.name.trim())).filter(Boolean)
+              const appliesToAll = group.applies_to_item_names.length === 0
+              return <article className="scanned-category" key={`modifier-${groupIndex}`}><div className="form-grid"><label className="large-field">Choice name<input value={group.name} onChange={(event) => updateModifierGroup(groupIndex, { name: event.target.value })} /></label><label className="large-field">Type<select value={group.selection_type} onChange={(event) => updateModifierGroup(groupIndex, { selection_type: event.target.value as 'single' | 'multiple' })}><option value="single">Choose one</option><option value="multiple">Choose several</option></select></label><fieldset className="modifier-dish-picker full-width"><legend>Which dishes does this apply to?</legend><div className="modifier-scope-buttons"><button className={appliesToAll ? 'selected' : ''} type="button" aria-pressed={appliesToAll} onClick={() => updateModifierGroup(groupIndex, { applies_to_item_names: [] })}>All dishes in this section</button><button className={!appliesToAll ? 'selected' : ''} type="button" aria-pressed={!appliesToAll} onClick={() => updateModifierGroup(groupIndex, { applies_to_item_names: dishNames.slice(0, 1) })}>Selected dishes only</button></div>{!appliesToAll && <div className="modifier-dish-list">{dishNames.map((itemName, itemIndex) => { const selected = group.applies_to_item_names.some((name) => name.trim().toLocaleLowerCase() === itemName.toLocaleLowerCase()); return <button className={selected ? 'selected' : ''} type="button" aria-pressed={selected} onClick={() => toggleModifierDish(groupIndex, itemName)} key={`${itemName}-${itemIndex}`}><span aria-hidden="true">{selected ? '✓' : '+'}</span>{itemName}</button> })}</div>}<span className="field-help">Dish names update automatically when you edit the items above.</span></fieldset></div><div className="scanned-items">{group.options.map((option, optionIndex) => <div className="scanned-item" key={`option-${optionIndex}`}><div className="form-grid"><label className="large-field">Option<input value={option.name} onChange={(event) => updateModifierGroup(groupIndex, { options: group.options.map((value, index) => index === optionIndex ? { ...value, name: event.target.value } : value) })} /></label><label className="large-field">Extra charge (£)<input inputMode="decimal" value={option.price} onChange={(event) => updateModifierGroup(groupIndex, { options: group.options.map((value, index) => index === optionIndex ? { ...value, price: event.target.value } : value) })} /></label></div></div>)}</div><button className="danger-text-button" type="button" onClick={() => setExtractedMenu((current) => ({ ...current, modifier_groups: current.modifier_groups.filter((_, index) => index !== groupIndex) }))}>Remove choice</button></article>
+            })}</div>}
             {error && <div className="form-error" role="alert">{error}</div>}
             <StepActions onBack={() => setStep(STEP.upload)} onContinue={() => void importScannedMenu()} saving={saving} continueLabel="Confirm this section" />
           </div>

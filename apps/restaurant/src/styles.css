@@ -802,6 +802,61 @@ p {
   background: #fffdf5;
 }
 
+.modifier-dish-picker {
+  min-width: 0;
+  margin: 0;
+  padding: 16px;
+  border: 1px solid #ece1e6;
+  border-radius: 16px;
+  background: white;
+}
+
+.modifier-dish-picker legend {
+  padding: 0 6px;
+  color: #24161e;
+  font-weight: 850;
+}
+
+.modifier-scope-buttons,
+.modifier-dish-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 9px;
+}
+
+.modifier-scope-buttons {
+  margin-bottom: 12px;
+}
+
+.modifier-scope-buttons button,
+.modifier-dish-list button {
+  min-height: 42px;
+  padding: 9px 13px;
+  border: 1px solid rgba(81, 56, 69, 0.16);
+  border-radius: 999px;
+  background: #fffafd;
+  color: #513845;
+  font: inherit;
+  font-size: 0.88rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.modifier-scope-buttons button.selected,
+.modifier-dish-list button.selected {
+  border-color: #d94479;
+  background: #fbe6ef;
+  color: #8f204a;
+}
+
+.modifier-dish-list button span {
+  margin-right: 6px;
+}
+
+.modifier-dish-picker .field-help {
+  margin-top: 10px;
+}
+
 .low-confidence-label,
 .item-warning {
   display: block;
