@@ -264,6 +264,12 @@ export default function MenuBuilder() {
 
   async function replaceEntireMenu() {
     if (!restaurantId) return
+
+    if (!categories.length) {
+      navigate('/onboarding?menu-reupload=1')
+      return
+    }
+
     if (!window.confirm('Delete the entire current menu and start a new PDF import? All categories, products, extras and choices will be removed. Existing order history will remain.')) return
     setSaving(true)
     setError('')
@@ -465,7 +471,14 @@ export default function MenuBuilder() {
         <div><span className="eyebrow">Build your menu</span><h1>Products, ingredients and extras</h1><p>{categories.length} categories · {itemCount} products</p></div>
         <div className="menu-title-actions">
           <button className="secondary-button" type="button" onClick={() => setHistoryOpen((open) => !open)} disabled={saving}>Version history{snapshots.length ? ` (${snapshots.length})` : ''}</button>
-          <button className="danger-outline-button" type="button" onClick={() => void replaceEntireMenu()} disabled={saving || !categories.length}>Delete menu &amp; reupload PDF</button>
+          <button
+            className={categories.length ? 'danger-outline-button' : 'primary-button'}
+            type="button"
+            onClick={() => void replaceEntireMenu()}
+            disabled={saving}
+          >
+            {categories.length ? 'Delete menu & reupload PDF' : 'Upload menu PDF'}
+          </button>
         </div>
       </section>
 
