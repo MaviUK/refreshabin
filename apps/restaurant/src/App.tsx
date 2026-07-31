@@ -61,7 +61,7 @@ export default function App() {
       <Route path="/kds" element={<ProtectedRoute><KitchenDisplay /></ProtectedRoute>} />
       <Route path="/printers" element={<ProtectedRoute><PrinterManagement /></ProtectedRoute>} />
       <Route path="/print-history" element={<ProtectedRoute><PrintHistory /></ProtectedRoute>} />
-      <Route path="/onboarding" element={<ProtectedRoute><Onboarding /></ProtectedRoute>} />
+      <Route path="/onboarding" element={<ProtectedRoute allowApplication><Onboarding /></ProtectedRoute>} />
       <Route path="/menu" element={<ProtectedRoute><MenuBuilder /></ProtectedRoute>} />
       <Route path="/menu/modifiers" element={<ProtectedRoute><ModifierGroups /></ProtectedRoute>} />
       <Route path="/opening-hours" element={<ProtectedRoute><OpeningHours /></ProtectedRoute>} />
