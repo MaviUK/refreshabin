@@ -8,7 +8,7 @@ import {
   type DragEvent,
   type FormEvent,
 } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 
 type Restaurant = {
@@ -99,6 +99,7 @@ type MenuSectionMeta = {
   scan_instructions: string
   section_confirmed: boolean
   menu_complete: boolean
+  menu_reupload: boolean
 }
 
 type Counts = {
@@ -259,6 +260,7 @@ function menuSectionMeta(value: unknown): MenuSectionMeta {
     scan_instructions: typeof record.scan_instructions === 'string' ? record.scan_instructions : '',
     section_confirmed: Boolean(record.section_confirmed),
     menu_complete: Boolean(record.menu_complete),
+    menu_reupload: Boolean(record.menu_reupload),
   }
 }
 
@@ -358,6 +360,8 @@ function StepActions({
 
 export default function Onboarding() {
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  const menuReupload = searchParams.get('menu-reupload') === '1'
   const fileInputRef = useRef<HTMLInputElement>(null)
   const scanPollRef = useRef<number | null>(null)
   const [step, setStep] = useState<number>(STEP.welcome)
@@ -468,7 +472,7 @@ export default function Onboarding() {
       if (firstError) throw firstError
 
       const nextRestaurant = restaurantResult.data as Restaurant
-      if (nextRestaurant.status === 'active') {
+      if (nextRestaurant.status === 'active' && !menuReupload) {
         navigate('/dashboard', { replace: true })
         return
       }
@@ -512,7 +516,9 @@ export default function Onboarding() {
         }
       }
 
-      const latestImport = importResult.data as MenuImport | null
+      const fetchedImport = importResult.data as MenuImport | null
+      const fetchedSection = menuSectionMeta(fetchedImport?.confidence_notes)
+      const latestImport = menuReupload && !fetchedSection.menu_reupload ? null : fetchedImport
       setMenuImport(latestImport)
       const latestSection = menuSectionMeta(latestImport?.confidence_notes)
       if (latestImport) {
@@ -522,7 +528,11 @@ export default function Onboarding() {
       }
       setCounts({ categories: categoryResult.count ?? 0, items: itemResult.count ?? 0 })
 
-      if (nextRestaurant.status === 'pending_approval') {
+      if (menuReupload) {
+        if (latestImport?.status === 'processing' || latestImport?.status === 'queued') setStep(STEP.scanning)
+        else if (latestImport?.status === 'review') setStep(STEP.menuReview)
+        else setStep(STEP.upload)
+      } else if (nextRestaurant.status === 'pending_approval') {
         setStep(STEP.submit)
       } else {
         const savedStep = Math.max(STEP.welcome, Math.min(nextRestaurant.onboarding_step ?? STEP.welcome, STEP.applicationReview))
@@ -536,7 +546,7 @@ export default function Onboarding() {
     } finally {
       setLoading(false)
     }
-  }, [navigate])
+  }, [navigate, menuReupload])
 
   useEffect(() => {
     void loadApplication()
@@ -792,6 +802,7 @@ export default function Onboarding() {
             scan_instructions: sectionInstructions.trim(),
             section_confirmed: false,
             menu_complete: false,
+            menu_reupload: menuReupload,
             warnings: [],
           },
         })
@@ -942,6 +953,7 @@ export default function Onboarding() {
             scan_instructions: sectionInstructions.trim(),
             section_confirmed: false,
             menu_complete: false,
+            menu_reupload: menuReupload,
             warnings: extractedMenu.warnings,
           },
         })
@@ -964,6 +976,7 @@ export default function Onboarding() {
         scan_instructions: sectionInstructions.trim(),
         section_confirmed: true,
         menu_complete: false,
+        menu_reupload: menuReupload,
         warnings: extractedMenu.warnings,
       }
       const { error: confirmError } = await supabase.from('menu_imports').update({ confidence_notes: confirmedNotes }).eq('id', menuImport.id)
@@ -993,7 +1006,8 @@ export default function Onboarding() {
         }).eq('id', menuImport.id)
         if (updateError) throw updateError
       }
-      await advance(STEP.branding)
+      if (menuReupload) navigate('/menu', { replace: true })
+      else await advance(STEP.branding)
     } catch (caughtError) {
       setError(caughtError instanceof Error ? caughtError.message : 'Unable to finish the menu import.')
     } finally {
@@ -1229,9 +1243,9 @@ export default function Onboarding() {
 
         {!pending && step === STEP.upload && (
           <div className="onboarding-step">
-            <span className="eyebrow">Menu sections</span>
-            <h1>Add your menu one section at a time.</h1>
-            <p>Name this section yourself, add any instructions for the AI, then upload the page or image that contains it.</p>
+            <span className="eyebrow">{menuReupload ? 'Replace menu' : 'Menu sections'}</span>
+            <h1>{menuReupload ? 'Upload your new menu.' : 'Add your menu one section at a time.'}</h1>
+            <p>{menuReupload ? 'Your old menu has been cleared. Name each section, upload its PDF page or image, review it, then add the next section.' : 'Name this section yourself, add any instructions for the AI, then upload the page or image that contains it.'}</p>
             {counts.items > 0 && (
               <div className="existing-menu-summary"><strong>Menu so far</strong><span>{counts.categories} confirmed sections · {counts.items} items</span><button className="primary-button" type="button" onClick={() => void completeMenu()} disabled={saving}>My menu is complete</button></div>
             )}
@@ -1247,7 +1261,7 @@ export default function Onboarding() {
             {saving && <div className="upload-progress"><span style={{ width: `${uploadProgress}%` }} /><small>{uploadProgress < 70 ? 'Uploading menu…' : 'Starting AI scan…'}</small></div>}
             {menuImport?.status === 'failed' && <div className="scan-failure"><strong>Previous scan failed</strong><p>{menuImport.error_message || 'The menu could not be scanned.'}</p><button className="secondary-button" type="button" onClick={() => void retryScan()} disabled={saving}>Retry scan</button></div>}
             {error && <div className="form-error" role="alert">{error}</div>}
-            <div className="onboarding-actions"><button className="text-button" type="button" onClick={back} disabled={saving}>Back</button></div>
+            <div className="onboarding-actions"><button className="text-button" type="button" onClick={() => menuReupload ? navigate('/menu') : back()} disabled={saving}>{menuReupload ? 'Cancel and return to menu' : 'Back'}</button></div>
           </div>
         )}
 
