@@ -942,19 +942,26 @@ export default function Onboarding() {
   }
 
   function toggleModifierDish(groupIndex: number, itemName: string) {
-    setExtractedMenu((current) => ({
-      ...current,
-      modifier_groups: current.modifier_groups.map((group, index) => {
-        if (index !== groupIndex) return group
-        const selected = group.applies_to_item_names.some((name) => name.trim().toLocaleLowerCase() === itemName.trim().toLocaleLowerCase())
-        return {
-          ...group,
-          applies_to_item_names: selected
-            ? group.applies_to_item_names.filter((name) => name.trim().toLocaleLowerCase() !== itemName.trim().toLocaleLowerCase())
-            : [...group.applies_to_item_names, itemName],
-        }
-      }),
-    }))
+    setExtractedMenu((current) => {
+      const dishNames = current.categories.flatMap((category) => category.items.map((item) => item.name.trim())).filter(Boolean)
+      return {
+        ...current,
+        modifier_groups: current.modifier_groups.map((group, index) => {
+          if (index !== groupIndex) return group
+          const selectedNames = group.applies_to_item_names.length ? group.applies_to_item_names : dishNames
+          const selected = selectedNames.some((name) => name.trim().toLocaleLowerCase() === itemName.trim().toLocaleLowerCase())
+          if (selected && selectedNames.length === 1) return group
+          const nextNames = selected
+            ? selectedNames.filter((name) => name.trim().toLocaleLowerCase() !== itemName.trim().toLocaleLowerCase())
+            : [...selectedNames, itemName]
+          const appliesToAll = dishNames.length > 0 && dishNames.every((name) => nextNames.some((selectedName) => selectedName.trim().toLocaleLowerCase() === name.toLocaleLowerCase()))
+          return {
+            ...group,
+            applies_to_item_names: appliesToAll ? [] : nextNames,
+          }
+        }),
+      }
+    })
   }
 
   async function applyImportedModifierGroups(categoryName: string, groups: ScannedModifierGroup[]) {
@@ -1354,7 +1361,7 @@ export default function Onboarding() {
             {extractedMenu.modifier_groups.length > 0 && <div className="scanned-modifiers"><h2>Customer choices</h2><p>Choose exactly which dishes each option belongs to.</p>{extractedMenu.modifier_groups.map((group, groupIndex) => {
               const dishNames = extractedMenu.categories.flatMap((category) => category.items.map((item) => item.name.trim())).filter(Boolean)
               const appliesToAll = group.applies_to_item_names.length === 0
-              return <article className="scanned-category" key={`modifier-${groupIndex}`}><div className="form-grid"><label className="large-field">Choice name<input value={group.name} onChange={(event) => updateModifierGroup(groupIndex, { name: event.target.value })} /></label><label className="large-field">Type<select value={group.selection_type} onChange={(event) => updateModifierGroup(groupIndex, { selection_type: event.target.value as 'single' | 'multiple' })}><option value="single">Choose one</option><option value="multiple">Choose several</option></select></label><fieldset className="modifier-dish-picker full-width"><legend>Which dishes does this apply to?</legend><div className="modifier-scope-buttons"><button className={appliesToAll ? 'selected' : ''} type="button" aria-pressed={appliesToAll} onClick={() => updateModifierGroup(groupIndex, { applies_to_item_names: [] })}>All dishes in this section</button><button className={!appliesToAll ? 'selected' : ''} type="button" aria-pressed={!appliesToAll} onClick={() => updateModifierGroup(groupIndex, { applies_to_item_names: dishNames.slice(0, 1) })}>Selected dishes only</button></div>{!appliesToAll && <div className="modifier-dish-list">{dishNames.map((itemName, itemIndex) => { const selected = group.applies_to_item_names.some((name) => name.trim().toLocaleLowerCase() === itemName.toLocaleLowerCase()); return <button className={selected ? 'selected' : ''} type="button" aria-pressed={selected} onClick={() => toggleModifierDish(groupIndex, itemName)} key={`${itemName}-${itemIndex}`}><span aria-hidden="true">{selected ? '✓' : '+'}</span>{itemName}</button> })}</div>}<span className="field-help">Dish names update automatically when you edit the items above.</span></fieldset></div><div className="scanned-items">{group.options.map((option, optionIndex) => <div className="scanned-item" key={`option-${optionIndex}`}><div className="form-grid"><label className="large-field">Option<input value={option.name} onChange={(event) => updateModifierGroup(groupIndex, { options: group.options.map((value, index) => index === optionIndex ? { ...value, name: event.target.value } : value) })} /></label><label className="large-field">Extra charge (£)<input inputMode="decimal" value={option.price} onChange={(event) => updateModifierGroup(groupIndex, { options: group.options.map((value, index) => index === optionIndex ? { ...value, price: event.target.value } : value) })} /></label></div></div>)}</div><button className="danger-text-button" type="button" onClick={() => setExtractedMenu((current) => ({ ...current, modifier_groups: current.modifier_groups.filter((_, index) => index !== groupIndex) }))}>Remove choice</button></article>
+              return <article className="scanned-category" key={`modifier-${groupIndex}`}><div className="form-grid"><label className="large-field full-width">Choice name<input value={group.name} onChange={(event) => updateModifierGroup(groupIndex, { name: event.target.value })} /></label><fieldset className="modifier-dish-picker full-width"><legend>Which dishes does this apply to?</legend><div className="modifier-dish-list">{dishNames.map((itemName, itemIndex) => { const selected = appliesToAll || group.applies_to_item_names.some((name) => name.trim().toLocaleLowerCase() === itemName.toLocaleLowerCase()); return <button className={selected ? 'selected' : ''} type="button" aria-pressed={selected} onClick={() => toggleModifierDish(groupIndex, itemName)} key={`${itemName}-${itemIndex}`}><span aria-hidden="true">{selected ? '✓' : '+'}</span>{itemName}</button> })}</div><span className="field-help">Tap the dishes this choice applies to. Selecting one dish or every dish works the same way.</span></fieldset></div><div className="scanned-items">{group.options.map((option, optionIndex) => <div className="scanned-item" key={`option-${optionIndex}`}><div className="form-grid"><label className="large-field">Option<input value={option.name} onChange={(event) => updateModifierGroup(groupIndex, { options: group.options.map((value, index) => index === optionIndex ? { ...value, name: event.target.value } : value) })} /></label><label className="large-field">Extra charge (£)<input inputMode="decimal" value={option.price} onChange={(event) => updateModifierGroup(groupIndex, { options: group.options.map((value, index) => index === optionIndex ? { ...value, price: event.target.value } : value) })} /></label></div></div>)}</div><button className="danger-text-button" type="button" onClick={() => setExtractedMenu((current) => ({ ...current, modifier_groups: current.modifier_groups.filter((_, index) => index !== groupIndex) }))}>Remove choice</button></article>
             })}</div>}
             {error && <div className="form-error" role="alert">{error}</div>}
             <StepActions onBack={() => setStep(STEP.upload)} onContinue={() => void importScannedMenu()} saving={saving} continueLabel="Confirm this section" />

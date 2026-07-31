@@ -817,18 +817,12 @@ p {
   font-weight: 850;
 }
 
-.modifier-scope-buttons,
 .modifier-dish-list {
   display: flex;
   flex-wrap: wrap;
   gap: 9px;
 }
 
-.modifier-scope-buttons {
-  margin-bottom: 12px;
-}
-
-.modifier-scope-buttons button,
 .modifier-dish-list button {
   min-height: 42px;
   padding: 9px 13px;
@@ -842,7 +836,6 @@ p {
   cursor: pointer;
 }
 
-.modifier-scope-buttons button.selected,
 .modifier-dish-list button.selected {
   border-color: #d94479;
   background: #fbe6ef;
