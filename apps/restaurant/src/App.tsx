@@ -15,6 +15,7 @@ import ModifierGroups from './menu/ModifierGroups'
 import OpeningHours from './opening-hours/OpeningHours'
 import Branding from './branding/Branding'
 import RestaurantSettings from './settings/RestaurantSettings'
+import RestaurantDetails from './settings/RestaurantDetails'
 import DeliveryAreas from './settings/DeliveryAreas'
 import DeliveryMap from './settings/DeliveryMap'
 import Storefront from './storefront/Storefront'
@@ -69,6 +70,7 @@ export default function App() {
       <Route path="/opening-hours" element={<ProtectedRoute><OpeningHours /></ProtectedRoute>} />
       <Route path="/branding" element={<ProtectedRoute><Branding /></ProtectedRoute>} />
       <Route path="/settings" element={<ProtectedRoute><RestaurantSettings /></ProtectedRoute>} />
+      <Route path="/restaurant-details" element={<ProtectedRoute><RestaurantDetails /></ProtectedRoute>} />
       <Route path="/delivery-areas" element={<ProtectedRoute><DeliveryAreas /></ProtectedRoute>} />
       <Route path="/delivery-map" element={<ProtectedRoute><DeliveryMap /></ProtectedRoute>} />
       <Route path="/admin/applications" element={<AdminRoute><RestaurantApplications /></AdminRoute>} />

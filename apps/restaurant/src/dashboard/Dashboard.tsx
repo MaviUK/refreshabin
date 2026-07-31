@@ -170,8 +170,8 @@ export default function Dashboard() {
   }, [loadDashboard])
 
   const setupSteps = useMemo<SetupStep[]>(() => [
-    { label: 'Restaurant details', complete: Boolean(restaurant?.name && restaurant.email && restaurant.phone), to: '/onboarding' },
-    { label: 'Address and contact details', complete: stats.hasLocation, to: '/onboarding' },
+    { label: 'Restaurant details', complete: Boolean(restaurant?.name && restaurant.email && restaurant.phone), to: '/restaurant-details' },
+    { label: 'Address and contact details', complete: stats.hasLocation, to: '/restaurant-details' },
     { label: 'Opening hours', complete: stats.openingHoursCount > 0, to: '/opening-hours' },
     { label: 'Add your first menu category', complete: stats.categoryCount > 0, to: '/menu' },
     { label: 'Add your first product', complete: stats.itemCount > 0, to: '/menu' },

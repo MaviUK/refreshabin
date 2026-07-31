@@ -30,7 +30,8 @@ export default function ProtectedRoute({ children, allowApplication = false }: P
             .maybeSingle()
           const relation = membership?.restaurants
           const restaurant = Array.isArray(relation) ? relation[0] : relation
-          setApplicationRequired(!restaurant || (restaurant as { status?: string })?.status !== 'active')
+          const status = (restaurant as { status?: string } | null)?.status
+          setApplicationRequired(!restaurant || !['approved', 'active'].includes(status ?? ''))
         }
         setLoading(false)
       }
