@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 
 type Ingredient = {
@@ -50,6 +50,7 @@ type DraftExtra = {
 const money = new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'GBP' })
 
 export default function MenuBuilder() {
+  const navigate = useNavigate()
   const [restaurantId, setRestaurantId] = useState<string | null>(null)
   const [restaurantName, setRestaurantName] = useState('Your restaurant')
   const [categories, setCategories] = useState<MenuCategory[]>([])
@@ -57,6 +58,8 @@ export default function MenuBuilder() {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [categoryName, setCategoryName] = useState('')
+  const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null)
+  const [editingCategoryName, setEditingCategoryName] = useState('')
   const [activeCategoryId, setActiveCategoryId] = useState<string | null>(null)
   const [itemName, setItemName] = useState('')
   const [itemDescription, setItemDescription] = useState('')
@@ -167,6 +170,51 @@ export default function MenuBuilder() {
     setCategories((current) => [...current, category])
     setActiveCategoryId(category.id)
     setCategoryName('')
+  }
+
+  function startEditingCategory(category: MenuCategory) {
+    setEditingCategoryId(category.id)
+    setEditingCategoryName(category.name)
+  }
+
+  async function saveCategoryName(categoryId: string) {
+    const name = editingCategoryName.trim()
+    if (!name) return setError('Enter a category name.')
+    setSaving(true)
+    setError('')
+    const { error: updateError } = await supabase.from('menu_categories').update({ name, updated_at: new Date().toISOString() }).eq('id', categoryId)
+    setSaving(false)
+    if (updateError) return setError(updateError.message)
+    setCategories((current) => current.map((category) => category.id === categoryId ? { ...category, name } : category))
+    setEditingCategoryId(null)
+    setEditingCategoryName('')
+  }
+
+  async function deleteCategory(category: MenuCategory) {
+    const warning = category.menu_items.length
+      ? `Delete "${category.name}" and its ${category.menu_items.length} product${category.menu_items.length === 1 ? '' : 's'}? This cannot be undone.`
+      : `Delete the empty category "${category.name}"?`
+    if (!window.confirm(warning)) return
+    setSaving(true)
+    setError('')
+    const { error: deleteError } = await supabase.from('menu_categories').delete().eq('id', category.id)
+    setSaving(false)
+    if (deleteError) return setError(deleteError.message)
+    const remaining = categories.filter((entry) => entry.id !== category.id)
+    setCategories(remaining)
+    if (activeCategoryId === category.id) setActiveCategoryId(remaining[0]?.id || null)
+    if (editingCategoryId === category.id) setEditingCategoryId(null)
+  }
+
+  async function replaceEntireMenu() {
+    if (!restaurantId) return
+    if (!window.confirm('Delete the entire current menu and start a new PDF import? All categories, products, extras and choices will be removed. Existing order history will remain.')) return
+    setSaving(true)
+    setError('')
+    const { error: resetError } = await supabase.rpc('reset_restaurant_menu', { p_restaurant_id: restaurantId })
+    setSaving(false)
+    if (resetError) return setError(resetError.message)
+    navigate('/onboarding?menu-reupload=1')
   }
 
   function updateIngredient(index: number, value: string) {
@@ -324,6 +372,7 @@ export default function MenuBuilder() {
 
       <section className="menu-title-row">
         <div><span className="eyebrow">Build your menu</span><h1>Products, ingredients and extras</h1><p>{categories.length} categories · {itemCount} products</p></div>
+        <button className="danger-outline-button" type="button" onClick={() => void replaceEntireMenu()} disabled={saving || !categories.length}>Delete menu &amp; reupload PDF</button>
       </section>
 
       {error && <div className="form-error" role="alert">{error}</div>}
@@ -337,7 +386,25 @@ export default function MenuBuilder() {
           </form>
 
           <div className="category-list">
-            {categories.map((category) => <button type="button" key={category.id} className={activeCategoryId === category.id ? 'category-row active' : 'category-row'} onClick={() => setActiveCategoryId(category.id)}><span>{category.name}</span><small>{category.menu_items.length}</small></button>)}
+            {categories.map((category) => (
+              <div className={activeCategoryId === category.id ? 'category-row active' : 'category-row'} key={category.id}>
+                {editingCategoryId === category.id ? (
+                  <form className="category-edit-form" onSubmit={(event) => { event.preventDefault(); void saveCategoryName(category.id) }}>
+                    <input autoFocus value={editingCategoryName} onChange={(event) => setEditingCategoryName(event.target.value)} aria-label="Category name" />
+                    <button type="submit" disabled={saving || !editingCategoryName.trim()}>Save</button>
+                    <button type="button" onClick={() => setEditingCategoryId(null)}>Cancel</button>
+                  </form>
+                ) : (
+                  <>
+                    <button className="category-select-button" type="button" onClick={() => setActiveCategoryId(category.id)}><span>{category.name}</span><small>{category.menu_items.length}</small></button>
+                    <div className="category-row-actions">
+                      <button type="button" onClick={() => startEditingCategory(category)} aria-label={`Edit ${category.name}`}>Edit</button>
+                      <button className="danger-text-button" type="button" onClick={() => void deleteCategory(category)} aria-label={`Delete ${category.name}`}>Delete</button>
+                    </div>
+                  </>
+                )}
+              </div>
+            ))}
             {!categories.length && <p className="empty-copy">Add your first category to begin.</p>}
           </div>
 
