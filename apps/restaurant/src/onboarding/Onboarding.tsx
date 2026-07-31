@@ -63,10 +63,22 @@ type ScannedCategory = {
   items: ScannedItem[]
 }
 
+type ScannedModifierOption = { name: string; price_pence: number; price: string }
+type ScannedModifierGroup = {
+  name: string
+  description: string
+  selection_type: 'single' | 'multiple'
+  minimum_selections: number
+  maximum_selections: number | null
+  options: ScannedModifierOption[]
+  applies_to_item_names: string[]
+}
+
 type ExtractedMenu = {
   restaurant_name: string | undefined
   categories: ScannedCategory[]
   warnings: string[]
+  modifier_groups: ScannedModifierGroup[]
 }
 
 type MenuImport = {
@@ -169,6 +181,22 @@ function normaliseExtractedMenu(value: unknown, notes: unknown): ExtractedMenu {
   return {
     restaurant_name: typeof root.restaurant_name === 'string' ? root.restaurant_name : undefined,
     warnings: [...asStringArray(root.warnings), ...noteWarnings],
+    modifier_groups: (Array.isArray(root.modifier_groups) ? root.modifier_groups : []).map((groupValue) => {
+      const group = asRecord(groupValue)
+      return {
+        name: typeof group.name === 'string' ? group.name : 'Choose an option',
+        description: typeof group.description === 'string' ? group.description : '',
+        selection_type: group.selection_type === 'multiple' ? 'multiple' : 'single',
+        minimum_selections: typeof group.minimum_selections === 'number' ? group.minimum_selections : 0,
+        maximum_selections: typeof group.maximum_selections === 'number' ? group.maximum_selections : null,
+        applies_to_item_names: asStringArray(group.applies_to_item_names),
+        options: (Array.isArray(group.options) ? group.options : []).map((optionValue) => {
+          const option = asRecord(optionValue)
+          const price = typeof option.price_pence === 'number' ? Math.max(0, Math.round(option.price_pence)) : 0
+          return { name: typeof option.name === 'string' ? option.name : '', price_pence: price, price: (price / 100).toFixed(2) }
+        }),
+      }
+    }),
     categories: rawCategories.map((categoryValue) => {
       const category = asRecord(categoryValue)
       const rawItems = Array.isArray(category.items) ? category.items : []
@@ -204,6 +232,10 @@ function serialiseExtractedMenu(menu: ExtractedMenu) {
     restaurant_name: menu.restaurant_name ?? null,
     currency: 'GBP',
     warnings: menu.warnings,
+    modifier_groups: menu.modifier_groups.map((group) => ({
+      ...group,
+      options: group.options.map((option) => ({ name: option.name, price_pence: pence(option.price) })),
+    })),
     categories: menu.categories.map((category) => ({
       name: category.name,
       description: null,
@@ -333,7 +365,7 @@ export default function Onboarding() {
   const [location, setLocation] = useState<Location | null>(null)
   const [hours, setHours] = useState<DayHours[]>(defaultHours)
   const [menuImport, setMenuImport] = useState<MenuImport | null>(null)
-  const [extractedMenu, setExtractedMenu] = useState<ExtractedMenu>({ restaurant_name: undefined, categories: [], warnings: [] })
+  const [extractedMenu, setExtractedMenu] = useState<ExtractedMenu>({ restaurant_name: undefined, categories: [], warnings: [], modifier_groups: [] })
   const [counts, setCounts] = useState<Counts>({ categories: 0, items: 0 })
   const [userId, setUserId] = useState('')
   const [userEmail, setUserEmail] = useState('')
@@ -867,6 +899,33 @@ export default function Onboarding() {
     }))
   }
 
+  function updateModifierGroup(groupIndex: number, patch: Partial<ScannedModifierGroup>) {
+    setExtractedMenu((current) => ({ ...current, modifier_groups: current.modifier_groups.map((group, index) => index === groupIndex ? { ...group, ...patch } : group) }))
+  }
+
+  async function applyImportedModifierGroups(categoryName: string, groups: ScannedModifierGroup[]) {
+    if (!restaurant || !groups.length) return
+    const { data: category, error: categoryError } = await supabase.from('menu_categories').select('id').eq('restaurant_id', restaurant.id).eq('name', categoryName).order('created_at', { ascending: false }).limit(1).maybeSingle()
+    if (categoryError) throw categoryError
+    if (!category) throw new Error('The imported category could not be found for its choices.')
+    const { data: importedItems, error: itemError } = await supabase.from('menu_items').select('id,name').eq('restaurant_id', restaurant.id).eq('category_id', category.id)
+    if (itemError) throw itemError
+    for (const [groupIndex, group] of groups.entries()) {
+      const validOptions = group.options.filter((option) => option.name.trim())
+      if (!group.name.trim() || !validOptions.length) continue
+      const { data: createdGroup, error: groupError } = await supabase.from('modifier_groups').insert({ restaurant_id: restaurant.id, name: group.name.trim(), description: group.description.trim() || null, selection_type: group.selection_type, minimum_selections: Math.max(0, group.minimum_selections), maximum_selections: group.maximum_selections, free_selections: 0, is_active: true, sort_order: groupIndex }).select('id').single()
+      if (groupError) throw groupError
+      const { error: optionsError } = await supabase.from('modifier_options').insert(validOptions.map((option, optionIndex) => ({ restaurant_id: restaurant.id, modifier_group_id: createdGroup.id, name: option.name.trim(), price_pence: pence(option.price), maximum_quantity: 1, is_default: false, is_available: true, sort_order: optionIndex })))
+      if (optionsError) throw optionsError
+      const requestedNames = new Set(group.applies_to_item_names.map((name) => name.trim().toLocaleLowerCase()))
+      const targets = (importedItems || []).filter((item) => !requestedNames.size || requestedNames.has(item.name.trim().toLocaleLowerCase()))
+      if (targets.length) {
+        const { error: assignmentsError } = await supabase.from('menu_item_modifier_groups').insert(targets.map((item, itemIndex) => ({ restaurant_id: restaurant.id, menu_item_id: item.id, modifier_group_id: createdGroup.id, sort_order: itemIndex })))
+        if (assignmentsError) throw assignmentsError
+      }
+    }
+  }
+
   async function importScannedMenu() {
     clearMessages()
     if (!menuImport) return
@@ -899,6 +958,7 @@ export default function Onboarding() {
         categories: current.categories + createdCategories,
         items: current.items + createdItems,
       }))
+      await applyImportedModifierGroups(extractedMenu.categories[0]?.name.trim() || sectionName.trim(), extractedMenu.modifier_groups)
       const confirmedNotes = {
         section_name: extractedMenu.categories[0]?.name.trim() || sectionName.trim(),
         scan_instructions: sectionInstructions.trim(),
@@ -911,7 +971,7 @@ export default function Onboarding() {
       setMenuImport({ ...menuImport, status: 'imported', extracted_menu: extractedMenu, confidence_notes: confirmedNotes })
       setSectionName('')
       setSectionInstructions('')
-      setExtractedMenu({ restaurant_name: undefined, categories: [], warnings: [] })
+      setExtractedMenu({ restaurant_name: undefined, categories: [], warnings: [], modifier_groups: [] })
       setSuccess('Section confirmed. Add the next section, or finish your menu.')
       setStep(STEP.upload)
     } catch (caughtError) {
@@ -1234,6 +1294,7 @@ export default function Onboarding() {
                 </article>
               ))}
             </div>
+            {extractedMenu.modifier_groups.length > 0 && <div className="scanned-modifiers"><h2>Customer choices</h2><p>These choices will be attached to the dishes listed below.</p>{extractedMenu.modifier_groups.map((group, groupIndex) => <article className="scanned-category" key={`modifier-${groupIndex}`}><div className="form-grid"><label className="large-field">Choice name<input value={group.name} onChange={(event) => updateModifierGroup(groupIndex, { name: event.target.value })} /></label><label className="large-field">Type<select value={group.selection_type} onChange={(event) => updateModifierGroup(groupIndex, { selection_type: event.target.value as 'single' | 'multiple' })}><option value="single">Choose one</option><option value="multiple">Choose several</option></select></label><label className="large-field full-width">Applies to<input value={group.applies_to_item_names.join(', ')} onChange={(event) => updateModifierGroup(groupIndex, { applies_to_item_names: event.target.value.split(',').map((value) => value.trim()).filter(Boolean) })} /><span className="field-help">Comma-separated dish names. Leave empty to apply to every dish in this section.</span></label></div><div className="scanned-items">{group.options.map((option, optionIndex) => <div className="scanned-item" key={`option-${optionIndex}`}><div className="form-grid"><label className="large-field">Option<input value={option.name} onChange={(event) => updateModifierGroup(groupIndex, { options: group.options.map((value, index) => index === optionIndex ? { ...value, name: event.target.value } : value) })} /></label><label className="large-field">Extra charge (£)<input inputMode="decimal" value={option.price} onChange={(event) => updateModifierGroup(groupIndex, { options: group.options.map((value, index) => index === optionIndex ? { ...value, price: event.target.value } : value) })} /></label></div></div>)}</div><button className="danger-text-button" type="button" onClick={() => setExtractedMenu((current) => ({ ...current, modifier_groups: current.modifier_groups.filter((_, index) => index !== groupIndex) }))}>Remove choice</button></article>)}</div>}
             {error && <div className="form-error" role="alert">{error}</div>}
             <StepActions onBack={() => setStep(STEP.upload)} onContinue={() => void importScannedMenu()} saving={saving} continueLabel="Confirm this section" />
           </div>
