@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import './Storefront.css'
 
@@ -25,6 +25,7 @@ type MenuItem = {
   image_url: string | null
   is_vegetarian: boolean
   is_vegan: boolean
+  is_available: boolean
   ingredients: Ingredient[]
   extras: Extra[]
   modifier_groups: ModifierGroup[]
@@ -45,6 +46,15 @@ type Restaurant = {
   free_delivery_threshold_pence: number | null
 }
 type StorefrontData = { restaurant: Restaurant; categories: Category[] }
+type ManagementMenuItem = Omit<MenuItem, 'ingredients' | 'extras' | 'modifier_groups'> & { sort_order: number }
+type ManagementCategory = {
+  id: string
+  name: string
+  description: string | null
+  sort_order: number
+  is_active: boolean
+  menu_items: ManagementMenuItem[]
+}
 type SelectedExtra = Extra & { quantity: number }
 type SelectedModifierOption = ModifierOption & { quantity: number }
 type SelectedModifierGroup = { group_id: string; group_name: string; options: SelectedModifierOption[] }
@@ -83,6 +93,8 @@ function basketLineId(itemId: string, configuration: unknown) {
 export default function Storefront() {
   const { slug } = useParams()
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  const managementRequested = searchParams.get('manage_menu') === '1'
   const [data, setData] = useState<StorefrontData | null>(null)
   const [basket, setBasket] = useState<Record<string, BasketLine>>({})
   const [search, setSearch] = useState('')
@@ -101,6 +113,70 @@ export default function Storefront() {
   const [favouriteItemIds, setFavouriteItemIds] = useState<Set<string>>(new Set())
   const [restaurantFavouriteBusy, setRestaurantFavouriteBusy] = useState(false)
   const [itemFavouriteBusy, setItemFavouriteBusy] = useState<Set<string>>(new Set())
+  const [managementMode, setManagementMode] = useState(false)
+  const [managementError, setManagementError] = useState('')
+  const [availabilityBusy, setAvailabilityBusy] = useState<Set<string>>(new Set())
+
+  const loadManagementMenu = useCallback(async (storefront: StorefrontData) => {
+    const { data: authData, error: authError } = await supabase.auth.getUser()
+    if (authError || !authData.user) {
+      setManagementError('Sign in to your restaurant account to manage menu availability.')
+      return null
+    }
+
+    const { data: membership, error: membershipError } = await supabase
+      .from('restaurant_members')
+      .select('restaurant_id, role')
+      .eq('user_id', authData.user.id)
+      .eq('restaurant_id', storefront.restaurant.id)
+      .in('role', ['owner', 'manager'])
+      .maybeSingle()
+
+    if (membershipError) {
+      setManagementError(membershipError.message)
+      return null
+    }
+    if (!membership) {
+      setManagementError('Only this restaurant\'s owner or manager can change menu availability.')
+      return null
+    }
+
+    const { data: categoryRows, error: menuError } = await supabase
+      .from('menu_categories')
+      .select(`
+        id, name, description, sort_order, is_active,
+        menu_items(id, name, description, price_pence, image_url, is_available, is_vegetarian, is_vegan, sort_order)
+      `)
+      .eq('restaurant_id', storefront.restaurant.id)
+      .eq('is_active', true)
+      .order('sort_order', { ascending: true })
+      .order('sort_order', { referencedTable: 'menu_items', ascending: true })
+
+    if (menuError) {
+      setManagementError(menuError.message)
+      return null
+    }
+
+    const publicItems = new Map(
+      storefront.categories.flatMap((category) => category.items).map((item) => [item.id, item]),
+    )
+    const categories = ((categoryRows ?? []) as ManagementCategory[]).map((category) => ({
+      id: category.id,
+      name: category.name,
+      description: category.description,
+      items: (category.menu_items ?? []).map((item) => ({
+        ...(publicItems.get(item.id) ?? item),
+        is_available: item.is_available,
+        ingredients: publicItems.get(item.id)?.ingredients ?? [],
+        extras: publicItems.get(item.id)?.extras ?? [],
+        modifier_groups: publicItems.get(item.id)?.modifier_groups ?? [],
+      })),
+    }))
+
+    setManagementError('')
+    setManagementMode(true)
+    return { ...storefront, categories }
+  }, [])
 
   const loadStorefront = useCallback(async (silent = false) => {
     if (!slug) return
@@ -109,9 +185,23 @@ export default function Storefront() {
     const { data: storefront, error: rpcError } = await supabase.rpc('get_public_storefront', { storefront_slug: slug })
     if (rpcError) setError(rpcError.message)
     else if (!storefront) setError('Restaurant not found.')
-    else setData(storefront as StorefrontData)
+    else {
+      const publicStorefront = storefront as StorefrontData
+      publicStorefront.categories = publicStorefront.categories.map((category) => ({
+        ...category,
+        items: category.items.map((item) => ({ ...item, is_available: true })),
+      }))
+      if (managementRequested) {
+        setManagementMode(false)
+        setData(await loadManagementMenu(publicStorefront) ?? publicStorefront)
+      } else {
+        setManagementError('')
+        setManagementMode(false)
+        setData(publicStorefront)
+      }
+    }
     if (!silent) setLoading(false)
-  }, [slug])
+  }, [loadManagementMenu, managementRequested, slug])
 
   useEffect(() => {
     if (!slug) return
@@ -313,6 +403,7 @@ export default function Storefront() {
   }
 
   function openCustomisation(item: MenuItem) {
+    if (managementMode || !item.is_available) return
     setCustomisingItem(item)
     setRemovedIngredientIds([])
     setExtraQuantities({})
@@ -425,6 +516,42 @@ export default function Storefront() {
     })
   }
 
+  async function toggleMenuItemAvailability(item: MenuItem) {
+    if (!data || !managementMode || availabilityBusy.has(item.id)) return
+    const nextAvailability = !item.is_available
+    setAvailabilityBusy((current) => new Set(current).add(item.id))
+    setManagementError('')
+
+    const { data: updatedItem, error: updateError } = await supabase
+      .from('menu_items')
+      .update({ is_available: nextAvailability, updated_at: new Date().toISOString() })
+      .eq('id', item.id)
+      .eq('restaurant_id', data.restaurant.id)
+      .select('id, is_available')
+      .maybeSingle()
+
+    if (updateError || !updatedItem) {
+      setManagementError(updateError?.message || 'This item could not be updated.')
+    } else {
+      setData((current) => current ? {
+        ...current,
+        categories: current.categories.map((category) => ({
+          ...category,
+          items: category.items.map((entry) => entry.id === item.id
+            ? { ...entry, is_available: updatedItem.is_available }
+            : entry),
+        })),
+      } : current)
+      setBasketMessage(updatedItem.is_available ? `${item.name} is available` : `${item.name} marked sold out`)
+    }
+
+    setAvailabilityBusy((current) => {
+      const next = new Set(current)
+      next.delete(item.id)
+      return next
+    })
+  }
+
   if (loading) return <main className="storefront-state">Loading menu…</main>
   if (error || !data) return <main className="storefront-state"><h1>Unable to load restaurant</h1><p>{error}</p></main>
 
@@ -444,20 +571,26 @@ export default function Storefront() {
         {restaurant.cover_url && <img className="storefront-cover" src={restaurant.cover_url} alt="" />}
         <div className="storefront-hero-overlay" />
         <div className="storefront-hero-actions">
-          <Link className="storefront-account-link" to={customerUserId ? '/account' : '/account/login'}>
-            <span aria-hidden="true">◉</span>
-            {customerUserId ? 'My account' : 'Sign in'}
-          </Link>
-          <button
-            className={favouriteRestaurant ? 'storefront-favourite active' : 'storefront-favourite'}
-            type="button"
-            onClick={() => void toggleRestaurantFavourite()}
-            disabled={restaurantFavouriteBusy}
-            aria-label={favouriteRestaurant ? `Remove ${restaurant.name} from favourites` : `Save ${restaurant.name} to favourites`}
-            aria-pressed={favouriteRestaurant}
-          >
-            {favouriteRestaurant ? '♥' : '♡'}
-          </button>
+          {managementMode ? (
+            <Link className="storefront-account-link" to="/dashboard"><span aria-hidden="true">←</span> Dashboard</Link>
+          ) : (
+            <>
+              <Link className="storefront-account-link" to={customerUserId ? '/account' : '/account/login'}>
+                <span aria-hidden="true">◉</span>
+                {customerUserId ? 'My account' : 'Sign in'}
+              </Link>
+              <button
+                className={favouriteRestaurant ? 'storefront-favourite active' : 'storefront-favourite'}
+                type="button"
+                onClick={() => void toggleRestaurantFavourite()}
+                disabled={restaurantFavouriteBusy}
+                aria-label={favouriteRestaurant ? `Remove ${restaurant.name} from favourites` : `Save ${restaurant.name} to favourites`}
+                aria-pressed={favouriteRestaurant}
+              >
+                {favouriteRestaurant ? '♥' : '♡'}
+              </button>
+            </>
+          )}
         </div>
         <div className="storefront-identity">
           {restaurant.logo_url
@@ -466,6 +599,13 @@ export default function Storefront() {
           <div><span className="storefront-brand">ordered.food</span><h1>{restaurant.name}</h1><p>{restaurant.cuisines?.join(' · ') || 'Freshly prepared food'}</p></div>
         </div>
       </section>
+
+      {managementRequested && (
+        <section className={managementMode ? 'storefront-management-banner' : 'storefront-management-banner storefront-management-banner--error'}>
+          <div><span className="eyebrow">Restaurant view</span><h2>{managementMode ? 'Manage item availability' : 'Management controls unavailable'}</h2><p>{managementMode ? 'Switch items on or off below. Changes are live immediately and sold-out items remain here so you can enable them again.' : managementError}</p></div>
+          <Link className="secondary-button button-link" to="/menu">Open full menu editor</Link>
+        </section>
+      )}
 
       <section className="storefront-summary">
         <div className="storefront-pills">
@@ -484,7 +624,7 @@ export default function Storefront() {
         <div>{data.categories.map((category) => <button key={category.id} type="button" onClick={() => document.getElementById(`category-${category.id}`)?.scrollIntoView({ behavior: 'smooth' })}>{category.name}</button>)}</div>
       </nav>
 
-      <div className="storefront-layout">
+      <div className={managementMode ? 'storefront-layout storefront-layout--management' : 'storefront-layout'}>
         <section className="storefront-menu">
           <div className="storefront-search-wrap"><input className="storefront-search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search the menu" aria-label="Search the menu" /></div>
           {!filteredCategories.length && (
@@ -498,8 +638,8 @@ export default function Storefront() {
               <header><h2>{category.name}</h2>{category.description && <p>{category.description}</p>}</header>
               <div className="menu-item-grid">
                 {category.items.map((item) => (
-                  <article className="menu-item-card" key={item.id} onClick={() => openCustomisation(item)}>
-                    <button
+                  <article className={item.is_available ? 'menu-item-card' : 'menu-item-card menu-item-card--unavailable'} key={item.id} onClick={() => openCustomisation(item)}>
+                    {!managementMode && <button
                       className={favouriteItemIds.has(item.id) ? 'menu-item-favourite active' : 'menu-item-favourite'}
                       type="button"
                       onClick={(event) => { event.stopPropagation(); void toggleItemFavourite(item) }}
@@ -508,7 +648,7 @@ export default function Storefront() {
                       aria-pressed={favouriteItemIds.has(item.id)}
                     >
                       {favouriteItemIds.has(item.id) ? '♥' : '♡'}
-                    </button>
+                    </button>}
                     <div className="menu-item-copy">
                       <div>
                         <h3>{item.name}</h3>
@@ -518,13 +658,26 @@ export default function Storefront() {
                           {item.is_vegan && <span>Vegan</span>}
                           {!item.is_vegan && item.is_vegetarian && <span>Vegetarian</span>}
                           {(item.extras?.length > 0 || item.modifier_groups?.length > 0) && <span className="customisable-tag">Customisable</span>}
+                          {managementMode && !item.is_available && <span className="sold-out-tag">Sold out</span>}
                         </div>
                       </div>
                       <strong>{money.format(item.price_pence / 100)}</strong>
                     </div>
                     <div className="menu-item-action">
                       {item.image_url && <img src={item.image_url} alt={item.name} />}
-                      <button type="button" onClick={(event) => { event.stopPropagation(); openCustomisation(item) }} aria-label={`Customise ${item.name}`}>+</button>
+                      {managementMode ? (
+                        <button
+                          className={item.is_available ? 'menu-item-availability-toggle active' : 'menu-item-availability-toggle'}
+                          type="button"
+                          onClick={(event) => { event.stopPropagation(); void toggleMenuItemAvailability(item) }}
+                          disabled={availabilityBusy.has(item.id)}
+                          aria-pressed={item.is_available}
+                        >
+                          {availabilityBusy.has(item.id) ? 'Saving…' : item.is_available ? 'Available' : 'Sold out'}
+                        </button>
+                      ) : (
+                        <button type="button" onClick={(event) => { event.stopPropagation(); openCustomisation(item) }} aria-label={`Customise ${item.name}`}>+</button>
+                      )}
                     </div>
                   </article>
                 ))}
@@ -533,7 +686,7 @@ export default function Storefront() {
           ))}
         </section>
 
-        <aside className="basket-panel">
+        {!managementMode && <aside className="basket-panel">
           <div className="basket-heading"><div><span>Your order</span><h2>Basket</h2></div><span>{itemCount} item{itemCount === 1 ? '' : 's'}</span></div>
           {!basketLines.length ? (
             <div className="basket-empty"><div>🛍️</div><h3>Your basket is empty</h3><p>Add something tasty from the menu.</p></div>
@@ -564,11 +717,11 @@ export default function Storefront() {
               <p className="basket-note">Delivery details and payment are added in the next checkout step.</p>
             </>
           )}
-        </aside>
+        </aside>}
       </div>
 
       {basketMessage && <div className="basket-toast" role="status">✓ {basketMessage}</div>}
-      {itemCount > 0 && <button className="mobile-basket-button" type="button" onClick={() => document.querySelector('.basket-panel')?.scrollIntoView({ behavior: 'smooth' })}><span>{itemCount} item{itemCount === 1 ? '' : 's'}</span><strong>View basket · {money.format(total / 100)}</strong></button>}
+      {!managementMode && itemCount > 0 && <button className="mobile-basket-button" type="button" onClick={() => document.querySelector('.basket-panel')?.scrollIntoView({ behavior: 'smooth' })}><span>{itemCount} item{itemCount === 1 ? '' : 's'}</span><strong>View basket · {money.format(total / 100)}</strong></button>}
 
       {customisingItem && (
         <div className="customisation-overlay" role="presentation" onMouseDown={closeCustomisation}>

@@ -273,7 +273,7 @@ export default function Dashboard() {
           <div><span className="eyebrow">Storefront status</span><h2>{availability.label}</h2><p>{availability.detail}</p></div>
         </div>
         <div className="restaurant-live-actions">
-          {isLive && <a className="secondary-button button-link" href={`/r/${restaurant?.slug}`} target="_blank" rel="noreferrer">View live storefront</a>}
+          {isLive && <a className="secondary-button button-link" href={`/r/${restaurant?.slug}?manage_menu=1`} target="_blank" rel="noreferrer">View & manage storefront</a>}
           <label className="availability-switch">
             <span><strong>Accepting orders</strong><small>{restaurant?.accepting_orders ? 'On' : 'Off'}</small></span>
             <input type="checkbox" checked={Boolean(restaurant?.accepting_orders)} onChange={() => void toggleAcceptingOrders()} disabled={!isLive || availabilityBusy} />
