@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import './Storefront.css'
 
@@ -443,16 +443,22 @@ export default function Storefront() {
       <section className="storefront-hero">
         {restaurant.cover_url && <img className="storefront-cover" src={restaurant.cover_url} alt="" />}
         <div className="storefront-hero-overlay" />
-        <button
-          className={favouriteRestaurant ? 'storefront-favourite active' : 'storefront-favourite'}
-          type="button"
-          onClick={() => void toggleRestaurantFavourite()}
-          disabled={restaurantFavouriteBusy}
-          aria-label={favouriteRestaurant ? `Remove ${restaurant.name} from favourites` : `Save ${restaurant.name} to favourites`}
-          aria-pressed={favouriteRestaurant}
-        >
-          {favouriteRestaurant ? '♥' : '♡'}
-        </button>
+        <div className="storefront-hero-actions">
+          <Link className="storefront-account-link" to={customerUserId ? '/account' : '/account/login'}>
+            <span aria-hidden="true">◉</span>
+            {customerUserId ? 'My account' : 'Sign in'}
+          </Link>
+          <button
+            className={favouriteRestaurant ? 'storefront-favourite active' : 'storefront-favourite'}
+            type="button"
+            onClick={() => void toggleRestaurantFavourite()}
+            disabled={restaurantFavouriteBusy}
+            aria-label={favouriteRestaurant ? `Remove ${restaurant.name} from favourites` : `Save ${restaurant.name} to favourites`}
+            aria-pressed={favouriteRestaurant}
+          >
+            {favouriteRestaurant ? '♥' : '♡'}
+          </button>
+        </div>
         <div className="storefront-identity">
           {restaurant.logo_url
             ? <img className="storefront-logo" src={restaurant.logo_url} alt={`${restaurant.name} logo`} />

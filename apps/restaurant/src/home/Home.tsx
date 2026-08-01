@@ -19,7 +19,8 @@ export default function Home() {
       <header className="home-header">
         <Link className="home-logo" to="/">ordered.food</Link>
         <nav className="home-nav" aria-label="Main navigation">
-          <Link to="/login">Restaurant login</Link>
+          <Link className="home-customer-link" to="/account">My account</Link>
+          <Link className="home-restaurant-login" to="/login">Restaurant login</Link>
           <Link className="home-business-button" to="/register">List your business</Link>
         </nav>
       </header>
@@ -113,7 +114,7 @@ export default function Home() {
       <footer className="home-footer">
         <Link className="home-logo" to="/">ordered.food</Link>
         <p>Online ordering for local restaurants.</p>
-        <div><Link to="/login">Restaurant login</Link><Link to="/register">Business sign up</Link></div>
+        <div><Link to="/account">My account</Link><Link to="/login">Restaurant login</Link><Link to="/register">Business sign up</Link></div>
       </footer>
     </main>
   )

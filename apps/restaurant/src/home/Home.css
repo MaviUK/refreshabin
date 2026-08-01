@@ -35,6 +35,13 @@
   text-decoration: none;
 }
 
+.home-customer-link {
+  border: 1px solid #d8d1c4;
+  border-radius: 999px;
+  padding: 10px 15px;
+  background: rgba(255,255,255,.6);
+}
+
 .home-business-button,
 .business-banner > a {
   border-radius: 999px;
@@ -318,7 +325,9 @@
 
 @media (max-width: 640px) {
   .home-header { min-height: 68px; padding: 0 16px; }
-  .home-nav > a:first-child { display: none; }
+  .home-nav { gap: 8px; }
+  .home-restaurant-login { display: none; }
+  .home-customer-link { padding: 9px 11px; font-size: .82rem; }
   .home-business-button { padding: 10px 14px; font-size: 0.82rem; }
   .home-hero { padding: 44px 16px 64px; gap: 42px; }
   .home-hero h1 { font-size: clamp(3.6rem, 19vw, 5.5rem); }
