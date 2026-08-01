@@ -323,7 +323,7 @@ export default function CustomerOrders() {
         )}
         <div className={`customer-order-message${cancelled ? ' customer-order-message--cancelled' : ''}`}><strong>{statusMessage(order)}</strong>{eta && <span>{eta}</span>}</div>
         <div className="customer-order-actions">
-          {order.stripe_checkout_session_id && <Link to={`/order/success?session_id=${encodeURIComponent(order.stripe_checkout_session_id)}`}>View order</Link>}
+          {order.stripe_checkout_session_id && <Link to={`/order/success?session_id=${encodeURIComponent(order.stripe_checkout_session_id)}&order_id=${encodeURIComponent(order.id)}`}>View order</Link>}
           <button type="button" onClick={() => void reorder(order)} disabled={reorderingId === order.id}>{reorderingId === order.id ? 'Building basket…' : 'Order again'}</button>
         </div>
       </article>
