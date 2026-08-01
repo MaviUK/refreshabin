@@ -1,10 +1,20 @@
 [build]
-  command = "pnpm --filter @ordered/restaurant build"
+  command = "pnpm --filter @ordered/restaurant build && pnpm --filter @ordered/platform-admin build"
   publish = "apps/restaurant/dist"
 
 [build.environment]
   NODE_VERSION = "22"
   PNPM_VERSION = "9.15.4"
+
+[[redirects]]
+  from = "/platform-admin"
+  to = "/platform-admin/"
+  status = 301
+
+[[redirects]]
+  from = "/platform-admin/*"
+  to = "/platform-admin/index.html"
+  status = 200
 
 [[redirects]]
   from = "/*"
