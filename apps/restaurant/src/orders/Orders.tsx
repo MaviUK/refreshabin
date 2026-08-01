@@ -61,10 +61,59 @@ type RestaurantMembership = {
 }
 
 type LiveStatus = 'connecting' | 'live' | 'offline'
+type AlertTone = 'classic' | 'kitchen' | 'urgent' | 'chime'
+type AlertNote = {
+  start: number
+  duration: number
+  frequency: number
+  waveform?: 'sine' | 'square'
+}
 
 const activeStatuses = ['placed', 'accepted', 'preparing', 'ready', 'out_for_delivery']
 const preparationChoices = [15, 20, 30, 45]
 const soundStorageKey = 'ordered-food-restaurant-order-sound'
+const soundToneStorageKey = 'ordered-food-restaurant-order-sound-tone'
+const soundVolumeStorageKey = 'ordered-food-restaurant-order-sound-volume'
+const alertTones: Array<{ value: AlertTone; label: string; description: string }> = [
+  { value: 'classic', label: 'Classic bell', description: 'A clear two-tone restaurant bell' },
+  { value: 'kitchen', label: 'Kitchen buzzer', description: 'A punchy repeating kitchen alert' },
+  { value: 'urgent', label: 'Urgent alarm', description: 'A faster high-priority alarm' },
+  { value: 'chime', label: 'Gentle chime', description: 'A softer three-note chime' },
+]
+const alertPatterns: Record<AlertTone, { duration: number; notes: AlertNote[] }> = {
+  classic: {
+    duration: 2.2,
+    notes: [
+      { start: 0, duration: 0.34, frequency: 880 },
+      { start: 0.42, duration: 0.38, frequency: 1100 },
+    ],
+  },
+  kitchen: {
+    duration: 1.8,
+    notes: [
+      { start: 0, duration: 0.18, frequency: 740, waveform: 'square' },
+      { start: 0.28, duration: 0.18, frequency: 740, waveform: 'square' },
+      { start: 0.56, duration: 0.25, frequency: 920, waveform: 'square' },
+    ],
+  },
+  urgent: {
+    duration: 1.5,
+    notes: [
+      { start: 0, duration: 0.2, frequency: 980, waveform: 'square' },
+      { start: 0.24, duration: 0.2, frequency: 1240, waveform: 'square' },
+      { start: 0.48, duration: 0.2, frequency: 980, waveform: 'square' },
+      { start: 0.72, duration: 0.2, frequency: 1240, waveform: 'square' },
+    ],
+  },
+  chime: {
+    duration: 2.5,
+    notes: [
+      { start: 0, duration: 0.42, frequency: 659 },
+      { start: 0.34, duration: 0.46, frequency: 784 },
+      { start: 0.68, duration: 0.55, frequency: 988 },
+    ],
+  },
+}
 const statusLabels: Record<string, string> = {
   pending_payment: 'Awaiting payment',
   placed: 'New',
@@ -105,6 +154,45 @@ function initialSoundPreference() {
   return window.localStorage.getItem(soundStorageKey) === 'enabled'
 }
 
+function initialAlertTone(): AlertTone {
+  if (typeof window === 'undefined') return 'classic'
+  const stored = window.localStorage.getItem(soundToneStorageKey)
+  return alertTones.some((tone) => tone.value === stored) ? stored as AlertTone : 'classic'
+}
+
+function initialAlertVolume() {
+  if (typeof window === 'undefined') return 75
+  const storedValue = window.localStorage.getItem(soundVolumeStorageKey)
+  if (storedValue === null) return 75
+  const stored = Number(storedValue)
+  return Number.isFinite(stored) && stored >= 0 && stored <= 100 ? stored : 75
+}
+
+function createAlertBuffer(context: AudioContext, tone: AlertTone) {
+  const pattern = alertPatterns[tone]
+  const frameCount = Math.ceil(pattern.duration * context.sampleRate)
+  const buffer = context.createBuffer(1, frameCount, context.sampleRate)
+  const samples = buffer.getChannelData(0)
+
+  for (const note of pattern.notes) {
+    const startFrame = Math.floor(note.start * context.sampleRate)
+    const noteFrames = Math.floor(note.duration * context.sampleRate)
+    const attackFrames = Math.max(1, Math.floor(0.012 * context.sampleRate))
+    const releaseFrames = Math.max(1, Math.floor(Math.min(0.12, note.duration / 2) * context.sampleRate))
+
+    for (let frame = 0; frame < noteFrames && startFrame + frame < frameCount; frame += 1) {
+      const phase = 2 * Math.PI * note.frequency * frame / context.sampleRate
+      const wave = note.waveform === 'square' ? (Math.sin(phase) >= 0 ? 0.58 : -0.58) : Math.sin(phase)
+      const attack = Math.min(1, frame / attackFrames)
+      const release = Math.min(1, (noteFrames - frame) / releaseFrames)
+      const sampleIndex = startFrame + frame
+      samples[sampleIndex] = Math.max(-1, Math.min(1, (samples[sampleIndex] ?? 0) + wave * attack * release * 0.62))
+    }
+  }
+
+  return buffer
+}
+
 export default function Orders() {
   const navigate = useNavigate()
   const [restaurantId, setRestaurantId] = useState('')
@@ -116,10 +204,26 @@ export default function Orders() {
   const [updatingId, setUpdatingId] = useState('')
   const [view, setView] = useState<'active' | 'completed'>('active')
   const [soundEnabled, setSoundEnabled] = useState(initialSoundPreference)
+  const [soundPanelOpen, setSoundPanelOpen] = useState(false)
+  const [alertTone, setAlertTone] = useState<AlertTone>(initialAlertTone)
+  const [alertVolume, setAlertVolume] = useState(initialAlertVolume)
   const [choosingTimeFor, setChoosingTimeFor] = useState('')
   const [liveStatus, setLiveStatus] = useState<LiveStatus>('connecting')
   const soundEnabledRef = useRef(soundEnabled)
+  const alertToneRef = useRef(alertTone)
+  const alertVolumeRef = useRef(alertVolume)
+  const audioContextRef = useRef<AudioContext | null>(null)
+  const alarmSourceRef = useRef<AudioBufferSourceNode | null>(null)
+  const alarmGainRef = useRef<GainNode | null>(null)
+  const alarmGenerationRef = useRef(0)
   const mountedRef = useRef(true)
+
+  const visibleOrders = useMemo(() => orders.filter((order) => {
+    const isActive = activeStatuses.includes(order.order_status)
+    return view === 'active' ? isActive : !isActive && order.order_status !== 'pending_payment'
+  }), [orders, view])
+
+  const newCount = useMemo(() => orders.filter((order) => order.order_status === 'placed').length, [orders])
 
   useEffect(() => {
     soundEnabledRef.current = soundEnabled
@@ -127,8 +231,24 @@ export default function Orders() {
     else window.localStorage.removeItem(soundStorageKey)
   }, [soundEnabled])
 
+  useEffect(() => {
+    alertToneRef.current = alertTone
+    window.localStorage.setItem(soundToneStorageKey, alertTone)
+  }, [alertTone])
+
+  useEffect(() => {
+    alertVolumeRef.current = alertVolume
+    window.localStorage.setItem(soundVolumeStorageKey, String(alertVolume))
+    const gain = alarmGainRef.current
+    const context = audioContextRef.current
+    if (gain && context) gain.gain.setTargetAtTime(alertVolume / 100, context.currentTime, 0.025)
+  }, [alertVolume])
+
   useEffect(() => () => {
     mountedRef.current = false
+    alarmGenerationRef.current += 1
+    try { alarmSourceRef.current?.stop() } catch { /* The source may already be stopped. */ }
+    void audioContextRef.current?.close()
   }, [])
 
   const loadOrders = useCallback(async (id: string, silent = false) => {
@@ -177,39 +297,87 @@ export default function Orders() {
     setOrders((data ?? []) as Order[])
   }, [])
 
-  function playOrderAlert() {
-    if (!soundEnabledRef.current) return
+  const getAudioContext = useCallback(() => {
+    const AudioContextClass = window.AudioContext || (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext
+    if (!AudioContextClass) return null
+    if (!audioContextRef.current || audioContextRef.current.state === 'closed') audioContextRef.current = new AudioContextClass()
+    return audioContextRef.current
+  }, [])
+
+  const stopOrderAlarm = useCallback(() => {
+    alarmGenerationRef.current += 1
+    const source = alarmSourceRef.current
+    const gain = alarmGainRef.current
+    alarmSourceRef.current = null
+    alarmGainRef.current = null
     try {
-      const AudioContextClass = window.AudioContext || (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext
-      if (!AudioContextClass) return
-      const context = new AudioContextClass()
-      const ring = (start: number, frequency: number) => {
-        const oscillator = context.createOscillator()
-        const gain = context.createGain()
-        oscillator.frequency.value = frequency
-        oscillator.type = 'sine'
-        gain.gain.setValueAtTime(0.0001, start)
-        gain.gain.exponentialRampToValueAtTime(0.35, start + 0.02)
-        gain.gain.exponentialRampToValueAtTime(0.0001, start + 0.35)
-        oscillator.connect(gain)
-        gain.connect(context.destination)
-        oscillator.start(start)
-        oscillator.stop(start + 0.38)
-      }
-      const now = context.currentTime
-      ring(now, 880)
-      ring(now + 0.42, 1100)
-      window.setTimeout(() => void context.close(), 1200)
+      source?.stop()
+      source?.disconnect()
+      gain?.disconnect()
+    } catch { /* The source may already be stopped. */ }
+  }, [])
+
+  const startOrderAlarm = useCallback(async () => {
+    if (!soundEnabledRef.current) return
+    const context = getAudioContext()
+    if (!context) return
+    const generation = alarmGenerationRef.current
+
+    try {
+      if (context.state === 'suspended') await context.resume()
+      if (generation !== alarmGenerationRef.current || !soundEnabledRef.current) return
+
+      const source = context.createBufferSource()
+      const gain = context.createGain()
+      source.buffer = createAlertBuffer(context, alertToneRef.current)
+      source.loop = true
+      gain.gain.value = alertVolumeRef.current / 100
+      source.connect(gain)
+      gain.connect(context.destination)
+      alarmSourceRef.current = source
+      alarmGainRef.current = gain
+      source.start()
     } catch {
       // Browsers can block audio until the user has interacted with the page.
     }
-  }
+  }, [getAudioContext])
+
+  const playAlertPreview = useCallback(async () => {
+    const context = getAudioContext()
+    if (!context) return
+    try {
+      if (context.state === 'suspended') await context.resume()
+      const source = context.createBufferSource()
+      const gain = context.createGain()
+      const pattern = alertPatterns[alertToneRef.current]
+      source.buffer = createAlertBuffer(context, alertToneRef.current)
+      gain.gain.value = alertVolumeRef.current / 100
+      source.connect(gain)
+      gain.connect(context.destination)
+      source.start()
+      source.stop(context.currentTime + pattern.duration)
+    } catch {
+      // Browsers can block audio until the user has interacted with the page.
+    }
+  }, [getAudioContext])
 
   function enableSound() {
-    setSoundEnabled(true)
     soundEnabledRef.current = true
-    playOrderAlert()
+    setSoundEnabled(true)
+    if (newCount === 0) void playAlertPreview()
   }
+
+  function disableSound() {
+    soundEnabledRef.current = false
+    stopOrderAlarm()
+    setSoundEnabled(false)
+  }
+
+  useEffect(() => {
+    stopOrderAlarm()
+    if (soundEnabled && newCount > 0) void startOrderAlarm()
+    return stopOrderAlarm
+  }, [alertTone, newCount, soundEnabled, startOrderAlarm, stopOrderAlarm])
 
   useEffect(() => {
     let channel: ReturnType<typeof supabase.channel> | null = null
@@ -252,9 +420,7 @@ export default function Orders() {
               table: 'orders',
               filter: `restaurant_id=eq.${typedMembership.restaurant_id}`,
             },
-            (payload) => {
-              const nextOrder = payload.new as Partial<Order> | undefined
-              if (payload.eventType === 'INSERT' || nextOrder?.order_status === 'placed') playOrderAlert()
+            () => {
               void loadOrders(typedMembership.restaurant_id, true).catch(() => setLiveStatus('offline'))
             },
           )
@@ -289,13 +455,6 @@ export default function Orders() {
       window.removeEventListener('focus', refreshWhenVisible)
     }
   }, [loadOrders, restaurantId])
-
-  const visibleOrders = useMemo(() => orders.filter((order) => {
-    const isActive = activeStatuses.includes(order.order_status)
-    return view === 'active' ? isActive : !isActive && order.order_status !== 'pending_payment'
-  }), [orders, view])
-
-  const newCount = orders.filter((order) => order.order_status === 'placed').length
 
   async function setOrderStatus(order: Order, orderStatus: string, preparationMinutes?: number) {
     if (!restaurantId || updatingId) return
@@ -393,11 +552,48 @@ export default function Orders() {
           <div className={`order-live-status order-live-status--${liveStatus}`} role="status">
             {liveStatus === 'live' ? 'Live' : liveStatus === 'offline' ? 'Offline' : 'Connecting'}
           </div>
-          <button className={soundEnabled ? 'sound-toggle enabled' : 'sound-toggle'} type="button" onClick={soundEnabled ? () => setSoundEnabled(false) : enableSound}>{soundEnabled ? '🔔 Sound on' : '🔕 Enable sound'}</button>
+          <button className={soundEnabled ? 'sound-toggle enabled' : 'sound-toggle'} type="button" onClick={soundEnabled ? disableSound : enableSound}>{soundEnabled ? '🔔 Sound on' : '🔕 Enable sound'}</button>
+          <button className="sound-toggle" type="button" aria-expanded={soundPanelOpen} aria-controls="order-sound-settings" onClick={() => setSoundPanelOpen((open) => !open)}>Manage sound</button>
           <button className="sound-toggle" type="button" disabled={refreshing || !restaurantId} onClick={() => restaurantId && void loadOrders(restaurantId).catch((caughtError) => setError(caughtError instanceof Error ? caughtError.message : 'Unable to refresh orders.'))}>{refreshing ? 'Refreshing…' : 'Refresh'}</button>
           {newCount > 0 && <div className="new-order-count">{newCount} new</div>}
         </div>
       </section>
+
+      {soundPanelOpen && (
+        <section className="order-sound-settings" id="order-sound-settings" aria-labelledby="order-sound-settings-title">
+          <div className="order-sound-settings-copy">
+            <span className="orders-eyebrow">New order alert</span>
+            <h2 id="order-sound-settings-title">Manage sound</h2>
+            <p>The selected alert repeats continuously until every new order is accepted or rejected.</p>
+          </div>
+          <label className="order-sound-field">
+            <span>Alert sound</span>
+            <select value={alertTone} onChange={(event) => setAlertTone(event.target.value as AlertTone)}>
+              {alertTones.map((tone) => <option key={tone.value} value={tone.value}>{tone.label} — {tone.description}</option>)}
+            </select>
+          </label>
+          <label className="order-sound-field order-volume-field">
+            <span>Volume <output>{alertVolume}%</output></span>
+            <input
+              aria-label="Order alert volume"
+              type="range"
+              min="0"
+              max="100"
+              step="5"
+              value={alertVolume}
+              onChange={(event) => {
+                const volume = Number(event.target.value)
+                alertVolumeRef.current = volume
+                setAlertVolume(volume)
+              }}
+            />
+          </label>
+          <div className="order-sound-buttons">
+            <button className="sound-toggle" type="button" onClick={() => void playAlertPreview()}>Test sound</button>
+            <button className={soundEnabled ? 'sound-toggle enabled' : 'sound-toggle'} type="button" onClick={soundEnabled ? disableSound : enableSound}>{soundEnabled ? 'Sound enabled' : 'Enable alerts'}</button>
+          </div>
+        </section>
+      )}
 
       <div className="orders-tabs" role="tablist" aria-label="Order views">
         <button type="button" role="tab" aria-selected={view === 'active'} className={view === 'active' ? 'active' : ''} onClick={() => setView('active')}>Active</button>
