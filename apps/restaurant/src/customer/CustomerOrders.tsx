@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import './CustomerAccount.css'
+import './CustomerOrders.css'
 
 type CustomerOrder = {
   id: string
