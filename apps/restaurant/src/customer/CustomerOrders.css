@@ -1,0 +1,189 @@
+.customer-account-shell--wide {
+  width: 100%;
+  overflow-x: clip;
+}
+
+.customer-account-shell--wide .customer-account-card,
+.customer-account-shell--wide .customer-account-card > *,
+.customer-order-card,
+.customer-order-card > * {
+  min-width: 0;
+}
+
+@media (max-width: 600px) {
+  .customer-account-shell--wide {
+    display: block;
+    padding: 0;
+    background: #f7f4ef;
+  }
+
+  .customer-account-shell--wide .customer-account-card {
+    width: 100%;
+    max-width: none;
+    min-height: 100vh;
+    padding: 22px 14px 44px;
+    overflow: hidden;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+  }
+
+  .customer-account-shell--wide .customer-account-header {
+    flex-direction: row;
+    align-items: flex-end;
+    gap: 14px;
+  }
+
+  .customer-account-shell--wide .customer-account-header > div {
+    min-width: 0;
+    flex: 1;
+  }
+
+  .customer-account-shell--wide .customer-account-brand {
+    margin-bottom: 22px;
+  }
+
+  .customer-account-shell--wide .customer-account-header > .customer-account-secondary {
+    flex: 0 0 auto;
+    margin-bottom: 2px;
+    padding: 10px 14px;
+  }
+
+  .customer-account-shell--wide .customer-account-card h1 {
+    margin-bottom: 0;
+    font-size: 1.75rem;
+    line-height: 1.05;
+  }
+
+  .customer-order-tools {
+    margin-top: 20px;
+  }
+
+  .customer-order-notification-toggle {
+    padding: 12px 14px;
+    border-radius: 14px;
+  }
+
+  .customer-order-section {
+    margin-top: 30px;
+  }
+
+  .customer-order-section-heading {
+    margin-bottom: 12px;
+  }
+
+  .customer-order-section-heading h2 {
+    font-size: 1.45rem;
+  }
+
+  .customer-order-list {
+    gap: 12px;
+  }
+
+  .customer-order-card {
+    width: 100%;
+    padding: 16px 14px;
+    overflow: hidden;
+    border-radius: 20px;
+  }
+
+  .customer-order-topline {
+    gap: 12px;
+  }
+
+  .customer-order-topline > div {
+    min-width: 0;
+  }
+
+  .customer-order-topline h2 {
+    overflow-wrap: anywhere;
+  }
+
+  .customer-order-topline strong {
+    font-size: 1.05rem;
+  }
+
+  .customer-order-summary-row {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: 8px 12px;
+    margin-top: 13px;
+  }
+
+  .customer-order-summary-row > span:last-child {
+    grid-column: 1 / -1;
+  }
+
+  .customer-order-status-pill {
+    justify-self: start;
+  }
+
+  .customer-order-tracker {
+    width: 100%;
+    min-width: 0;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    justify-content: stretch;
+    margin: 24px 0 20px;
+    padding: 4px 0;
+    overflow: visible;
+  }
+
+  .customer-order-tracker::before {
+    left: 10%;
+    right: 10%;
+  }
+
+  .customer-order-step {
+    min-width: 0;
+    gap: 7px;
+    font-size: 0.64rem;
+    line-height: 1.15;
+  }
+
+  .customer-order-step > span:last-child {
+    max-width: 58px;
+    overflow-wrap: break-word;
+  }
+
+  .customer-order-step-dot {
+    width: 28px;
+    height: 28px;
+  }
+
+  .customer-order-message {
+    padding: 14px;
+    border-radius: 15px;
+  }
+
+  .customer-order-actions {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+    margin-top: 14px;
+  }
+
+  .customer-order-actions a,
+  .customer-order-actions button {
+    width: 100%;
+    min-width: 0;
+    padding: 12px 8px;
+  }
+}
+
+@media (max-width: 360px) {
+  .customer-account-shell--wide .customer-account-card {
+    padding-inline: 10px;
+  }
+
+  .customer-order-card {
+    padding-inline: 12px;
+  }
+
+  .customer-order-step {
+    font-size: 0.6rem;
+  }
+
+  .customer-order-step > span:last-child {
+    max-width: 52px;
+  }
+}
