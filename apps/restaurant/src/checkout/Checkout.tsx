@@ -16,6 +16,11 @@ type Restaurant = {
   id: string; name: string; slug: string; accepts_delivery: boolean; accepts_collection: boolean
   minimum_order_pence: number | null; delivery_fee_pence: number | null
   free_delivery_threshold_pence: number | null; preparation_time_minutes: number | null
+  delivery_preparation_time_minutes?: number | null; collection_preparation_time_minutes?: number | null
+}
+type FulfilmentSettings = {
+  delivery_preparation_time_minutes: number
+  collection_preparation_time_minutes: number
 }
 type StorefrontData = { restaurant: Restaurant }
 type FulfilmentMethod = 'delivery' | 'collection'
@@ -41,6 +46,18 @@ type CustomerAddress = {
 }
 
 const money = new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'GBP' })
+const dateTime = new Intl.DateTimeFormat('en-GB', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
+
+function localDateTimeValue(date: Date) {
+  const offset = date.getTimezoneOffset() * 60_000
+  return new Date(date.getTime() - offset).toISOString().slice(0, 16)
+}
+
+function roundedMinimumTime(minutes: number) {
+  const date = new Date(Date.now() + minutes * 60_000)
+  date.setMinutes(Math.ceil(date.getMinutes() / 15) * 15, 0, 0)
+  return date
+}
 function formatPostcode(value: string) {
   const compact = value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 7)
   return compact.length <= 3 ? compact : `${compact.slice(0, -3)} ${compact.slice(-3)}`
@@ -62,6 +79,8 @@ export default function Checkout() {
   const [signedIn, setSignedIn] = useState(false)
   const [savedAddresses, setSavedAddresses] = useState<CustomerAddress[]>([])
   const [selectedAddressId, setSelectedAddressId] = useState<string>('new')
+  const [timingChoice, setTimingChoice] = useState<'asap' | 'later'>('asap')
+  const [requestedTime, setRequestedTime] = useState('')
   const [details, setDetails] = useState({ firstName: '', lastName: '', email: '', phone: '', addressLine1: '', addressLine2: '', town: '', postcode: '', instructions: '' })
 
   function applyAddress(address: CustomerAddress) {
@@ -108,15 +127,16 @@ export default function Checkout() {
 
     async function loadPage() {
       setLoading(true)
-      const [{ data, error: rpcError }, { data: sessionData }] = await Promise.all([
+      const [{ data, error: rpcError }, { data: fulfilmentData }, { data: sessionData }] = await Promise.all([
         supabase.rpc('get_public_storefront', { storefront_slug: slug }),
+        supabase.rpc('get_public_fulfilment_settings', { storefront_slug: slug }),
         supabase.auth.getSession(),
       ])
       if (rpcError) setError(rpcError.message)
       else if (!data) setError('Restaurant not found.')
       else {
         const storefront = data as StorefrontData
-        setRestaurant(storefront.restaurant)
+        setRestaurant({ ...storefront.restaurant, ...(fulfilmentData as FulfilmentSettings | null) })
         if (!storefront.restaurant.accepts_delivery && storefront.restaurant.accepts_collection) setMethod('collection')
       }
 
@@ -152,6 +172,12 @@ export default function Checkout() {
   }, [method, restaurant, subtotal])
   const total = subtotal + deliveryFee
   const minimumShortfall = Math.max((restaurant?.minimum_order_pence ?? 0) - subtotal, 0)
+  const defaultMinutes = method === 'delivery'
+    ? restaurant?.delivery_preparation_time_minutes ?? restaurant?.preparation_time_minutes ?? 30
+    : restaurant?.collection_preparation_time_minutes ?? restaurant?.preparation_time_minutes ?? 20
+  const minimumRequestedTime = roundedMinimumTime(defaultMinutes)
+  const maximumRequestedTime = new Date(Date.now() + 7 * 24 * 60 * 60_000)
+  const requestedDate = requestedTime ? new Date(requestedTime) : null
 
   function updateField(field: keyof typeof details, value: string) {
     setDetails((current) => ({ ...current, [field]: value }))
@@ -241,6 +267,10 @@ export default function Checkout() {
       setError('Please complete all required fields.')
       return
     }
+    if (timingChoice === 'later' && (!requestedDate || Number.isNaN(requestedDate.getTime()) || requestedDate < minimumRequestedTime || requestedDate > maximumRequestedTime)) {
+      setError(`Choose a ${method} time at least ${defaultMinutes} minutes from now and within the next 7 days.`)
+      return
+    }
 
     setSubmitting(true)
     setMessage(signedIn ? 'Creating your order…' : accountMode === 'signin' ? 'Signing in…' : 'Creating your account…')
@@ -266,6 +296,7 @@ export default function Checkout() {
       town_city: method === 'delivery' ? details.town : null,
       postcode: method === 'delivery' ? details.postcode : null,
       delivery_instructions: details.instructions || null,
+      requested_fulfilment_at: timingChoice === 'later' && requestedDate ? requestedDate.toISOString() : null,
     })
 
     if (orderError) { setSubmitting(false); setMessage(''); setError(orderError.message); return }
@@ -296,14 +327,14 @@ export default function Checkout() {
       <header className="checkout-header"><Link to={`/r/${slug}`}>← Back to menu</Link><strong>ordered.food</strong><Link to="/account/orders">My orders</Link></header>
       <div className="checkout-layout">
         <form className="checkout-form" onSubmit={handleSubmit} noValidate>
-          <section className="checkout-card"><span className="checkout-step">1</span><div className="checkout-section-heading"><h1>How would you like your order?</h1><p>Choose delivery or collection from {restaurant.name}.</p></div><div className="fulfilment-options">{restaurant.accepts_delivery && <button className={method === 'delivery' ? 'selected' : ''} type="button" onClick={() => setMethod('delivery')} disabled={submitting || Boolean(createdOrder)}><strong>Delivery</strong><span>Delivered to your address</span></button>}{restaurant.accepts_collection && <button className={method === 'collection' ? 'selected' : ''} type="button" onClick={() => setMethod('collection')} disabled={submitting || Boolean(createdOrder)}><strong>Collection</strong><span>Collect from the restaurant</span></button>}</div></section>
+          <section className="checkout-card"><span className="checkout-step">1</span><div className="checkout-section-heading"><h1>How would you like your order?</h1><p>Choose delivery or collection from {restaurant.name}.</p></div><div className="fulfilment-options">{restaurant.accepts_delivery && <button className={method === 'delivery' ? 'selected' : ''} type="button" onClick={() => { setMethod('delivery'); setTimingChoice('asap'); setRequestedTime('') }} disabled={submitting || Boolean(createdOrder)}><strong>Delivery</strong><span>Delivered to your address</span></button>}{restaurant.accepts_collection && <button className={method === 'collection' ? 'selected' : ''} type="button" onClick={() => { setMethod('collection'); setTimingChoice('asap'); setRequestedTime('') }} disabled={submitting || Boolean(createdOrder)}><strong>Collection</strong><span>Collect from the restaurant</span></button>}</div><div className="fulfilment-timing"><div><strong>When would you like it?</strong><span>The earliest {method} is in about {defaultMinutes} minutes.</span></div><div className="fulfilment-time-options"><button className={timingChoice === 'asap' ? 'selected' : ''} type="button" onClick={() => { setTimingChoice('asap'); setRequestedTime('') }} disabled={submitting || Boolean(createdOrder)}><strong>ASAP</strong><span>About {dateTime.format(minimumRequestedTime)}</span></button><button className={timingChoice === 'later' ? 'selected' : ''} type="button" onClick={() => { setTimingChoice('later'); setRequestedTime((current) => current || localDateTimeValue(minimumRequestedTime)) }} disabled={submitting || Boolean(createdOrder)}><strong>Choose a later time</strong><span>Up to 7 days ahead</span></button></div>{timingChoice === 'later' && <label className="requested-time-field">Requested {method} time<input type="datetime-local" min={localDateTimeValue(minimumRequestedTime)} max={localDateTimeValue(maximumRequestedTime)} step="900" value={requestedTime} onChange={(event) => setRequestedTime(event.target.value)} required disabled={submitting || Boolean(createdOrder)} /><span>Times outside the restaurant's opening hours will not be available.</span></label>}</div></section>
           <section className="checkout-card"><span className="checkout-step">2</span><div className="checkout-section-heading"><h2>Your details</h2><p>We will use these details for order updates.</p></div><div className="checkout-fields two-column"><label>First name<input value={details.firstName} onChange={(event) => updateField('firstName', event.target.value)} required disabled={submitting || Boolean(createdOrder)} /></label><label>Last name<input value={details.lastName} onChange={(event) => updateField('lastName', event.target.value)} required disabled={submitting || Boolean(createdOrder)} /></label><label>Email<input type="email" value={details.email} onChange={(event) => updateField('email', event.target.value)} required disabled={signedIn || submitting || Boolean(createdOrder)} /></label><label>Mobile number<input type="tel" value={details.phone} onChange={(event) => updateField('phone', event.target.value)} required disabled={submitting || Boolean(createdOrder)} /></label></div></section>
           {method === 'delivery' && <section className="checkout-card"><span className="checkout-step">{addressStep}</span><div className="checkout-section-heading"><h2>Delivery address</h2><p>{signedIn && savedAddresses.length ? 'Choose a saved address or enter a different one.' : 'We will save this address to your account for next time.'}</p></div>{signedIn && savedAddresses.length > 0 && <div className="checkout-saved-addresses">{savedAddresses.map((address) => <button className={selectedAddressId === address.id ? 'selected' : ''} type="button" key={address.id} onClick={() => applyAddress(address)} disabled={submitting || Boolean(createdOrder)}><span className="checkout-address-radio" aria-hidden="true" /><span><strong>{address.label}{address.is_default ? ' · Default' : ''}</strong><small>{address.address_line_1}{address.address_line_2 ? `, ${address.address_line_2}` : ''}</small><small>{address.town_city}, {address.postcode}</small>{address.delivery_instructions && <small>Note: {address.delivery_instructions}</small>}</span></button>)}<button className={selectedAddressId === 'new' ? 'selected' : ''} type="button" onClick={chooseNewAddress} disabled={submitting || Boolean(createdOrder)}><span className="checkout-address-radio" aria-hidden="true" /><span><strong>Use a different address</strong><small>Enter another delivery address below</small></span></button><Link className="checkout-manage-addresses" to="/account/addresses">Manage saved addresses</Link></div>}<div className="checkout-fields"><label>Address line 1<input value={details.addressLine1} onChange={(event) => updateField('addressLine1', event.target.value)} required disabled={submitting || Boolean(createdOrder)} /></label><label>Address line 2 <span>Optional</span><input value={details.addressLine2} onChange={(event) => updateField('addressLine2', event.target.value)} disabled={submitting || Boolean(createdOrder)} /></label><div className="two-column"><label>Town or city<input value={details.town} onChange={(event) => updateField('town', event.target.value)} required disabled={submitting || Boolean(createdOrder)} /></label><label>Postcode<input value={details.postcode} onChange={(event) => updateField('postcode', formatPostcode(event.target.value))} required disabled={submitting || Boolean(createdOrder)} /></label></div><label>Delivery instructions <span>Optional</span><textarea value={details.instructions} onChange={(event) => updateField('instructions', event.target.value)} rows={3} placeholder="Door number, access instructions or anything the driver should know" disabled={submitting || Boolean(createdOrder)} /></label></div></section>}
           <section className="checkout-card"><span className="checkout-step">{accountStep}</span><div className="checkout-section-heading"><h2>{signedIn ? 'Your account' : 'Save your details'}</h2><p>{signedIn ? 'You are signed in. This order will appear in My orders.' : 'Create an account to save your details and see your full order history.'}</p></div>{signedIn ? <div className="payment-placeholder">Signed in as {details.email}</div> : <div className="checkout-account"><div className="checkout-account-tabs"><button type="button" className={accountMode === 'create' ? 'selected' : ''} onClick={() => setAccountMode('create')}>Create account</button><button type="button" className={accountMode === 'signin' ? 'selected' : ''} onClick={() => setAccountMode('signin')}>Already registered</button></div><div className="checkout-fields"><label>Password<input type="password" minLength={8} autoComplete={accountMode === 'create' ? 'new-password' : 'current-password'} value={password} onChange={(event) => setPassword(event.target.value)} required disabled={submitting || Boolean(createdOrder)} /><span>At least 8 characters</span></label></div></div>}</section>
           <section className="checkout-card checkout-payment-placeholder"><span className="checkout-step">{paymentStep}</span><div className="checkout-section-heading"><h2>Payment</h2><p>You will be transferred to Stripe for secure card, Apple Pay or Google Pay payment.</p></div><div className="payment-placeholder">{createdOrder ? `Order #${createdOrder.order_number} is opening secure payment` : 'Payment details are entered securely on Stripe'}</div></section>
           {submitted && minimumShortfall > 0 && <p className="checkout-error">Add {money.format(minimumShortfall / 100)} more to meet the minimum order.</p>}{error && <p className="checkout-error">{error}</p>}{message && <p className="checkout-message">{message}</p>}<button className="checkout-submit" type="submit" disabled={minimumShortfall > 0 || submitting || Boolean(createdOrder)}>{submitting ? 'Opening secure payment…' : createdOrder ? `Order #${createdOrder.order_number} created` : `Pay securely · ${money.format(total / 100)}`}</button>
         </form>
-        <aside className="checkout-summary"><span>Your order from</span><h2>{restaurant.name}</h2><div className="checkout-summary-lines">{basketLines.map((line) => <div key={line.line_id || line.id}><span>{line.quantity} × {line.name}{line.removed_ingredients?.map((ingredient) => <small key={ingredient.id}>No {ingredient.name}</small>)}{line.selected_extras?.map((extra) => <small key={extra.id}>+ {extra.quantity > 1 ? `${extra.quantity} × ` : ''}{extra.name}</small>)}{line.selected_modifier_groups?.flatMap((group) => group.options.map((option) => <small key={`${group.group_id}-${option.id}`}>{group.group_name}: {option.quantity > 1 ? `${option.quantity} × ` : ''}{option.name}</small>))}{line.special_instructions && <small>Note: {line.special_instructions}</small>}</span><strong>{money.format(((line.unit_price_pence ?? line.price_pence) * line.quantity) / 100)}</strong></div>)}</div><div className="checkout-summary-costs"><div><span>Subtotal</span><strong>{money.format((createdOrder?.subtotal_pence ?? subtotal) / 100)}</strong></div>{method === 'delivery' && <div><span>Delivery</span><strong>{(createdOrder?.delivery_fee_pence ?? deliveryFee) ? money.format((createdOrder?.delivery_fee_pence ?? deliveryFee) / 100) : 'Free'}</strong></div>}<div className="checkout-summary-total"><span>Total</span><strong>{money.format((createdOrder?.total_pence ?? total) / 100)}</strong></div></div>{restaurant.preparation_time_minutes && <p>Estimated {method}: {restaurant.preparation_time_minutes} minutes</p>}</aside>
+        <aside className="checkout-summary"><span>Your order from</span><h2>{restaurant.name}</h2><div className="checkout-summary-lines">{basketLines.map((line) => <div key={line.line_id || line.id}><span>{line.quantity} × {line.name}{line.removed_ingredients?.map((ingredient) => <small key={ingredient.id}>No {ingredient.name}</small>)}{line.selected_extras?.map((extra) => <small key={extra.id}>+ {extra.quantity > 1 ? `${extra.quantity} × ` : ''}{extra.name}</small>)}{line.selected_modifier_groups?.flatMap((group) => group.options.map((option) => <small key={`${group.group_id}-${option.id}`}>{group.group_name}: {option.quantity > 1 ? `${option.quantity} × ` : ''}{option.name}</small>))}{line.special_instructions && <small>Note: {line.special_instructions}</small>}</span><strong>{money.format(((line.unit_price_pence ?? line.price_pence) * line.quantity) / 100)}</strong></div>)}</div><div className="checkout-summary-costs"><div><span>Subtotal</span><strong>{money.format((createdOrder?.subtotal_pence ?? subtotal) / 100)}</strong></div>{method === 'delivery' && <div><span>Delivery</span><strong>{(createdOrder?.delivery_fee_pence ?? deliveryFee) ? money.format((createdOrder?.delivery_fee_pence ?? deliveryFee) / 100) : 'Free'}</strong></div>}<div className="checkout-summary-total"><span>Total</span><strong>{money.format((createdOrder?.total_pence ?? total) / 100)}</strong></div></div><p>{timingChoice === 'later' && requestedDate ? `Requested ${method}: ${dateTime.format(requestedDate)}` : `Estimated ${method}: ${defaultMinutes} minutes`}</p></aside>
       </div>
     </main>
   )

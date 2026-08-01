@@ -131,6 +131,72 @@
   font-size: 0.9rem;
 }
 
+.fulfilment-timing {
+  display: grid;
+  gap: 14px;
+  margin-top: 22px;
+  padding-top: 22px;
+  border-top: 1px solid #ececec;
+}
+
+.fulfilment-timing > div:first-child {
+  display: grid;
+  gap: 4px;
+}
+
+.fulfilment-timing > div:first-child span,
+.requested-time-field > span {
+  color: #6b7280;
+  font-size: 0.88rem;
+}
+
+.fulfilment-time-options {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.fulfilment-time-options button {
+  display: grid;
+  gap: 4px;
+  min-height: 76px;
+  padding: 14px;
+  border: 2px solid #e5e7eb;
+  border-radius: 14px;
+  background: #fff;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.fulfilment-time-options button.selected {
+  border-color: #171717;
+  background: #f8f8f8;
+}
+
+.fulfilment-time-options button span {
+  color: #6b7280;
+  font-size: 0.84rem;
+}
+
+.requested-time-field {
+  display: grid;
+  gap: 8px;
+  font-weight: 700;
+}
+
+.requested-time-field input {
+  width: 100%;
+  box-sizing: border-box;
+  min-height: 48px;
+  border: 1px solid #d7d7d7;
+  border-radius: 12px;
+  background: #fff;
+  color: inherit;
+  font: inherit;
+  padding: 12px 14px;
+}
+
 .checkout-fields {
   display: grid;
   gap: 16px;
@@ -309,7 +375,8 @@
   }
 
   .two-column,
-  .fulfilment-options {
+  .fulfilment-options,
+  .fulfilment-time-options {
     grid-template-columns: 1fr;
   }
 }

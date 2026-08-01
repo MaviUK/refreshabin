@@ -265,6 +265,15 @@
   padding: 5px 9px;
 }
 
+.order-card-header .requested-time {
+  width: max-content;
+  border-radius: 999px;
+  background: #eef2ff;
+  color: #3730a3;
+  font-weight: 900;
+  padding: 5px 9px;
+}
+
 .order-card-total {
   display: grid;
   justify-items: end;
@@ -416,6 +425,39 @@
   color: #536058;
 }
 
+.prep-time-picker button.requested-time-action {
+  flex-basis: 100%;
+  border-color: #c7d2fe;
+  background: #eef2ff;
+  color: #3730a3;
+}
+
+.custom-prep-time {
+  display: grid;
+  grid-template-columns: auto 72px auto;
+  align-items: center;
+  gap: 7px;
+  min-height: 42px;
+  border: 1px solid #cad2cc;
+  border-radius: 11px;
+  background: white;
+  color: #536058;
+  font-size: 0.82rem;
+  font-weight: 900;
+  padding: 0 10px;
+}
+
+.custom-prep-time input {
+  width: 100%;
+  box-sizing: border-box;
+  border: 0;
+  border-bottom: 1px solid #cad2cc;
+  background: transparent;
+  color: #17211b;
+  font: inherit;
+  text-align: center;
+}
+
 .orders-empty,
 .orders-state {
   max-width: 1240px;
@@ -458,4 +500,7 @@
   .order-actions { align-items: stretch; flex-direction: column; padding: 0 18px 18px; }
   .order-action { width: 100%; }
   .prep-time-picker { width: 100%; margin: 0; }
+  .prep-time-picker button { flex: 1 1 calc(50% - 8px); }
+  .prep-time-picker > span { flex-basis: 100%; }
+  .custom-prep-time { flex: 1 1 100%; grid-template-columns: auto minmax(72px, 1fr) auto; }
 }

@@ -52,12 +52,21 @@ type Order = {
   created_at: string
   paid_at: string | null
   estimated_ready_at: string | null
+  requested_fulfilment_at: string | null
   order_items: OrderItem[]
 }
 
 type RestaurantMembership = {
   restaurant_id: string
-  restaurants: { name: string } | { name: string }[] | null
+  restaurants: {
+    name: string
+    delivery_preparation_time_minutes: number
+    collection_preparation_time_minutes: number
+  } | Array<{
+    name: string
+    delivery_preparation_time_minutes: number
+    collection_preparation_time_minutes: number
+  }> | null
 }
 
 type LiveStatus = 'connecting' | 'live' | 'offline'
@@ -70,7 +79,6 @@ type AlertNote = {
 }
 
 const activeStatuses = ['placed', 'accepted', 'preparing', 'ready', 'out_for_delivery']
-const preparationChoices = [15, 20, 30, 45]
 const soundStorageKey = 'ordered-food-restaurant-order-sound'
 const soundToneStorageKey = 'ordered-food-restaurant-order-sound-tone'
 const soundVolumeStorageKey = 'ordered-food-restaurant-order-sound-volume'
@@ -132,6 +140,10 @@ const time = new Intl.DateTimeFormat('en-GB', { hour: '2-digit', minute: '2-digi
 function restaurantName(value: RestaurantMembership['restaurants']) {
   if (Array.isArray(value)) return value[0]?.name ?? 'Restaurant'
   return value?.name ?? 'Restaurant'
+}
+
+function restaurantRecord(value: RestaurantMembership['restaurants']) {
+  return Array.isArray(value) ? value[0] ?? null : value
 }
 
 function modifierLines(item: OrderItem) {
@@ -208,6 +220,9 @@ export default function Orders() {
   const [alertTone, setAlertTone] = useState<AlertTone>(initialAlertTone)
   const [alertVolume, setAlertVolume] = useState(initialAlertVolume)
   const [choosingTimeFor, setChoosingTimeFor] = useState('')
+  const [customPreparationMinutes, setCustomPreparationMinutes] = useState('60')
+  const [deliveryDefaultMinutes, setDeliveryDefaultMinutes] = useState(30)
+  const [collectionDefaultMinutes, setCollectionDefaultMinutes] = useState(20)
   const [liveStatus, setLiveStatus] = useState<LiveStatus>('connecting')
   const soundEnabledRef = useRef(soundEnabled)
   const alertToneRef = useRef(alertTone)
@@ -278,6 +293,7 @@ export default function Orders() {
         created_at,
         paid_at,
         estimated_ready_at,
+        requested_fulfilment_at,
         order_items (
           id,
           item_name,
@@ -394,7 +410,7 @@ export default function Orders() {
 
         const { data: membership, error: membershipError } = await supabase
           .from('restaurant_members')
-          .select('restaurant_id, restaurants(name)')
+          .select('restaurant_id, restaurants(name,delivery_preparation_time_minutes,collection_preparation_time_minutes)')
           .eq('user_id', userData.user.id)
           .limit(1)
           .maybeSingle()
@@ -406,8 +422,11 @@ export default function Orders() {
         }
 
         const typedMembership = membership as RestaurantMembership
+        const selectedRestaurant = restaurantRecord(typedMembership.restaurants)
         setRestaurantId(typedMembership.restaurant_id)
         setRestaurant(restaurantName(typedMembership.restaurants))
+        setDeliveryDefaultMinutes(selectedRestaurant?.delivery_preparation_time_minutes ?? 30)
+        setCollectionDefaultMinutes(selectedRestaurant?.collection_preparation_time_minutes ?? 20)
         await loadOrders(typedMembership.restaurant_id, true)
 
         channel = supabase
@@ -456,7 +475,7 @@ export default function Orders() {
     }
   }, [loadOrders, restaurantId])
 
-  async function setOrderStatus(order: Order, orderStatus: string, preparationMinutes?: number) {
+  async function setOrderStatus(order: Order, orderStatus: string, preparationMinutes?: number, promisedAt?: string) {
     if (!restaurantId || updatingId) return
     if ((orderStatus === 'rejected' || orderStatus === 'cancelled') && !window.confirm(`Are you sure you want to ${orderStatus === 'rejected' ? 'reject' : 'cancel'} order #${order.order_number}?`)) return
 
@@ -467,7 +486,7 @@ export default function Orders() {
     const patch: Record<string, string | null> = { order_status: orderStatus }
     if (orderStatus === 'accepted') {
       patch.accepted_at = now
-      patch.estimated_ready_at = new Date(Date.now() + (preparationMinutes ?? 20) * 60_000).toISOString()
+      patch.estimated_ready_at = promisedAt ?? new Date(Date.now() + (preparationMinutes ?? 20) * 60_000).toISOString()
     }
     if (orderStatus === 'completed') patch.completed_at = now
     if (orderStatus === 'rejected' || orderStatus === 'cancelled') patch.cancelled_at = now
@@ -494,6 +513,10 @@ export default function Orders() {
   }
 
   function nextActions(order: Order) {
+    const defaultMinutes = order.fulfilment_method === 'delivery' ? deliveryDefaultMinutes : collectionDefaultMinutes
+    const preparationChoices = Array.from(new Set([defaultMinutes, 30, 45, 60, 90])).filter((minutes) => minutes >= 5 && minutes <= 480).sort((a, b) => a - b)
+    const customMinutes = Number.parseInt(customPreparationMinutes, 10)
+    const customMinutesValid = Number.isInteger(customMinutes) && customMinutes >= 5 && customMinutes <= 480
     switch (order.order_status) {
       case 'placed':
         return (
@@ -501,9 +524,16 @@ export default function Orders() {
             {choosingTimeFor === order.id ? (
               <div className="prep-time-picker">
                 <span>Ready in</span>
+                {order.requested_fulfilment_at && (
+                  <button className="requested-time-action" type="button" onClick={() => void setOrderStatus(order, 'accepted', undefined, order.requested_fulfilment_at!)} disabled={updatingId === order.id}>
+                    Accept for requested {time.format(new Date(order.requested_fulfilment_at))}
+                  </button>
+                )}
                 {preparationChoices.map((minutes) => (
                   <button key={minutes} type="button" onClick={() => void setOrderStatus(order, 'accepted', minutes)} disabled={updatingId === order.id}>{minutes} min</button>
                 ))}
+                <label className="custom-prep-time"><span>Custom</span><input aria-label="Custom preparation time in minutes" type="number" inputMode="numeric" min="5" max="480" step="1" value={customPreparationMinutes} onChange={(event) => setCustomPreparationMinutes(event.target.value)} /><span>min</span></label>
+                <button type="button" onClick={() => customMinutesValid && void setOrderStatus(order, 'accepted', customMinutes)} disabled={updatingId === order.id || !customMinutesValid}>Use custom time</button>
                 <button className="cancel" type="button" onClick={() => setChoosingTimeFor('')}>Cancel</button>
               </div>
             ) : (
@@ -617,6 +647,7 @@ export default function Orders() {
                   <span className="order-number">Order #{order.order_number}</span>
                   <strong>{order.customer_first_name} {order.customer_last_name}</strong>
                   <small>{time.format(new Date(order.created_at))} · {order.fulfilment_method}</small>
+                  {order.requested_fulfilment_at && <small className="requested-time">Customer requested {time.format(new Date(order.requested_fulfilment_at))}</small>}
                   {order.estimated_ready_at && activeStatuses.includes(order.order_status) && <small className="ready-time">Due {time.format(new Date(order.estimated_ready_at))}</small>}
                 </div>
                 <div className="order-card-total">

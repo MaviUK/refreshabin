@@ -25,6 +25,8 @@ type Restaurant = {
   delivery_fee_pence: number
   delivery_radius_miles: number | string
   preparation_time_minutes: number
+  delivery_preparation_time_minutes: number
+  collection_preparation_time_minutes: number
   logo_url: string | null
   cover_url: string | null
   onboarding_step: number | null
@@ -396,7 +398,8 @@ export default function Onboarding() {
   const [minimumOrder, setMinimumOrder] = useState('0.00')
   const [deliveryFee, setDeliveryFee] = useState('0.00')
   const [deliveryRadius, setDeliveryRadius] = useState('3')
-  const [preparationTime, setPreparationTime] = useState('25')
+  const [deliveryPreparationTime, setDeliveryPreparationTime] = useState('30')
+  const [collectionPreparationTime, setCollectionPreparationTime] = useState('20')
 
   const progress = useMemo(
     () => Math.round(((Math.min(step, STEP.submit) + 1) / stepLabels.length) * 100),
@@ -445,7 +448,7 @@ export default function Onboarding() {
       const [restaurantResult, locationResult, importResult, categoryResult, itemResult] = await Promise.all([
         supabase
           .from('restaurants')
-          .select('id,name,slug,status,cuisines,email,phone,accepts_delivery,accepts_collection,minimum_order_pence,delivery_fee_pence,delivery_radius_miles,preparation_time_minutes,logo_url,cover_url,onboarding_step,approval_notes')
+          .select('id,name,slug,status,cuisines,email,phone,accepts_delivery,accepts_collection,minimum_order_pence,delivery_fee_pence,delivery_radius_miles,preparation_time_minutes,delivery_preparation_time_minutes,collection_preparation_time_minutes,logo_url,cover_url,onboarding_step,approval_notes')
           .eq('id', restaurantId)
           .single(),
         supabase
@@ -486,7 +489,8 @@ export default function Onboarding() {
       setMinimumOrder(pounds(nextRestaurant.minimum_order_pence))
       setDeliveryFee(pounds(nextRestaurant.delivery_fee_pence))
       setDeliveryRadius(String(nextRestaurant.delivery_radius_miles ?? 3))
-      setPreparationTime(String(nextRestaurant.preparation_time_minutes ?? 25))
+      setDeliveryPreparationTime(String(nextRestaurant.delivery_preparation_time_minutes ?? nextRestaurant.preparation_time_minutes ?? 30))
+      setCollectionPreparationTime(String(nextRestaurant.collection_preparation_time_minutes ?? nextRestaurant.preparation_time_minutes ?? 20))
 
       const nextLocation = locationResult.data as Location | null
       setLocation(nextLocation)
@@ -646,7 +650,7 @@ export default function Onboarding() {
         const [restaurantResult, locationResult] = await Promise.all([
           supabase
             .from('restaurants')
-            .select('id,name,slug,status,cuisines,email,phone,accepts_delivery,accepts_collection,minimum_order_pence,delivery_fee_pence,delivery_radius_miles,preparation_time_minutes,logo_url,cover_url,onboarding_step,approval_notes')
+            .select('id,name,slug,status,cuisines,email,phone,accepts_delivery,accepts_collection,minimum_order_pence,delivery_fee_pence,delivery_radius_miles,preparation_time_minutes,delivery_preparation_time_minutes,collection_preparation_time_minutes,logo_url,cover_url,onboarding_step,approval_notes')
             .eq('id', id)
             .single(),
           supabase
@@ -722,9 +726,11 @@ export default function Onboarding() {
     if (!restaurant) return
     if (!acceptsDelivery && !acceptsCollection) return setError('Enable delivery, collection, or both.')
     const radius = Number.parseFloat(deliveryRadius)
-    const prep = Number.parseInt(preparationTime, 10)
+    const deliveryPrep = Number.parseInt(deliveryPreparationTime, 10)
+    const collectionPrep = Number.parseInt(collectionPreparationTime, 10)
     if (acceptsDelivery && (!Number.isFinite(radius) || radius <= 0)) return setError('Enter a valid delivery radius.')
-    if (!Number.isInteger(prep) || prep < 5 || prep > 240) return setError('Preparation time must be between 5 and 240 minutes.')
+    if (acceptsDelivery && (!Number.isInteger(deliveryPrep) || deliveryPrep < 5 || deliveryPrep > 480)) return setError('Default delivery time must be between 5 and 480 minutes.')
+    if (acceptsCollection && (!Number.isInteger(collectionPrep) || collectionPrep < 5 || collectionPrep > 480)) return setError('Default collection time must be between 5 and 480 minutes.')
     setSaving(true)
     try {
       const patch = {
@@ -733,7 +739,9 @@ export default function Onboarding() {
         minimum_order_pence: pence(minimumOrder),
         delivery_fee_pence: acceptsDelivery ? pence(deliveryFee) : 0,
         delivery_radius_miles: acceptsDelivery ? radius : 0,
-        preparation_time_minutes: prep,
+        preparation_time_minutes: acceptsDelivery ? deliveryPrep : collectionPrep,
+        delivery_preparation_time_minutes: deliveryPrep,
+        collection_preparation_time_minutes: collectionPrep,
         updated_at: new Date().toISOString(),
       }
       const { error: saveError } = await supabase.from('restaurants').update(patch).eq('id', restaurant.id)
@@ -1265,7 +1273,8 @@ export default function Onboarding() {
             </div>
             <div className="form-grid onboarding-money-grid">
               <label className="large-field">Minimum order (£)<input inputMode="decimal" value={minimumOrder} onChange={(event) => setMinimumOrder(event.target.value)} /></label>
-              <label className="large-field">Preparation time (minutes)<input type="number" min="5" max="240" value={preparationTime} onChange={(event) => setPreparationTime(event.target.value)} /></label>
+              {acceptsDelivery && <label className="large-field">Default delivery time (minutes)<input type="number" min="5" max="480" value={deliveryPreparationTime} onChange={(event) => setDeliveryPreparationTime(event.target.value)} /><span className="field-help">The earliest delivery time shown to customers.</span></label>}
+              {acceptsCollection && <label className="large-field">Default collection time (minutes)<input type="number" min="5" max="480" value={collectionPreparationTime} onChange={(event) => setCollectionPreparationTime(event.target.value)} /><span className="field-help">The earliest collection time shown to customers.</span></label>}
               {acceptsDelivery && <><label className="large-field">Delivery fee (£)<input inputMode="decimal" value={deliveryFee} onChange={(event) => setDeliveryFee(event.target.value)} /></label><label className="large-field">Delivery radius (miles)<input type="number" min="0.1" step="0.1" value={deliveryRadius} onChange={(event) => setDeliveryRadius(event.target.value)} /></label></>}
             </div>
             {error && <div className="form-error" role="alert">{error}</div>}

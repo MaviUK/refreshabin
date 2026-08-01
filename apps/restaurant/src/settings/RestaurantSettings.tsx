@@ -11,6 +11,8 @@ type RestaurantSettingsRecord = {
   delivery_fee_pence: number
   delivery_radius_miles: number | string
   preparation_time_minutes: number
+  delivery_preparation_time_minutes: number
+  collection_preparation_time_minutes: number
   free_delivery_threshold_pence: number | null
   vat_registered: boolean
   vat_number: string | null
@@ -23,7 +25,8 @@ type FormState = {
   minimumOrder: string
   deliveryFee: string
   deliveryRadius: string
-  preparationTime: string
+  deliveryPreparationTime: string
+  collectionPreparationTime: string
   freeDeliveryThreshold: string
   vatRegistered: boolean
   vatNumber: string
@@ -35,7 +38,8 @@ const emptyForm: FormState = {
   minimumOrder: '0.00',
   deliveryFee: '0.00',
   deliveryRadius: '3',
-  preparationTime: '25',
+  deliveryPreparationTime: '30',
+  collectionPreparationTime: '20',
   freeDeliveryThreshold: '',
   vatRegistered: false,
   vatNumber: '',
@@ -64,7 +68,8 @@ function settingsToForm(record: RestaurantSettingsRecord): FormState {
     minimumOrder: penceToPounds(record.minimum_order_pence),
     deliveryFee: penceToPounds(record.delivery_fee_pence),
     deliveryRadius: String(record.delivery_radius_miles),
-    preparationTime: String(record.preparation_time_minutes),
+    deliveryPreparationTime: String(record.delivery_preparation_time_minutes ?? record.preparation_time_minutes),
+    collectionPreparationTime: String(record.collection_preparation_time_minutes ?? record.preparation_time_minutes),
     freeDeliveryThreshold: penceToPounds(record.free_delivery_threshold_pence),
     vatRegistered: record.vat_registered,
     vatNumber: record.vat_number || '',
@@ -128,7 +133,7 @@ export default function RestaurantSettings() {
 
       const { data, error: settingsError } = await supabase
         .from('restaurants')
-        .select('id, name, accepts_delivery, accepts_collection, minimum_order_pence, delivery_fee_pence, delivery_radius_miles, preparation_time_minutes, free_delivery_threshold_pence, vat_registered, vat_number, updated_at')
+        .select('id, name, accepts_delivery, accepts_collection, minimum_order_pence, delivery_fee_pence, delivery_radius_miles, preparation_time_minutes, delivery_preparation_time_minutes, collection_preparation_time_minutes, free_delivery_threshold_pence, vat_registered, vat_number, updated_at')
         .eq('id', membership.restaurant_id)
         .single()
 
@@ -177,11 +182,17 @@ export default function RestaurantSettings() {
       return
     }
 
-    const preparationTime = Number.parseInt(form.preparationTime, 10)
+    const deliveryPreparationTime = Number.parseInt(form.deliveryPreparationTime, 10)
+    const collectionPreparationTime = Number.parseInt(form.collectionPreparationTime, 10)
     const deliveryRadius = Number.parseFloat(form.deliveryRadius)
 
-    if (!Number.isInteger(preparationTime) || preparationTime < 5 || preparationTime > 240) {
-      setError('Preparation time must be a whole number between 5 and 240 minutes.')
+    if (form.acceptsDelivery && (!Number.isInteger(deliveryPreparationTime) || deliveryPreparationTime < 5 || deliveryPreparationTime > 480)) {
+      setError('Default delivery time must be a whole number between 5 and 480 minutes.')
+      return
+    }
+
+    if (form.acceptsCollection && (!Number.isInteger(collectionPreparationTime) || collectionPreparationTime < 5 || collectionPreparationTime > 480)) {
+      setError('Default collection time must be a whole number between 5 and 480 minutes.')
       return
     }
 
@@ -219,7 +230,9 @@ export default function RestaurantSettings() {
           minimum_order_pence: minimumOrderPence,
           delivery_fee_pence: form.acceptsDelivery ? deliveryFeePence : 0,
           delivery_radius_miles: form.acceptsDelivery ? deliveryRadius : 0,
-          preparation_time_minutes: preparationTime,
+          preparation_time_minutes: form.acceptsDelivery ? deliveryPreparationTime : collectionPreparationTime,
+          delivery_preparation_time_minutes: deliveryPreparationTime,
+          collection_preparation_time_minutes: collectionPreparationTime,
           free_delivery_threshold_pence: form.acceptsDelivery ? freeDeliveryPence : null,
           vat_registered: form.vatRegistered,
           vat_number: form.vatRegistered ? vatNumber : null,
@@ -318,7 +331,8 @@ export default function RestaurantSettings() {
             <div className="settings-card-heading"><div><h2>Pricing and fulfilment</h2><p>These values appear throughout the customer checkout.</p></div></div>
             <div className="settings-field-grid">
               <label className="settings-field"><span>Minimum order</span><div className="input-prefix"><span>£</span><input inputMode="decimal" value={form.minimumOrder} onChange={(event) => updateForm('minimumOrder', event.target.value)} /></div></label>
-              <label className="settings-field"><span>Preparation time</span><div className="input-suffix"><input type="number" min="5" max="240" step="1" value={form.preparationTime} onChange={(event) => updateForm('preparationTime', event.target.value)} /><span>minutes</span></div></label>
+              <label className="settings-field"><span>Default delivery time</span><div className="input-suffix"><input type="number" min="5" max="480" step="1" value={form.deliveryPreparationTime} onChange={(event) => updateForm('deliveryPreparationTime', event.target.value)} disabled={!form.acceptsDelivery} /><span>minutes</span></div><small>Earliest delivery customers can request.</small></label>
+              <label className="settings-field"><span>Default collection time</span><div className="input-suffix"><input type="number" min="5" max="480" step="1" value={form.collectionPreparationTime} onChange={(event) => updateForm('collectionPreparationTime', event.target.value)} disabled={!form.acceptsCollection} /><span>minutes</span></div><small>Earliest collection customers can request.</small></label>
               <label className="settings-field"><span>Delivery fee</span><div className="input-prefix"><span>£</span><input inputMode="decimal" value={form.deliveryFee} onChange={(event) => updateForm('deliveryFee', event.target.value)} disabled={!form.acceptsDelivery} /></div></label>
               <label className="settings-field"><span>Delivery radius</span><div className="input-suffix"><input type="number" min="0.1" max="100" step="0.1" value={form.deliveryRadius} onChange={(event) => updateForm('deliveryRadius', event.target.value)} disabled={!form.acceptsDelivery} /><span>miles</span></div></label>
               <label className="settings-field settings-field-wide"><span>Free delivery threshold <small>Optional</small></span><div className="input-prefix"><span>£</span><input inputMode="decimal" placeholder="Leave blank to disable" value={form.freeDeliveryThreshold} onChange={(event) => updateForm('freeDeliveryThreshold', event.target.value)} disabled={!form.acceptsDelivery} /></div></label>
@@ -339,7 +353,8 @@ export default function RestaurantSettings() {
           <div className="summary-service-list">
             {form.acceptsDelivery && <div><strong>Delivery</strong><span>{moneyPattern.test(form.deliveryFee) && poundsToPence(form.deliveryFee) === 0 ? 'Free' : `£${form.deliveryFee || '0.00'}`} · {form.deliveryRadius || '0'} miles</span></div>}
             {form.acceptsCollection && <div><strong>Collection</strong><span>Available</span></div>}
-            <div><strong>Ready in</strong><span>{form.preparationTime || '0'} minutes</span></div>
+            {form.acceptsDelivery && <div><strong>Delivery</strong><span>From {form.deliveryPreparationTime || '0'} minutes</span></div>}
+            {form.acceptsCollection && <div><strong>Collection</strong><span>From {form.collectionPreparationTime || '0'} minutes</span></div>}
             <div><strong>Minimum order</strong><span>£{form.minimumOrder || '0.00'}</span></div>
           </div>
           {form.acceptsDelivery && form.freeDeliveryThreshold && <div className="summary-highlight">Free delivery on orders over £{form.freeDeliveryThreshold}</div>}
