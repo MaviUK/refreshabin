@@ -9,6 +9,14 @@ type Restaurant = {
   status: string
   email: string | null
   phone: string | null
+  accepting_orders: boolean
+}
+
+type OpeningHours = {
+  day_of_week: number
+  is_closed: boolean
+  open_time: string | null
+  close_time: string | null
 }
 
 type DashboardStats = {
@@ -58,6 +66,8 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [error, setError] = useState('')
+  const [openingHours, setOpeningHours] = useState<OpeningHours[]>([])
+  const [availabilityBusy, setAvailabilityBusy] = useState(false)
 
   const loadDashboard = useCallback(async (silent = false) => {
     if (!silent) setRefreshing(true)
@@ -72,7 +82,7 @@ export default function Dashboard() {
 
       const { data: membership, error: membershipError } = await supabase
         .from('restaurant_members')
-        .select('restaurant_id, restaurants(id,name,slug,status,email,phone)')
+        .select('restaurant_id, restaurants(id,name,slug,status,email,phone,accepting_orders)')
         .eq('user_id', userData.user.id)
         .limit(1)
         .maybeSingle()
@@ -127,12 +137,15 @@ export default function Dashboard() {
       const locationId = locationResult.data?.id
       let openingHoursCount = 0
       if (locationId) {
-        const { count, error: openingError } = await supabase
+        const { data: hours, count, error: openingError } = await supabase
           .from('opening_hours')
-          .select('id', { count: 'exact', head: true })
+          .select('day_of_week,is_closed,open_time,close_time', { count: 'exact' })
           .eq('location_id', locationId)
         if (openingError) throw openingError
         openingHoursCount = count ?? 0
+        setOpeningHours((hours ?? []) as OpeningHours[])
+      } else {
+        setOpeningHours([])
       }
 
       const paidOrders = (todayOrdersResult.data ?? []).filter((order) => !['pending', 'pending_payment', 'unpaid', 'failed'].includes(order.payment_status))
@@ -182,6 +195,47 @@ export default function Dashboard() {
   const progress = Math.round((completeCount / setupSteps.length) * 100)
   const isLive = restaurant?.status === 'approved' || restaurant?.status === 'active'
 
+  const isOpenNow = useMemo(() => {
+    const today = openingHours.find((entry) => entry.day_of_week === new Date().getDay())
+    if (!today || today.is_closed || !today.open_time || !today.close_time) return false
+    const now = new Date()
+    const minutes = now.getHours() * 60 + now.getMinutes()
+    const toMinutes = (value: string) => {
+      const parts = value.slice(0, 5).split(':').map(Number)
+      return (parts[0] ?? 0) * 60 + (parts[1] ?? 0)
+    }
+    const opens = toMinutes(today.open_time)
+    const closes = toMinutes(today.close_time)
+    return closes > opens ? minutes >= opens && minutes < closes : minutes >= opens || minutes < closes
+  }, [openingHours])
+
+  const availability = !isLive
+    ? { tone: 'pending', label: 'Awaiting approval', detail: 'Your storefront is not public yet.' }
+    : !restaurant?.accepting_orders
+      ? { tone: 'offline', label: 'Offline', detail: 'Your storefront is visible, but new orders are paused.' }
+      : isOpenNow
+        ? { tone: 'live', label: 'Live and accepting orders', detail: 'Customers can view your menu and place orders now.' }
+        : { tone: 'closed', label: 'Live but currently closed', detail: 'Your storefront is visible and will accept orders during opening hours.' }
+
+  async function toggleAcceptingOrders() {
+    if (!restaurant || !isLive || availabilityBusy) return
+    const nextValue = !restaurant.accepting_orders
+    setAvailabilityBusy(true)
+    setError('')
+    const { data, error: updateError } = await supabase
+      .from('restaurants')
+      .update({ accepting_orders: nextValue, updated_at: new Date().toISOString() })
+      .eq('id', restaurant.id)
+      .select('accepting_orders')
+      .maybeSingle()
+    if (updateError || !data) {
+      setError(updateError?.message || 'Your order availability could not be changed.')
+    } else {
+      setRestaurant((current) => current ? { ...current, accepting_orders: data.accepting_orders } : current)
+    }
+    setAvailabilityBusy(false)
+  }
+
   async function signOut() {
     await supabase.auth.signOut()
     navigate('/login', { replace: true })
@@ -213,10 +267,25 @@ export default function Dashboard() {
 
       {error && <p className="orders-error" role="alert">{error}</p>}
 
+      <section className={`restaurant-live-card restaurant-live-card--${availability.tone}`} aria-live="polite">
+        <div className="restaurant-live-copy">
+          <span className="restaurant-live-indicator" aria-hidden="true" />
+          <div><span className="eyebrow">Storefront status</span><h2>{availability.label}</h2><p>{availability.detail}</p></div>
+        </div>
+        <div className="restaurant-live-actions">
+          {isLive && <a className="secondary-button button-link" href={`/r/${restaurant?.slug}`} target="_blank" rel="noreferrer">View live storefront</a>}
+          <label className="availability-switch">
+            <span><strong>Accepting orders</strong><small>{restaurant?.accepting_orders ? 'On' : 'Off'}</small></span>
+            <input type="checkbox" checked={Boolean(restaurant?.accepting_orders)} onChange={() => void toggleAcceptingOrders()} disabled={!isLive || availabilityBusy} />
+            <i aria-hidden="true" />
+          </label>
+        </div>
+      </section>
+
       <section className="metrics-grid" aria-label="Restaurant summary">
         <article className="metric-card">
           <span>Restaurant status</span>
-          <strong className="status-value"><i className="status-dot" /> {isLive ? 'Live' : restaurant?.status?.replaceAll('_', ' ') || 'Setup mode'}</strong>
+          <strong className="status-value"><i className="status-dot" /> {availability.label}</strong>
         </article>
         <article className="metric-card"><span>Today's orders</span><strong>{stats.todayOrders}</strong></article>
         <article className="metric-card"><span>Open orders</span><strong>{stats.openOrders}</strong></article>
