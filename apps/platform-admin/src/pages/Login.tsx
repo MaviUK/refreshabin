@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react'
-import { useLocation, useNavigate } from 'react-router-dom'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 
 type Mode = 'sign-in' | 'activate'
@@ -13,7 +13,7 @@ export default function Login() {
   const [loading, setLoading] = useState(false)
   const navigate = useNavigate()
   const location = useLocation()
-  const state = location.state as { from?: string; accessDenied?: boolean } | null
+  const state = location.state as { from?: string; accessDenied?: boolean; passwordReset?: boolean } | null
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -82,10 +82,12 @@ export default function Login() {
           </div>
 
           {state?.accessDenied && !error && <div className="admin-alert error">Your account does not have platform-admin access.</div>}
+          {state?.passwordReset && !error && <div className="admin-alert success" role="status">Your password has been changed. Sign in with your new password.</div>}
 
           <form className="admin-auth-form" onSubmit={submit}>
             <label>Email address<input type="email" value={email} onChange={(event) => setEmail(event.target.value)} autoComplete="email" required /></label>
             <label>Password<input type="password" minLength={8} value={password} onChange={(event) => setPassword(event.target.value)} autoComplete={mode === 'sign-in' ? 'current-password' : 'new-password'} required /></label>
+            {mode === 'sign-in' && <div className="admin-auth-link-row"><Link to="/forgot-password">Forgot password?</Link></div>}
             {error && <div className="admin-alert error" role="alert">{error}</div>}
             {message && <div className="admin-alert success" role="status">{message}</div>}
             <button className="admin-primary-button" type="submit" disabled={loading}>{loading ? 'Please wait…' : mode === 'sign-in' ? 'Sign in securely' : 'Create admin account'}</button>

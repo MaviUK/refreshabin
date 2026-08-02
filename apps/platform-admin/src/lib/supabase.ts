@@ -1,5 +1,9 @@
 import { createClient } from '@supabase/supabase-js'
 
+export const hasPasswordRecoveryParams =
+  window.location.hash.includes('type=recovery') ||
+  new URLSearchParams(window.location.search).get('type') === 'recovery'
+
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
 
