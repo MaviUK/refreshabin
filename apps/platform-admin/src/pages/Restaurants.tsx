@@ -403,8 +403,8 @@ function MenuManager({ restaurant, menu, loading, canManage, reload }: { restaur
       {!menu.categories.length && <div className="panel-empty"><strong>No menu yet</strong><span>Add a category to start building this restaurant’s menu.</span></div>}
     </div>
 
-    {canManage && menu.categories.length > 0 && <form className="admin-menu-item-form" onSubmit={(event) => void saveItem(event)}>
-      <div><span className="admin-kicker">{itemDraft.id ? 'Edit menu item' : 'New menu item'}</span><h3>{itemDraft.id ? `Update ${itemDraft.name}` : 'Add an item'}</h3></div>
+    {canManage && menu.categories.length > 0 && !itemDraft.id && <form className="admin-menu-item-form" onSubmit={(event) => void saveItem(event)}>
+      <div><span className="admin-kicker">New menu item</span><h3>Add an item</h3></div>
       <div className="admin-menu-form-grid">
         <label>Category<select value={itemDraft.categoryId} onChange={(event) => setItemDraft({ ...itemDraft, categoryId: event.target.value })}>{menu.categories.map((category) => <option value={category.id} key={category.id}>{category.name}</option>)}</select></label>
         <label>Item name<input maxLength={160} value={itemDraft.name} onChange={(event) => setItemDraft({ ...itemDraft, name: event.target.value })} required /></label>
@@ -413,21 +413,40 @@ function MenuManager({ restaurant, menu, loading, canManage, reload }: { restaur
         <label className="wide">Reason<input maxLength={500} value={itemDraft.reason} onChange={(event) => setItemDraft({ ...itemDraft, reason: event.target.value })} placeholder="Why are you making this change?" required /></label>
       </div>
       <div className="admin-menu-dietary"><label><input type="checkbox" checked={itemDraft.isVegetarian} onChange={(event) => setItemDraft({ ...itemDraft, isVegetarian: event.target.checked })} /> Vegetarian</label><label><input type="checkbox" checked={itemDraft.isVegan} onChange={(event) => setItemDraft({ ...itemDraft, isVegan: event.target.checked, isVegetarian: event.target.checked || itemDraft.isVegetarian })} /> Vegan</label></div>
-      <div className="confirmation-buttons">{itemDraft.id && <button type="button" className="secondary-button" onClick={() => setItemDraft(emptyItemDraft(menu.categories[0]?.id || ''))}>Cancel</button>}<button type="submit" className="admin-primary-button" disabled={saving}>{saving ? 'Saving…' : itemDraft.id ? 'Save item' : 'Add item'}</button></div>
+      <div className="confirmation-buttons"><button type="submit" className="admin-primary-button" disabled={saving}>{saving ? 'Saving…' : 'Add item'}</button></div>
     </form>}
 
-    {editingCategory && <form className="admin-menu-dialog" onSubmit={(event) => void saveCategory(event)}>
-      <div><span className="admin-kicker">Edit category</span><h3>{editingCategory.name}</h3></div>
-      <label>Name<input maxLength={120} value={categoryDraft.name} onChange={(event) => setCategoryDraft({ ...categoryDraft, name: event.target.value })} required /></label>
-      <label>Description<textarea maxLength={500} rows={3} value={categoryDraft.description} onChange={(event) => setCategoryDraft({ ...categoryDraft, description: event.target.value })} /></label>
-      <label>Reason<input maxLength={500} value={categoryDraft.reason} onChange={(event) => setCategoryDraft({ ...categoryDraft, reason: event.target.value })} required /></label>
-      <div className="confirmation-buttons"><button type="button" className="secondary-button" onClick={() => setEditingCategory(null)}>Cancel</button><button type="submit" className="admin-primary-button" disabled={saving}>Save category</button></div>
-    </form>}
+    {itemDraft.id && <div className="admin-modal-backdrop" role="presentation" onMouseDown={() => { if (!saving) setItemDraft(emptyItemDraft(menu.categories[0]?.id || '')) }}>
+      <form className="admin-modal admin-menu-item-form admin-menu-edit-modal" role="dialog" aria-modal="true" aria-labelledby="menu-item-edit-heading" onMouseDown={(event) => event.stopPropagation()} onSubmit={(event) => void saveItem(event)}>
+        <div className="modal-heading"><div><span className="admin-kicker">Edit menu item</span><h2 id="menu-item-edit-heading">Update {itemDraft.name}</h2></div><button type="button" aria-label="Close" disabled={saving} onClick={() => setItemDraft(emptyItemDraft(menu.categories[0]?.id || ''))}>×</button></div>
+        <div className="admin-menu-form-grid">
+          <label>Category<select value={itemDraft.categoryId} onChange={(event) => setItemDraft({ ...itemDraft, categoryId: event.target.value })}>{menu.categories.map((category) => <option value={category.id} key={category.id}>{category.name}</option>)}</select></label>
+          <label>Item name<input autoFocus maxLength={160} value={itemDraft.name} onChange={(event) => setItemDraft({ ...itemDraft, name: event.target.value })} required /></label>
+          <label>Price (£)<input inputMode="decimal" value={itemDraft.price} onChange={(event) => setItemDraft({ ...itemDraft, price: event.target.value })} placeholder="6.50" required /></label>
+          <label className="wide">Description<textarea maxLength={1000} rows={2} value={itemDraft.description} onChange={(event) => setItemDraft({ ...itemDraft, description: event.target.value })} /></label>
+          <label className="wide">Reason<input maxLength={500} value={itemDraft.reason} onChange={(event) => setItemDraft({ ...itemDraft, reason: event.target.value })} placeholder="Why are you making this change?" required /></label>
+        </div>
+        <div className="admin-menu-dietary"><label><input type="checkbox" checked={itemDraft.isVegetarian} onChange={(event) => setItemDraft({ ...itemDraft, isVegetarian: event.target.checked })} /> Vegetarian</label><label><input type="checkbox" checked={itemDraft.isVegan} onChange={(event) => setItemDraft({ ...itemDraft, isVegan: event.target.checked, isVegetarian: event.target.checked || itemDraft.isVegetarian })} /> Vegan</label></div>
+        <div className="confirmation-buttons"><button type="button" className="secondary-button" disabled={saving} onClick={() => setItemDraft(emptyItemDraft(menu.categories[0]?.id || ''))}>Cancel</button><button type="submit" className="admin-primary-button" disabled={saving}>{saving ? 'Saving…' : 'Save item'}</button></div>
+      </form>
+    </div>}
 
-    {pending && <div className="admin-menu-dialog">
-      <div><span className="admin-kicker">Confirm menu change</span><h3>{pending.title}</h3><p>{pending.description}</p></div>
-      <label>Reason<textarea maxLength={500} rows={3} value={pendingReason} onChange={(event) => setPendingReason(event.target.value)} placeholder="Required for the audit trail…" required /></label>
-      <div className="confirmation-buttons"><button type="button" className="secondary-button" onClick={() => { setPending(null); setPendingReason('') }}>Cancel</button><button type="button" className={pending.action.endsWith('delete') ? 'danger-button' : 'admin-primary-button'} disabled={saving} onClick={() => void confirmPending()}>{saving ? 'Saving…' : 'Confirm'}</button></div>
+    {editingCategory && <div className="admin-modal-backdrop" role="presentation" onMouseDown={() => { if (!saving) setEditingCategory(null) }}>
+      <form className="admin-modal admin-menu-dialog admin-menu-edit-modal" role="dialog" aria-modal="true" aria-labelledby="menu-category-edit-heading" onMouseDown={(event) => event.stopPropagation()} onSubmit={(event) => void saveCategory(event)}>
+        <div className="modal-heading"><div><span className="admin-kicker">Edit category</span><h2 id="menu-category-edit-heading">{editingCategory.name}</h2></div><button type="button" aria-label="Close" disabled={saving} onClick={() => setEditingCategory(null)}>×</button></div>
+        <label>Name<input autoFocus maxLength={120} value={categoryDraft.name} onChange={(event) => setCategoryDraft({ ...categoryDraft, name: event.target.value })} required /></label>
+        <label>Description<textarea maxLength={500} rows={3} value={categoryDraft.description} onChange={(event) => setCategoryDraft({ ...categoryDraft, description: event.target.value })} /></label>
+        <label>Reason<input maxLength={500} value={categoryDraft.reason} onChange={(event) => setCategoryDraft({ ...categoryDraft, reason: event.target.value })} required /></label>
+        <div className="confirmation-buttons"><button type="button" className="secondary-button" disabled={saving} onClick={() => setEditingCategory(null)}>Cancel</button><button type="submit" className="admin-primary-button" disabled={saving}>{saving ? 'Saving…' : 'Save category'}</button></div>
+      </form>
+    </div>}
+
+    {pending && <div className="admin-modal-backdrop" role="presentation" onMouseDown={() => { if (!saving) { setPending(null); setPendingReason('') } }}>
+      <section className="admin-modal admin-menu-dialog admin-menu-edit-modal" role="dialog" aria-modal="true" aria-labelledby="menu-change-heading" onMouseDown={(event) => event.stopPropagation()}>
+        <div className="modal-heading"><div><span className="admin-kicker">Confirm menu change</span><h2 id="menu-change-heading">{pending.title}</h2><p>{pending.description}</p></div><button type="button" aria-label="Close" disabled={saving} onClick={() => { setPending(null); setPendingReason('') }}>×</button></div>
+        <label>Reason<textarea autoFocus maxLength={500} rows={3} value={pendingReason} onChange={(event) => setPendingReason(event.target.value)} placeholder="Required for the audit trail…" required /></label>
+        <div className="confirmation-buttons"><button type="button" className="secondary-button" disabled={saving} onClick={() => { setPending(null); setPendingReason('') }}>Cancel</button><button type="button" className={pending.action.endsWith('delete') ? 'danger-button' : 'admin-primary-button'} disabled={saving} onClick={() => void confirmPending()}>{saving ? 'Saving…' : 'Confirm'}</button></div>
+      </section>
     </div>}
   </div>
 }
