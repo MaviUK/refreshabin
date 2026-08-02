@@ -45,6 +45,7 @@ type Order = {
   delivery_instructions: string | null
   subtotal_pence: number
   delivery_fee_pence: number
+  service_fee_pence: number
   discount_pence: number
   total_pence: number
   payment_status: string
@@ -286,6 +287,7 @@ export default function Orders() {
         delivery_instructions,
         subtotal_pence,
         delivery_fee_pence,
+        service_fee_pence,
         discount_pence,
         total_pence,
         payment_status,
@@ -669,6 +671,7 @@ export default function Orders() {
                 ))}
                 {order.discount_pence > 0 && <div><span>Discount</span><strong>−{money.format(order.discount_pence / 100)}</strong></div>}
                 {order.delivery_fee_pence > 0 && <div><span>Delivery fee</span><strong>{money.format(order.delivery_fee_pence / 100)}</strong></div>}
+                {order.service_fee_pence > 0 && <div><span>Service fee</span><strong>{money.format(order.service_fee_pence / 100)}</strong></div>}
               </div>
 
               <div className="order-details">

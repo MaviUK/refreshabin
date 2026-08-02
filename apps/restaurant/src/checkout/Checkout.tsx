@@ -17,10 +17,12 @@ type Restaurant = {
   minimum_order_pence: number | null; delivery_fee_pence: number | null
   free_delivery_threshold_pence: number | null; preparation_time_minutes: number | null
   delivery_preparation_time_minutes?: number | null; collection_preparation_time_minutes?: number | null
+  service_fee_pence?: number | null
 }
 type FulfilmentSettings = {
   delivery_preparation_time_minutes: number
   collection_preparation_time_minutes: number
+  service_fee_pence: number
 }
 type StorefrontData = { restaurant: Restaurant }
 type FulfilmentMethod = 'delivery' | 'collection'
@@ -28,6 +30,7 @@ type AccountMode = 'create' | 'signin'
 type CreatedOrder = {
   order_id: string; order_number: number; restaurant_name: string; subtotal_pence: number
   delivery_fee_pence: number; total_pence: number; currency: string; payment_status: string; order_status: string
+  service_fee_pence: number
 }
 type CheckoutSessionResponse = { checkout_url?: string; session_id?: string; error?: string }
 type CustomerProfile = {
@@ -170,7 +173,8 @@ export default function Checkout() {
     if (restaurant.free_delivery_threshold_pence && subtotal >= restaurant.free_delivery_threshold_pence) return 0
     return restaurant.delivery_fee_pence ?? 0
   }, [method, restaurant, subtotal])
-  const total = subtotal + deliveryFee
+  const serviceFee = restaurant?.service_fee_pence ?? 0
+  const total = subtotal + deliveryFee + serviceFee
   const minimumShortfall = Math.max((restaurant?.minimum_order_pence ?? 0) - subtotal, 0)
   const defaultMinutes = method === 'delivery'
     ? restaurant?.delivery_preparation_time_minutes ?? restaurant?.preparation_time_minutes ?? 30
@@ -334,7 +338,7 @@ export default function Checkout() {
           <section className="checkout-card checkout-payment-placeholder"><span className="checkout-step">{paymentStep}</span><div className="checkout-section-heading"><h2>Payment</h2><p>You will be transferred to Stripe for secure card, Apple Pay or Google Pay payment.</p></div><div className="payment-placeholder">{createdOrder ? `Order #${createdOrder.order_number} is opening secure payment` : 'Payment details are entered securely on Stripe'}</div></section>
           {submitted && minimumShortfall > 0 && <p className="checkout-error">Add {money.format(minimumShortfall / 100)} more to meet the minimum order.</p>}{error && <p className="checkout-error">{error}</p>}{message && <p className="checkout-message">{message}</p>}<button className="checkout-submit" type="submit" disabled={minimumShortfall > 0 || submitting || Boolean(createdOrder)}>{submitting ? 'Opening secure payment…' : createdOrder ? `Order #${createdOrder.order_number} created` : `Pay securely · ${money.format(total / 100)}`}</button>
         </form>
-        <aside className="checkout-summary"><span>Your order from</span><h2>{restaurant.name}</h2><div className="checkout-summary-lines">{basketLines.map((line) => <div key={line.line_id || line.id}><span>{line.quantity} × {line.name}{line.removed_ingredients?.map((ingredient) => <small key={ingredient.id}>No {ingredient.name}</small>)}{line.selected_extras?.map((extra) => <small key={extra.id}>+ {extra.quantity > 1 ? `${extra.quantity} × ` : ''}{extra.name}</small>)}{line.selected_modifier_groups?.flatMap((group) => group.options.map((option) => <small key={`${group.group_id}-${option.id}`}>{group.group_name}: {option.quantity > 1 ? `${option.quantity} × ` : ''}{option.name}</small>))}{line.special_instructions && <small>Note: {line.special_instructions}</small>}</span><strong>{money.format(((line.unit_price_pence ?? line.price_pence) * line.quantity) / 100)}</strong></div>)}</div><div className="checkout-summary-costs"><div><span>Subtotal</span><strong>{money.format((createdOrder?.subtotal_pence ?? subtotal) / 100)}</strong></div>{method === 'delivery' && <div><span>Delivery</span><strong>{(createdOrder?.delivery_fee_pence ?? deliveryFee) ? money.format((createdOrder?.delivery_fee_pence ?? deliveryFee) / 100) : 'Free'}</strong></div>}<div className="checkout-summary-total"><span>Total</span><strong>{money.format((createdOrder?.total_pence ?? total) / 100)}</strong></div></div><p>{timingChoice === 'later' && requestedDate ? `Requested ${method}: ${dateTime.format(requestedDate)}` : `Estimated ${method}: ${defaultMinutes} minutes`}</p></aside>
+        <aside className="checkout-summary"><span>Your order from</span><h2>{restaurant.name}</h2><div className="checkout-summary-lines">{basketLines.map((line) => <div key={line.line_id || line.id}><span>{line.quantity} × {line.name}{line.removed_ingredients?.map((ingredient) => <small key={ingredient.id}>No {ingredient.name}</small>)}{line.selected_extras?.map((extra) => <small key={extra.id}>+ {extra.quantity > 1 ? `${extra.quantity} × ` : ''}{extra.name}</small>)}{line.selected_modifier_groups?.flatMap((group) => group.options.map((option) => <small key={`${group.group_id}-${option.id}`}>{group.group_name}: {option.quantity > 1 ? `${option.quantity} × ` : ''}{option.name}</small>))}{line.special_instructions && <small>Note: {line.special_instructions}</small>}</span><strong>{money.format(((line.unit_price_pence ?? line.price_pence) * line.quantity) / 100)}</strong></div>)}</div><div className="checkout-summary-costs"><div><span>Subtotal</span><strong>{money.format((createdOrder?.subtotal_pence ?? subtotal) / 100)}</strong></div>{method === 'delivery' && <div><span>Delivery</span><strong>{(createdOrder?.delivery_fee_pence ?? deliveryFee) ? money.format((createdOrder?.delivery_fee_pence ?? deliveryFee) / 100) : 'Free'}</strong></div>}{(createdOrder?.service_fee_pence ?? serviceFee) > 0 && <div><span>Service fee</span><strong>{money.format((createdOrder?.service_fee_pence ?? serviceFee) / 100)}</strong></div>}<div className="checkout-summary-total"><span>Total</span><strong>{money.format((createdOrder?.total_pence ?? total) / 100)}</strong></div></div><p>{timingChoice === 'later' && requestedDate ? `Requested ${method}: ${dateTime.format(requestedDate)}` : `Estimated ${method}: ${defaultMinutes} minutes`}</p></aside>
       </div>
     </main>
   )

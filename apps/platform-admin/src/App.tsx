@@ -6,6 +6,7 @@ import { supabase } from './lib/supabase'
 import Admins from './pages/Admins'
 import AuditLog from './pages/AuditLog'
 import ForgotPassword from './pages/ForgotPassword'
+import Fees from './pages/Fees'
 import Login from './pages/Login'
 import Orders from './pages/Orders'
 import Overview from './pages/Overview'
@@ -38,6 +39,7 @@ export default function App() {
           <Route index element={<Overview />} />
           <Route path="restaurants" element={<PermissionRoute permission="restaurants:view"><Restaurants /></PermissionRoute>} />
           <Route path="orders" element={<PermissionRoute permission="orders:view"><Orders /></PermissionRoute>} />
+          <Route path="fees" element={<PermissionRoute permission="finance:view"><Fees /></PermissionRoute>} />
           <Route path="admins" element={<PermissionRoute permission="admins:view"><Admins /></PermissionRoute>} />
           <Route path="audit" element={<PermissionRoute permission="audit:view"><AuditLog /></PermissionRoute>} />
         </Route>

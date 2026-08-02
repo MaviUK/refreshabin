@@ -46,6 +46,7 @@ Deno.serve(async (request) => {
         total_pence,
         currency,
         delivery_fee_pence,
+        service_fee_pence,
         stripe_checkout_session_id,
         restaurants!inner(name, slug),
         order_items(id, item_name, unit_price_pence, quantity)
@@ -90,6 +91,17 @@ Deno.serve(async (request) => {
           currency: order.currency,
           unit_amount: order.delivery_fee_pence,
           product_data: { name: 'Delivery fee' },
+        },
+      })
+    }
+
+    if (order.service_fee_pence > 0) {
+      lineItems.push({
+        quantity: 1,
+        price_data: {
+          currency: order.currency,
+          unit_amount: order.service_fee_pence,
+          product_data: { name: 'ordered.food service fee' },
         },
       })
     }

@@ -29,6 +29,7 @@ type OrderStatusData = {
     postcode: string | null
     subtotal_pence: number
     delivery_fee_pence: number
+    service_fee_pence: number
     discount_pence: number
     total_pence: number
     payment_status: string
@@ -141,7 +142,7 @@ export default function OrderStatus() {
             {item.customer_notes && <small>Note: {item.customer_notes}</small>}
           </div><strong>{money.format(((item.line_total_pence ?? item.unit_price_pence * item.quantity) || 0) / 100)}</strong></div>)}
         </div>
-        <div className="order-copy-costs"><div><span>Subtotal</span><strong>{money.format(order.subtotal_pence / 100)}</strong></div>{order.delivery_fee_pence > 0 && <div><span>Delivery</span><strong>{money.format(order.delivery_fee_pence / 100)}</strong></div>}{order.discount_pence > 0 && <div><span>Discount</span><strong>−{money.format(order.discount_pence / 100)}</strong></div>}<div className="order-copy-total"><span>Total paid</span><strong>{money.format(order.total_pence / 100)}</strong></div></div>
+        <div className="order-copy-costs"><div><span>Subtotal</span><strong>{money.format(order.subtotal_pence / 100)}</strong></div>{order.delivery_fee_pence > 0 && <div><span>Delivery</span><strong>{money.format(order.delivery_fee_pence / 100)}</strong></div>}{order.service_fee_pence > 0 && <div><span>Service fee</span><strong>{money.format(order.service_fee_pence / 100)}</strong></div>}{order.discount_pence > 0 && <div><span>Discount</span><strong>−{money.format(order.discount_pence / 100)}</strong></div>}<div className="order-copy-total"><span>Total paid</span><strong>{money.format(order.total_pence / 100)}</strong></div></div>
       </section>
 
       <section className="order-status-card">

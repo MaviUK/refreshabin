@@ -41,6 +41,7 @@ type Order = {
   delivery_instructions: string | null
   subtotal_pence: number
   delivery_fee_pence: number
+  service_fee_pence: number
   discount_pence: number
   total_pence: number
   paid_at: string | null
@@ -115,6 +116,7 @@ function formatTicket(order: Order) {
   lines.push('-'.repeat(42))
   lines.push(`Subtotal: ${money(order.subtotal_pence)}`)
   if (order.delivery_fee_pence) lines.push(`Delivery: ${money(order.delivery_fee_pence)}`)
+  if (order.service_fee_pence) lines.push(`Service fee: ${money(order.service_fee_pence)}`)
   if (order.discount_pence) lines.push(`Discount: -${money(order.discount_pence)}`)
   lines.push(`TOTAL: ${money(order.total_pence)}`)
   lines.push('', '', '')
@@ -172,6 +174,7 @@ async function fetchOrder(orderId: string): Promise<Order> {
       delivery_instructions,
       subtotal_pence,
       delivery_fee_pence,
+      service_fee_pence,
       discount_pence,
       total_pence,
       paid_at,
