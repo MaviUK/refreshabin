@@ -47,7 +47,13 @@ export default function ResetPassword() {
     setLoading(true)
     const { error: updateError } = await supabase.auth.updateUser({ password })
     if (updateError) {
-      setError('This recovery link is invalid or has expired. Request a new link and try again.')
+      if (updateError.code === 'same_password') {
+        setError('Your new password must be different from your current password.')
+      } else if (updateError.code === 'weak_password') {
+        setError('Choose a stronger password and try again.')
+      } else {
+        setError('We could not change your password. Request a new recovery link and try again.')
+      }
       setLoading(false)
       return
     }
