@@ -13,8 +13,7 @@ export default function ForgotPassword() {
     setError('')
     setLoading(true)
 
-    const adminBaseUrl = new URL(import.meta.env.BASE_URL, window.location.origin)
-    const redirectTo = new URL('reset-password', adminBaseUrl).toString()
+    const redirectTo = new URL(import.meta.env.BASE_URL, window.location.origin).toString()
     const { error: resetError } = await supabase.auth.resetPasswordForEmail(email.trim(), { redirectTo })
 
     if (resetError) {
