@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useAdmin } from '../components/AdminLayout'
+import RestaurantProfileEditor from '../components/RestaurantProfileEditor'
 import { supabase } from '../lib/supabase'
 import { formatDate, formatMoney, hasAdminPermission, statusLabels, type Restaurant, type RestaurantStatus } from '../types'
 
@@ -242,12 +243,7 @@ export default function Restaurants() {
                 <Summary label="Order availability" value={selected.status !== 'active' ? 'Unavailable' : selected.accepting_orders ? 'Online' : 'Offline'} detail={selected.last_order_at ? `Last order ${formatDate(selected.last_order_at, false)}` : 'No orders yet'} />
               </div>
 
-              <div className="detail-section"><h3>Business profile</h3><div className="detail-grid">
-                <Detail label="Contact" value={selected.email || 'Not supplied'} detail={selected.phone || undefined} />
-                <Detail label="Trading address" value={selected.location?.address_line_1 || 'Not supplied'} detail={[selected.location?.address_line_2, selected.location?.city, selected.location?.postcode].filter(Boolean).join(', ') || undefined} />
-                <Detail label="Service" value={[selected.accepts_delivery && 'Delivery', selected.accepts_collection && 'Collection'].filter(Boolean).join(' & ') || 'Not selected'} detail={`${formatMoney(selected.delivery_fee_pence)} delivery · ${formatMoney(selected.minimum_order_pence)} minimum`} />
-                <Detail label="Application" value={selected.submitted_at ? `Submitted ${formatDate(selected.submitted_at, false)}` : 'Not submitted'} detail={selected.approved_at ? `Approved ${formatDate(selected.approved_at, false)}` : selected.approval_notes || undefined} />
-              </div></div>
+              <RestaurantProfileEditor restaurantId={selected.id} canManage={canManage} onSaved={load} />
 
               <section className={`restaurant-availability-card ${selected.accepting_orders && selected.status === 'active' ? 'online' : 'offline'}`}>
                 <div><span className="availability-dot" /><div><span className="admin-kicker">Customer ordering</span><h3>{selected.status !== 'active' ? 'Storefront unavailable' : selected.accepting_orders ? 'Restaurant is online' : 'Restaurant is offline'}</h3><p>{selected.status !== 'active' ? 'Approve or reactivate the restaurant before changing day-to-day order availability.' : selected.accepting_orders ? 'Customers can currently place delivery or collection orders.' : 'The storefront remains visible, but checkout is paused until the restaurant is put online.'}</p></div></div>
@@ -438,10 +434,6 @@ function MenuManager({ restaurant, menu, loading, canManage, reload }: { restaur
 
 function Summary({ label, value, detail }: { label: string; value: string; detail: string }) {
   return <article><small>{label}</small><strong>{value}</strong><span>{detail}</span></article>
-}
-
-function Detail({ label, value, detail }: { label: string; value: string; detail?: string | undefined }) {
-  return <article><small>{label}</small><strong>{value}</strong>{detail && <span>{detail}</span>}</article>
 }
 
 function actionTitle(action: AdminAction, name: string) {
