@@ -1,8 +1,8 @@
 import { useEffect } from 'react'
-import { Navigate, Route, Routes, useNavigate } from 'react-router-dom'
+import { Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom'
 import AdminGate from './components/AdminGate'
 import AdminLayout from './components/AdminLayout'
-import { hasPasswordRecoveryParams, supabase } from './lib/supabase'
+import { supabase } from './lib/supabase'
 import AuditLog from './pages/AuditLog'
 import ForgotPassword from './pages/ForgotPassword'
 import Login from './pages/Login'
@@ -10,24 +10,35 @@ import Overview from './pages/Overview'
 import ResetPassword from './pages/ResetPassword'
 import Restaurants from './pages/Restaurants'
 
+function hasPasswordRecoveryParams() {
+  return window.location.hash.includes('type=recovery') ||
+    new URLSearchParams(window.location.search).get('type') === 'recovery'
+}
+
 export default function App() {
+  const location = useLocation()
+
+  // Older recovery emails return to the admin root with an implicit-flow token
+  // in the URL fragment. Keep that fragment intact until Supabase has consumed
+  // it; navigating before getSession() resolves discards the single-use token.
+  if (hasPasswordRecoveryParams() && location.pathname !== '/reset-password') {
+    return <RecoveryRedirect />
+  }
+
   return (
-    <>
-      <RecoveryRedirect />
-      <Routes>
-        <Route path="/login" element={<Login />} />
-        <Route path="/forgot-password" element={<ForgotPassword />} />
-        <Route path="/reset-password" element={<ResetPassword />} />
-        <Route element={<AdminGate />}>
-          <Route element={<AdminLayout />}>
-            <Route index element={<Overview />} />
-            <Route path="restaurants" element={<Restaurants />} />
-            <Route path="audit" element={<AuditLog />} />
-          </Route>
+    <Routes>
+      <Route path="/login" element={<Login />} />
+      <Route path="/forgot-password" element={<ForgotPassword />} />
+      <Route path="/reset-password" element={<ResetPassword />} />
+      <Route element={<AdminGate />}>
+        <Route element={<AdminLayout />}>
+          <Route index element={<Overview />} />
+          <Route path="restaurants" element={<Restaurants />} />
+          <Route path="audit" element={<AuditLog />} />
         </Route>
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
-    </>
+      </Route>
+      <Route path="*" element={<Navigate to="/" replace />} />
+    </Routes>
   )
 }
 
@@ -35,14 +46,43 @@ function RecoveryRedirect() {
   const navigate = useNavigate()
 
   useEffect(() => {
-    if (hasPasswordRecoveryParams) navigate('/reset-password', { replace: true })
+    let active = true
 
     const { data } = supabase.auth.onAuthStateChange((event) => {
-      if (event === 'PASSWORD_RECOVERY') navigate('/reset-password', { replace: true })
+      if (active && event === 'PASSWORD_RECOVERY') {
+        navigate('/reset-password', { replace: true })
+      }
     })
 
-    return () => data.subscription.unsubscribe()
+    // getSession waits for the client's URL-session initialization. Only then
+    // is it safe to replace the URL and remove the recovery token fragment.
+    void supabase.auth.getSession().then(() => {
+      if (active) navigate('/reset-password', { replace: true })
+    })
+
+    return () => {
+      active = false
+      data.subscription.unsubscribe()
+    }
   }, [navigate])
 
-  return null
+  return (
+    <main className="admin-auth-page">
+      <section className="admin-auth-intro">
+        <div className="admin-auth-logo"><span>o.</span>ordered.food</div>
+        <div>
+          <span className="admin-kicker">Secure recovery</span>
+          <h1>Checking your recovery link.</h1>
+          <p>Please wait while we verify this single-use link.</p>
+        </div>
+        <small>Restricted access · Authorised administrators only</small>
+      </section>
+      <section className="admin-auth-panel">
+        <div className="admin-auth-card auth-recovery-check">
+          <div className="gate-spinner" />
+          <p>Verifying securely…</p>
+        </div>
+      </section>
+    </main>
+  )
 }
