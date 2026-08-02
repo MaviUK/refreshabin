@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
+import { useAdmin } from '../components/AdminLayout'
 import { supabase } from '../lib/supabase'
-import { formatDate, formatMoney, statusLabels, type Restaurant, type RestaurantStatus } from '../types'
+import { formatDate, formatMoney, hasAdminPermission, statusLabels, type Restaurant, type RestaurantStatus } from '../types'
 
 const filters: Array<{ value: RestaurantStatus | 'all'; label: string }> = [
   { value: 'all', label: 'All' },
@@ -15,6 +16,8 @@ const filters: Array<{ value: RestaurantStatus | 'all'; label: string }> = [
 type AdminAction = 'approve' | 'reject' | 'suspend' | 'reactivate'
 
 export default function Restaurants() {
+  const { admin } = useAdmin()
+  const canManage = hasAdminPermission(admin, 'restaurants:manage')
   const [params, setParams] = useSearchParams()
   const rawStatus = params.get('status')
   const initialStatus = filters.some((entry) => entry.value === rawStatus) ? rawStatus as RestaurantStatus : 'all'
@@ -76,7 +79,7 @@ export default function Restaurants() {
   }
 
   async function confirmAction() {
-    if (!selected || !action) return
+    if (!selected || !action || !canManage) return
     if ((action === 'reject' || action === 'suspend') && !reason.trim()) {
       setError('Add a clear reason before continuing.')
       return
@@ -103,7 +106,7 @@ export default function Restaurants() {
 
   return (
     <div className="admin-page restaurants-page">
-      <header className="page-heading"><div><span className="admin-kicker">Restaurant operations</span><h1>Restaurants</h1><p>Review applications and control which businesses can trade on ordered.food.</p></div></header>
+      <header className="page-heading"><div><span className="admin-kicker">Restaurant operations</span><h1>Restaurants</h1><p>{canManage ? 'Review applications and control which businesses can trade on ordered.food.' : 'View restaurant applications and operational details in read-only mode.'}</p></div></header>
 
       <div className="restaurant-toolbar">
         <label className="admin-search"><span aria-hidden="true">⌕</span><input type="search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search name, email or URL…" /></label>
@@ -156,7 +159,9 @@ export default function Restaurants() {
               <div className="confirmation-buttons"><button type="button" className="secondary-button" onClick={() => { setAction(null); setReason('') }} disabled={saving}>Cancel</button><button type="button" className={action === 'reject' || action === 'suspend' ? 'danger-button' : 'admin-primary-button'} onClick={() => void confirmAction()} disabled={saving}>{saving ? 'Saving…' : 'Confirm'}</button></div>
             </div>}
 
-            {!action && <div className="restaurant-actions">
+            {!canManage && <div className="read-only-notice"><strong>Read-only access</strong><span>Your role can inspect restaurant details but cannot approve, reject, suspend or reactivate them.</span></div>}
+
+            {!action && canManage && <div className="restaurant-actions">
               {selected.status === 'pending_approval' && <><button type="button" className="danger-button ghost" onClick={() => setAction('reject')}>Reject application</button><button type="button" className="admin-primary-button" onClick={() => setAction('approve')}>Approve & make live</button></>}
               {selected.status === 'active' && <button type="button" className="danger-button ghost" onClick={() => setAction('suspend')}>Suspend restaurant</button>}
               {selected.status === 'suspended' && <button type="button" className="admin-primary-button" onClick={() => setAction('reactivate')}>Reactivate restaurant</button>}

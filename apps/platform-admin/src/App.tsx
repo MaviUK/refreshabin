@@ -1,14 +1,16 @@
-import { useEffect } from 'react'
+import { useEffect, type ReactNode } from 'react'
 import { Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom'
 import AdminGate from './components/AdminGate'
-import AdminLayout from './components/AdminLayout'
+import AdminLayout, { useAdmin } from './components/AdminLayout'
 import { supabase } from './lib/supabase'
+import Admins from './pages/Admins'
 import AuditLog from './pages/AuditLog'
 import ForgotPassword from './pages/ForgotPassword'
 import Login from './pages/Login'
 import Overview from './pages/Overview'
 import ResetPassword from './pages/ResetPassword'
 import Restaurants from './pages/Restaurants'
+import { hasAdminPermission, type AdminPermission } from './types'
 
 function hasPasswordRecoveryParams() {
   return window.location.hash.includes('type=recovery') ||
@@ -33,13 +35,19 @@ export default function App() {
       <Route element={<AdminGate />}>
         <Route element={<AdminLayout />}>
           <Route index element={<Overview />} />
-          <Route path="restaurants" element={<Restaurants />} />
-          <Route path="audit" element={<AuditLog />} />
+          <Route path="restaurants" element={<PermissionRoute permission="restaurants:view"><Restaurants /></PermissionRoute>} />
+          <Route path="admins" element={<PermissionRoute permission="admins:view"><Admins /></PermissionRoute>} />
+          <Route path="audit" element={<PermissionRoute permission="audit:view"><AuditLog /></PermissionRoute>} />
         </Route>
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   )
+}
+
+function PermissionRoute({ permission, children }: { permission: AdminPermission; children: ReactNode }) {
+  const { admin } = useAdmin()
+  return hasAdminPermission(admin, permission) ? children : <Navigate to="/" replace />
 }
 
 function RecoveryRedirect() {

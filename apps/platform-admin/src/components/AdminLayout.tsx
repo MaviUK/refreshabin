@@ -1,11 +1,14 @@
+import type { CSSProperties } from 'react'
 import { NavLink, Outlet, useNavigate, useOutletContext } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import { adminRoleLabels, hasAdminPermission, type AdminPermission } from '../types'
 import type { AdminOutletContext } from './AdminGate'
 
-const navItems = [
-  { to: '/', label: 'Overview', icon: '⌂', end: true },
-  { to: '/restaurants', label: 'Restaurants', icon: '▣', end: false },
-  { to: '/audit', label: 'Audit log', icon: '↻', end: false },
+const navItems: Array<{ to: string; label: string; icon: string; end: boolean; permission: AdminPermission }> = [
+  { to: '/', label: 'Overview', icon: '⌂', end: true, permission: 'overview:view' },
+  { to: '/restaurants', label: 'Restaurants', icon: '▣', end: false, permission: 'restaurants:view' },
+  { to: '/admins', label: 'Admin access', icon: '♙', end: false, permission: 'admins:view' },
+  { to: '/audit', label: 'Audit log', icon: '↻', end: false, permission: 'audit:view' },
 ]
 
 export function useAdmin() {
@@ -15,6 +18,7 @@ export function useAdmin() {
 export default function AdminLayout() {
   const { admin } = useOutletContext<AdminOutletContext>()
   const navigate = useNavigate()
+  const visibleNavItems = navItems.filter((item) => hasAdminPermission(admin, item.permission))
 
   async function signOut() {
     await supabase.auth.signOut()
@@ -30,7 +34,7 @@ export default function AdminLayout() {
         </div>
 
         <nav className="admin-nav" aria-label="Platform administration">
-          {navItems.map((item) => (
+          {visibleNavItems.map((item) => (
             <NavLink key={item.to} to={item.to} end={item.end}>
               <span aria-hidden="true">{item.icon}</span>{item.label}
             </NavLink>
@@ -39,7 +43,7 @@ export default function AdminLayout() {
 
         <div className="admin-account">
           <span className="admin-avatar">{admin.display_name.slice(0, 1).toUpperCase()}</span>
-          <span><strong>{admin.display_name}</strong><small>{admin.role.replace('_', ' ')}</small></span>
+          <span><strong>{admin.display_name}</strong><small>{adminRoleLabels[admin.role]}</small></span>
           <button type="button" onClick={() => void signOut()} aria-label="Sign out">↗</button>
         </div>
       </aside>
@@ -52,8 +56,12 @@ export default function AdminLayout() {
         <Outlet context={{ admin } satisfies AdminOutletContext} />
       </main>
 
-      <nav className="mobile-admin-nav" aria-label="Platform administration">
-        {navItems.map((item) => (
+      <nav
+        className="mobile-admin-nav"
+        aria-label="Platform administration"
+        style={{ '--admin-nav-count': visibleNavItems.length } as CSSProperties}
+      >
+        {visibleNavItems.map((item) => (
           <NavLink key={item.to} to={item.to} end={item.end}>
             <span aria-hidden="true">{item.icon}</span><small>{item.label}</small>
           </NavLink>

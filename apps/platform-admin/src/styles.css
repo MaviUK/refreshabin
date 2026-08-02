@@ -142,6 +142,59 @@ a { color: inherit; }
 .action-confirmation label { display: grid; gap: 7px; color: #4b4850; font-size: 0.78rem; font-weight: 800; }
 .action-confirmation textarea { width: 100%; padding: 11px; resize: vertical; border: 1px solid #d9d4d8; border-radius: 10px; outline: 0; background: #fff; }
 .confirmation-buttons { margin-top: 14px; display: flex; justify-content: flex-end; gap: 9px; }
+.read-only-notice { margin-top: 24px; padding: 15px 17px; display: grid; gap: 4px; border: 1px solid #dce1ea; border-radius: 12px; color: #586275; background: #f3f6fa; }
+.read-only-notice strong { font-size: 0.82rem; }
+.read-only-notice span { font-size: 0.76rem; line-height: 1.45; }
+
+.admin-role-grid { margin-bottom: 18px; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+.admin-role-card { min-width: 0; padding: 15px 16px; border: 1px solid #e2e1e6; border-top: 3px solid #7b7a84; border-radius: 13px; background: #fff; }
+.admin-role-card.super_admin { border-top-color: #bc3970; }
+.admin-role-card.operations { border-top-color: #4374d6; }
+.admin-role-card.support { border-top-color: #24a067; }
+.admin-role-card.finance { border-top-color: #a77216; }
+.admin-role-card > span { font-size: 0.78rem; font-weight: 900; }
+.admin-role-card p { margin: 7px 0 0; color: #85838c; font-size: 0.7rem; line-height: 1.45; }
+.admin-access-workspace { display: grid; grid-template-columns: minmax(0, 1.45fr) minmax(310px, 0.7fr); align-items: start; gap: 16px; }
+.admin-members-panel { overflow: visible; }
+.admin-member-row { padding: 18px 20px; display: grid; grid-template-columns: 42px minmax(0, 1fr) auto; align-items: center; gap: 11px 13px; border-bottom: 1px solid #ecebef; }
+.admin-member-row:last-child { border-bottom: 0; }
+.admin-member-row.inactive { background: #faf9fa; }
+.admin-member-row.inactive .admin-avatar, .admin-member-row.inactive .admin-member-identity { opacity: 0.62; }
+.admin-member-identity { min-width: 0; display: grid; gap: 3px; }
+.admin-member-identity > div { min-width: 0; display: flex; align-items: center; gap: 7px; }
+.admin-member-identity strong, .admin-member-identity span, .admin-member-identity small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.admin-member-identity strong { font-size: 0.88rem; }
+.admin-member-identity > span { color: #716f78; font-size: 0.76rem; }
+.admin-member-identity small { color: #9997a0; font-size: 0.68rem; }
+.current-admin-badge { padding: 3px 6px; border-radius: 999px; color: #9b2d59; background: #ffe5ef; font-size: 0.6rem; font-weight: 900; text-transform: uppercase; letter-spacing: 0.04em; }
+.access-status, .invite-status { width: max-content; padding: 5px 8px; border-radius: 999px; font-size: 0.65rem; font-weight: 900; }
+.access-status.active, .invite-status.pending { color: #17613b; background: #def5e7; }
+.access-status.inactive, .invite-status.revoked { color: #8c3342; background: #f8e1e5; }
+.invite-status.expired { color: #745b25; background: #f5ecd7; }
+.admin-member-controls { grid-column: 2 / -1; display: flex; align-items: end; justify-content: flex-end; gap: 8px; }
+.admin-member-controls label { margin-right: auto; display: grid; gap: 5px; color: #74717a; font-size: 0.65rem; font-weight: 850; text-transform: uppercase; letter-spacing: 0.045em; }
+.admin-member-controls select, .admin-invite-form select, .admin-invite-form input { min-height: 42px; padding: 0 11px; border: 1px solid #d9d7dc; border-radius: 10px; color: #3d3b42; outline: 0; background: #fff; }
+.admin-member-controls select:focus, .admin-invite-form select:focus, .admin-invite-form input:focus { border-color: #b83a69; box-shadow: 0 0 0 3px rgba(184, 58, 105, 0.1); }
+.admin-member-controls .secondary-button, .admin-member-controls .danger-button, .admin-member-controls .admin-primary-button { min-height: 42px; padding: 0 12px; font-size: 0.72rem; }
+.admin-access-side { display: grid; gap: 16px; }
+.admin-invite-form { padding: 18px 20px 20px; display: grid; gap: 14px; }
+.admin-invite-form label { display: grid; gap: 7px; color: #4d4a52; font-size: 0.76rem; font-weight: 850; }
+.admin-invite-form p { margin: -3px 0 0; color: #7e7c85; font-size: 0.74rem; line-height: 1.45; }
+.admin-invite-form > small { color: #918f98; font-size: 0.68rem; line-height: 1.5; }
+.admin-invite-row { padding: 15px 17px; display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 8px 10px; border-bottom: 1px solid #ecebef; }
+.admin-invite-row:last-child { border-bottom: 0; }
+.admin-invite-row > div { min-width: 0; display: grid; gap: 3px; }
+.admin-invite-row strong, .admin-invite-row span, .admin-invite-row small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.admin-invite-row strong { font-size: 0.8rem; }
+.admin-invite-row > div > span { color: #77757e; font-size: 0.7rem; }
+.admin-invite-row small { color: #9a98a0; font-size: 0.66rem; }
+.text-danger-button { grid-column: 2; padding: 0; border: 0; color: #ad2b40; background: transparent; font-size: 0.7rem; font-weight: 850; }
+.panel-empty.compact { min-height: 95px; }
+.admin-access-confirmation { width: min(calc(100% - 32px), 540px); padding: 22px; position: fixed; z-index: 50; right: 24px; bottom: 24px; border: 1px solid #d8cdd2; border-radius: 17px; background: #fff; box-shadow: 0 22px 70px rgba(31, 26, 34, 0.22); }
+.admin-access-confirmation h2 { margin: 7px 0 6px; font-size: 1.25rem; }
+.admin-access-confirmation p { margin: 0 0 16px; color: #77747d; font-size: 0.82rem; line-height: 1.5; }
+.admin-access-confirmation label { display: grid; gap: 7px; color: #4b4850; font-size: 0.76rem; font-weight: 850; }
+.admin-access-confirmation textarea { width: 100%; padding: 11px; resize: vertical; border: 1px solid #d9d4d8; border-radius: 10px; outline: 0; }
 
 .audit-panel { overflow: visible; }
 .audit-row { padding: 17px 20px; display: grid; grid-template-columns: 36px minmax(0, 1fr) auto; align-items: center; gap: 13px; border-bottom: 1px solid #ecebef; }
@@ -196,6 +249,9 @@ a { color: inherit; }
   .restaurant-workspace { grid-template-columns: 320px minmax(0, 1fr); }
   .restaurant-list-row { grid-template-columns: 42px minmax(0, 1fr); }
   .restaurant-list-row .status-badge { grid-column: 2; }
+  .admin-role-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .admin-access-workspace { grid-template-columns: 1fr; }
+  .admin-access-side { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
 @media (max-width: 820px) {
@@ -205,7 +261,7 @@ a { color: inherit; }
   .mobile-admin-header { height: 62px; padding: 0 16px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #e2e1e5; background: #fff; }
   .mobile-admin-header .admin-brand-mark { width: 32px; height: 32px; border-radius: 9px; }
   .mobile-admin-header button { min-height: 36px; padding: 0 11px; border: 1px solid #dfdde2; border-radius: 9px; color: #5e5c64; background: #fff; font-size: 0.75rem; font-weight: 800; }
-  .mobile-admin-nav { height: 67px; padding: 6px 12px max(6px, env(safe-area-inset-bottom)); display: grid; grid-template-columns: repeat(3, 1fr); position: fixed; z-index: 20; right: 0; bottom: 0; left: 0; border-top: 1px solid #dedde2; background: rgba(255, 255, 255, 0.97); backdrop-filter: blur(16px); }
+  .mobile-admin-nav { height: 67px; padding: 6px 12px max(6px, env(safe-area-inset-bottom)); display: grid; grid-template-columns: repeat(var(--admin-nav-count, 3), minmax(0, 1fr)); position: fixed; z-index: 20; right: 0; bottom: 0; left: 0; border-top: 1px solid #dedde2; background: rgba(255, 255, 255, 0.97); backdrop-filter: blur(16px); }
   .mobile-admin-nav a { display: grid; place-content: center; justify-items: center; gap: 2px; border-radius: 9px; color: #85838c; text-decoration: none; }
   .mobile-admin-nav a > span { font-size: 1.15rem; }
   .mobile-admin-nav small { font-size: 0.65rem; font-weight: 800; }
@@ -230,6 +286,7 @@ a { color: inherit; }
   .restaurant-summary { grid-template-columns: 1fr; }
   .restaurant-summary article { border-right: 0; border-bottom: 1px solid #e9e7eb; }
   .restaurant-summary article:last-child { border-bottom: 0; }
+  .admin-access-confirmation { right: 16px; bottom: 82px; }
   .admin-auth-page { grid-template-columns: 1fr; }
   .admin-auth-intro { min-height: 280px; padding: 28px; }
   .admin-auth-intro > div:nth-child(2) { margin: 50px 0 30px; }
@@ -254,4 +311,10 @@ a { color: inherit; }
   .restaurant-actions button, .confirmation-buttons button { width: 100%; }
   .audit-row { grid-template-columns: 34px minmax(0, 1fr); }
   .audit-row time { grid-column: 2; }
+  .admin-role-grid, .admin-access-side { grid-template-columns: 1fr; }
+  .admin-member-row { grid-template-columns: 38px minmax(0, 1fr) auto; padding: 16px; }
+  .admin-member-controls { grid-column: 1 / -1; display: grid; grid-template-columns: 1fr 1fr; }
+  .admin-member-controls label { grid-column: 1 / -1; width: 100%; }
+  .admin-member-controls select { width: 100%; }
+  .admin-member-controls button { width: 100%; }
 }

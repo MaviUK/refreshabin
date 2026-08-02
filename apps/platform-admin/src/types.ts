@@ -1,8 +1,42 @@
+export type AdminRole = 'super_admin' | 'operations' | 'support' | 'finance'
+
+export type AdminPermission =
+  | 'overview:view'
+  | 'restaurants:view'
+  | 'restaurants:manage'
+  | 'orders:view'
+  | 'orders:manage'
+  | 'customers:view'
+  | 'finance:view'
+  | 'finance:manage'
+  | 'audit:view'
+  | 'admins:view'
+  | 'admins:manage'
+
 export type AdminIdentity = {
   user_id: string
   email: string
   display_name: string
-  role: 'super_admin' | 'operations' | 'support' | 'finance'
+  role: AdminRole
+  permissions: AdminPermission[]
+}
+
+export const adminRoleLabels: Record<AdminRole, string> = {
+  super_admin: 'Super Admin',
+  operations: 'Operations',
+  support: 'Support',
+  finance: 'Finance',
+}
+
+export const adminRoleDescriptions: Record<AdminRole, string> = {
+  super_admin: 'Full platform access, including administrator security and roles.',
+  operations: 'Restaurants and order operations, without administrator or financial control.',
+  support: 'Read-only restaurant, order and customer support access.',
+  finance: 'Order, payment, refund and reporting access without restaurant control.',
+}
+
+export function hasAdminPermission(admin: AdminIdentity, permission: AdminPermission) {
+  return admin.permissions.includes(permission)
 }
 
 export type RestaurantStatus = 'draft' | 'pending_approval' | 'active' | 'suspended' | 'rejected'
