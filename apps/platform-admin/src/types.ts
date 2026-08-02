@@ -8,6 +8,8 @@ export type AdminPermission =
   | 'orders:manage'
   | 'orders:customer_details'
   | 'customers:view'
+  | 'support:view'
+  | 'support:manage'
   | 'finance:view'
   | 'finance:manage'
   | 'audit:view'

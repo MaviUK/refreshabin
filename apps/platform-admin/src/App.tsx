@@ -13,6 +13,7 @@ import Payments from './pages/Payments'
 import Overview from './pages/Overview'
 import ResetPassword from './pages/ResetPassword'
 import Restaurants from './pages/Restaurants'
+import Support from './pages/Support'
 import { hasAdminPermission, type AdminPermission } from './types'
 
 function hasPasswordRecoveryParams() {
@@ -40,6 +41,7 @@ export default function App() {
           <Route index element={<Overview />} />
           <Route path="restaurants" element={<PermissionRoute permission="restaurants:view"><Restaurants /></PermissionRoute>} />
           <Route path="orders" element={<PermissionRoute permission="orders:view"><Orders /></PermissionRoute>} />
+          <Route path="support" element={<PermissionRoute permission="support:view"><Support /></PermissionRoute>} />
           <Route path="payments" element={<PermissionRoute permission="finance:view"><Payments /></PermissionRoute>} />
           <Route path="fees" element={<PermissionRoute permission="finance:view"><Fees /></PermissionRoute>} />
           <Route path="admins" element={<PermissionRoute permission="admins:view"><Admins /></PermissionRoute>} />

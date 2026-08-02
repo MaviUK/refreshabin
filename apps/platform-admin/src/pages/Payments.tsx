@@ -1,4 +1,5 @@
 import { FormEvent, useCallback, useEffect, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { useAdmin } from '../components/AdminLayout'
 import { supabase } from '../lib/supabase'
 import { formatDate, formatMoney, hasAdminPermission } from '../types'
@@ -10,7 +11,8 @@ type Detail = { payment:PaymentRow; refunds:RefundRow[] }
 
 export default function Payments(){
   const { admin }=useAdmin(); const canRefund=hasAdminPermission(admin,'finance:manage')
-  const [status,setStatus]=useState(''); const [search,setSearch]=useState(''); const [page,setPage]=useState(1)
+  const [params]=useSearchParams()
+  const [status,setStatus]=useState(''); const [search,setSearch]=useState(params.get('search')??''); const [page,setPage]=useState(1)
   const [data,setData]=useState<Snapshot|null>(null); const [selected,setSelected]=useState<string|null>(null); const [detail,setDetail]=useState<Detail|null>(null)
   const [loading,setLoading]=useState(true); const [error,setError]=useState(''); const [success,setSuccess]=useState(''); const [submitting,setSubmitting]=useState(false)
   const [form,setForm]=useState({ amount:'', reason:'' })
