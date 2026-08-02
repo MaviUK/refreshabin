@@ -75,7 +75,7 @@ export default function Overview() {
           <div className="panel-heading"><div><h2>Operational attention</h2><p>Items worth checking now.</p></div></div>
           <Link to="/restaurants?status=pending_approval" className="attention-row"><span className="attention-icon amber">!</span><span><strong>{data?.pending_restaurants ?? 0} applications pending</strong><small>Review identity, menu and service details.</small></span><span>›</span></Link>
           <Link to="/restaurants?status=suspended" className="attention-row"><span className="attention-icon red">×</span><span><strong>{data?.suspended_restaurants ?? 0} restaurants suspended</strong><small>Review status and any reactivation notes.</small></span><span>›</span></Link>
-          <div className="attention-row muted"><span className="attention-icon blue">●</span><span><strong>{data?.orders_needing_attention ?? 0} orders awaiting response</strong><small>Full order monitoring is the next admin milestone.</small></span></div>
+          <Link to="/orders?status=placed" className="attention-row"><span className="attention-icon blue">●</span><span><strong>{data?.orders_needing_attention ?? 0} orders awaiting response</strong><small>Open the control centre to inspect response times.</small></span><span>›</span></Link>
         </aside>
       </div>
     </div>

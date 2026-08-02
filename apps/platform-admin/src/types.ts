@@ -6,6 +6,7 @@ export type AdminPermission =
   | 'restaurants:manage'
   | 'orders:view'
   | 'orders:manage'
+  | 'orders:customer_details'
   | 'customers:view'
   | 'finance:view'
   | 'finance:manage'

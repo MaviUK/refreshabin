@@ -7,6 +7,7 @@ import type { AdminOutletContext } from './AdminGate'
 const navItems: Array<{ to: string; label: string; icon: string; end: boolean; permission: AdminPermission }> = [
   { to: '/', label: 'Overview', icon: '⌂', end: true, permission: 'overview:view' },
   { to: '/restaurants', label: 'Restaurants', icon: '▣', end: false, permission: 'restaurants:view' },
+  { to: '/orders', label: 'Orders', icon: '◎', end: false, permission: 'orders:view' },
   { to: '/admins', label: 'Admin access', icon: '♙', end: false, permission: 'admins:view' },
   { to: '/audit', label: 'Audit log', icon: '↻', end: false, permission: 'audit:view' },
 ]
