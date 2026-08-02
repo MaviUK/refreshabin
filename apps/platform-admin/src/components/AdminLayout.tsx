@@ -10,6 +10,7 @@ const navItems: Array<{ to: string; label: string; icon: string; end: boolean; p
   { to: '/orders', label: 'Orders', icon: '◎', end: false, permission: 'orders:view' },
   { to: '/support', label: 'Support', icon: '◇', end: false, permission: 'support:view' },
   { to: '/payments', label: 'Payments', icon: '¤', end: false, permission: 'finance:view' },
+  { to: '/financials', label: 'Financials', icon: '▤', end: false, permission: 'finance:view' },
   { to: '/fees', label: 'Fees', icon: '£', end: false, permission: 'finance:view' },
   { to: '/admins', label: 'Admin access', icon: '♙', end: false, permission: 'admins:view' },
   { to: '/audit', label: 'Audit log', icon: '↻', end: false, permission: 'audit:view' },
