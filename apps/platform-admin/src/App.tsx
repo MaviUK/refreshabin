@@ -9,6 +9,7 @@ import ForgotPassword from './pages/ForgotPassword'
 import Fees from './pages/Fees'
 import Login from './pages/Login'
 import Orders from './pages/Orders'
+import Payments from './pages/Payments'
 import Overview from './pages/Overview'
 import ResetPassword from './pages/ResetPassword'
 import Restaurants from './pages/Restaurants'
@@ -39,6 +40,7 @@ export default function App() {
           <Route index element={<Overview />} />
           <Route path="restaurants" element={<PermissionRoute permission="restaurants:view"><Restaurants /></PermissionRoute>} />
           <Route path="orders" element={<PermissionRoute permission="orders:view"><Orders /></PermissionRoute>} />
+          <Route path="payments" element={<PermissionRoute permission="finance:view"><Payments /></PermissionRoute>} />
           <Route path="fees" element={<PermissionRoute permission="finance:view"><Fees /></PermissionRoute>} />
           <Route path="admins" element={<PermissionRoute permission="admins:view"><Admins /></PermissionRoute>} />
           <Route path="audit" element={<PermissionRoute permission="audit:view"><AuditLog /></PermissionRoute>} />

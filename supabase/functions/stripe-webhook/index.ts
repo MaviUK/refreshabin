@@ -146,7 +146,7 @@ Deno.serve(async (request) => {
 
         const { error } = await supabase
           .from('orders')
-          .update({ payment_status: paymentStatus })
+          .update({ payment_status: paymentStatus, refunded_pence: charge.amount_refunded, last_refunded_at: new Date().toISOString() })
           .eq('stripe_payment_intent_id', intentId)
 
         if (error) throw error
