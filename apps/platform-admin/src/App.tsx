@@ -14,6 +14,7 @@ import Payments from './pages/Payments'
 import Overview from './pages/Overview'
 import ResetPassword from './pages/ResetPassword'
 import Restaurants from './pages/Restaurants'
+import Settings from './pages/Settings'
 import Support from './pages/Support'
 import { hasAdminPermission, type AdminPermission } from './types'
 
@@ -46,6 +47,7 @@ export default function App() {
           <Route path="payments" element={<PermissionRoute permission="finance:view"><Payments /></PermissionRoute>} />
           <Route path="fees" element={<PermissionRoute permission="finance:view"><Fees /></PermissionRoute>} />
           <Route path="financials" element={<PermissionRoute permission="finance:view"><Financials /></PermissionRoute>} />
+          <Route path="settings" element={<PermissionRoute permission="settings:view"><Settings /></PermissionRoute>} />
           <Route path="admins" element={<PermissionRoute permission="admins:view"><Admins /></PermissionRoute>} />
           <Route path="audit" element={<PermissionRoute permission="audit:view"><AuditLog /></PermissionRoute>} />
         </Route>

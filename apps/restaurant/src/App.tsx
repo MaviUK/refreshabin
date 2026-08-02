@@ -32,10 +32,16 @@ import CustomerProfile from './customer/CustomerProfile'
 import CustomerOrders from './customer/CustomerOrders'
 import CustomerAddresses from './customer/CustomerAddresses'
 import CustomerFavourites from './customer/CustomerFavourites'
+import { PlatformConfigurationProvider, PlatformStatusBoundary, usePlatformConfiguration } from './lib/platformConfiguration'
 import './checkout/CheckoutAccount.css'
 import './checkout/CheckoutAddresses.css'
 
 export default function App() {
+  return <PlatformConfigurationProvider><PlatformStatusBoundary><ApplicationRoutes /></PlatformStatusBoundary></PlatformConfigurationProvider>
+}
+
+function ApplicationRoutes() {
+  const { configuration } = usePlatformConfiguration()
   return (
     <Routes>
       <Route path="/" element={<Home />} />
@@ -51,7 +57,7 @@ export default function App() {
       <Route path="/account/profile" element={<CustomerProfile />} />
       <Route path="/account/orders" element={<CustomerOrders />} />
       <Route path="/account/addresses" element={<CustomerAddresses />} />
-      <Route path="/account/favourites" element={<CustomerFavourites />} />
+      <Route path="/account/favourites" element={configuration.feature_flags.customer_favourites ? <CustomerFavourites /> : <Navigate to="/account" replace />} />
       <Route path="/login" element={<Login />} />
       <Route path="/register" element={<Register />} />
       <Route path="/forgot-password" element={<ForgotPassword />} />

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import { usePlatformConfiguration } from '../lib/platformConfiguration'
 import './Storefront.css'
 
 type Ingredient = { id: string; name: string; is_included: boolean; is_removable: boolean }
@@ -91,10 +92,15 @@ function basketLineId(itemId: string, configuration: unknown) {
 }
 
 export default function Storefront() {
+  const { configuration } = usePlatformConfiguration()
+  const favouritesEnabled = configuration.feature_flags.customer_favourites
+  const quickAvailabilityEnabled = configuration.feature_flags.restaurant_quick_availability
+  const orderingEnabled = configuration.ordering_enabled
   const { slug } = useParams()
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
-  const managementRequested = searchParams.get('manage_menu') === '1'
+  const managementQueryRequested = searchParams.get('manage_menu') === '1'
+  const managementRequested = managementQueryRequested && quickAvailabilityEnabled
   const [data, setData] = useState<StorefrontData | null>(null)
   const [basket, setBasket] = useState<Record<string, BasketLine>>({})
   const [search, setSearch] = useState('')
@@ -233,6 +239,11 @@ export default function Storefront() {
 
   useEffect(() => {
     if (!data) return
+    if (!favouritesEnabled) {
+      setFavouriteRestaurant(false)
+      setFavouriteItemIds(new Set())
+      return
+    }
 
     async function loadFavourites() {
       const { data: authData } = await supabase.auth.getUser()
@@ -264,7 +275,7 @@ export default function Storefront() {
     }
 
     void loadFavourites()
-  }, [data])
+  }, [data, favouritesEnabled])
 
   useEffect(() => {
     if (!slug) return
@@ -328,7 +339,7 @@ export default function Storefront() {
   }
 
   async function toggleRestaurantFavourite() {
-    if (!data || restaurantFavouriteBusy) return
+    if (!favouritesEnabled || !data || restaurantFavouriteBusy) return
     if (!customerUserId) {
       requireCustomerLogin()
       return
@@ -358,7 +369,7 @@ export default function Storefront() {
   }
 
   async function toggleItemFavourite(item: MenuItem) {
-    if (itemFavouriteBusy.has(item.id)) return
+    if (!favouritesEnabled || itemFavouriteBusy.has(item.id)) return
     if (!customerUserId) {
       requireCustomerLogin()
       return
@@ -563,7 +574,7 @@ export default function Storefront() {
     : 0
   const total = subtotal + deliveryFee
   const minimumShortfall = Math.max((restaurant.minimum_order_pence ?? 0) - subtotal, 0)
-  const canContinue = basketLines.length > 0 && minimumShortfall === 0
+  const canContinue = orderingEnabled && basketLines.length > 0 && minimumShortfall === 0
 
   return (
     <main className="storefront-page">
@@ -579,7 +590,7 @@ export default function Storefront() {
                 <span aria-hidden="true">◉</span>
                 {customerUserId ? 'My account' : 'Sign in'}
               </Link>
-              <button
+              {favouritesEnabled && <button
                 className={favouriteRestaurant ? 'storefront-favourite active' : 'storefront-favourite'}
                 type="button"
                 onClick={() => void toggleRestaurantFavourite()}
@@ -588,7 +599,7 @@ export default function Storefront() {
                 aria-pressed={favouriteRestaurant}
               >
                 {favouriteRestaurant ? '♥' : '♡'}
-              </button>
+              </button>}
             </>
           )}
         </div>
@@ -600,9 +611,9 @@ export default function Storefront() {
         </div>
       </section>
 
-      {managementRequested && (
+      {managementQueryRequested && (
         <section className={managementMode ? 'storefront-management-banner' : 'storefront-management-banner storefront-management-banner--error'}>
-          <div><span className="eyebrow">Restaurant view</span><h2>{managementMode ? 'Manage item availability' : 'Management controls unavailable'}</h2><p>{managementMode ? 'Switch items on or off below. Changes are live immediately and sold-out items remain here so you can enable them again.' : managementError}</p></div>
+          <div><span className="eyebrow">Restaurant view</span><h2>{managementMode ? 'Manage item availability' : 'Management controls unavailable'}</h2><p>{!quickAvailabilityEnabled ? 'Quick sold-out controls are temporarily disabled by the platform administrator. Use the full menu editor instead.' : managementMode ? 'Switch items on or off below. Changes are live immediately and sold-out items remain here so you can enable them again.' : managementError}</p></div>
           <Link className="secondary-button button-link" to="/menu">Open full menu editor</Link>
         </section>
       )}
@@ -639,7 +650,7 @@ export default function Storefront() {
               <div className="menu-item-grid">
                 {category.items.map((item) => (
                   <article className={item.is_available ? 'menu-item-card' : 'menu-item-card menu-item-card--unavailable'} key={item.id} onClick={() => openCustomisation(item)}>
-                    {!managementMode && <button
+                    {!managementMode && favouritesEnabled && <button
                       className={favouriteItemIds.has(item.id) ? 'menu-item-favourite active' : 'menu-item-favourite'}
                       type="button"
                       onClick={(event) => { event.stopPropagation(); void toggleItemFavourite(item) }}
@@ -713,6 +724,7 @@ export default function Storefront() {
                 <div className="basket-total"><span>Total</span><strong>{money.format(total / 100)}</strong></div>
               </div>
               {minimumShortfall > 0 && <p className="basket-warning">Add {money.format(minimumShortfall / 100)} more to reach the minimum order.</p>}
+              {!orderingEnabled && <p className="basket-warning">{configuration.ordering_pause_message}</p>}
               <button className="basket-checkout" type="button" disabled={!canContinue} onClick={() => navigate(`/r/${slug}/checkout`)}>Continue</button>
               <p className="basket-note">Delivery details and payment are added in the next checkout step.</p>
             </>

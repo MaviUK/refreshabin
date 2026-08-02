@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import { usePlatformConfiguration } from '../lib/platformConfiguration'
 import './Restaurants.css'
 
 type Restaurant = {
@@ -20,6 +21,8 @@ type Restaurant = {
 const money = new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'GBP' })
 
 export default function Restaurants() {
+  const { configuration } = usePlatformConfiguration()
+  const favouritesEnabled = configuration.feature_flags.customer_favourites
   const [searchParams, setSearchParams] = useSearchParams()
   const navigate = useNavigate()
   const [restaurants, setRestaurants] = useState<Restaurant[]>([])
@@ -52,7 +55,7 @@ export default function Restaurants() {
 
       const user = sessionData.session?.user
       setSignedIn(Boolean(user))
-      if (user) {
+      if (user && favouritesEnabled) {
         const { data: favouriteRows } = await supabase
           .from('customer_favourite_restaurants')
           .select('restaurant_id')
@@ -65,7 +68,7 @@ export default function Restaurants() {
     void loadRestaurants()
     const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => setSignedIn(Boolean(session?.user)))
     return () => authListener.subscription.unsubscribe()
-  }, [])
+  }, [favouritesEnabled])
 
   const cuisineOptions = useMemo(() => {
     const values = restaurants.flatMap((restaurant) => restaurant.cuisines ?? [])
@@ -86,6 +89,7 @@ export default function Restaurants() {
   }
 
   async function toggleFavourite(restaurantId: string) {
+    if (!favouritesEnabled) return
     if (!signedIn) {
       navigate('/account/login', { state: { from: `${window.location.pathname}${window.location.search}` } })
       return
@@ -123,7 +127,7 @@ export default function Restaurants() {
       <header className="restaurants-header">
         <Link className="restaurants-logo" to="/">ordered.food</Link>
         <nav>
-          {signedIn ? <><Link to="/account">My account</Link><Link to="/account/favourites">Favourites</Link><Link to="/account/orders">Orders</Link></> : <Link to="/account/login" state={{ from: `${window.location.pathname}${window.location.search}` }}>Customer login</Link>}
+          {signedIn ? <><Link to="/account">My account</Link>{favouritesEnabled && <Link to="/account/favourites">Favourites</Link>}<Link to="/account/orders">Orders</Link></> : <Link to="/account/login" state={{ from: `${window.location.pathname}${window.location.search}` }}>Customer login</Link>}
           <Link to="/login">Restaurant login</Link>
         </nav>
       </header>
@@ -170,14 +174,14 @@ export default function Restaurants() {
                     </div>
                   </div>
                 </Link>
-                <button
+                {favouritesEnabled && <button
                   className={isFavourite ? 'restaurant-favourite selected' : 'restaurant-favourite'}
                   type="button"
                   aria-label={isFavourite ? `Remove ${restaurant.name} from favourites` : `Add ${restaurant.name} to favourites`}
                   aria-pressed={isFavourite}
                   disabled={savingFavourite === restaurant.id}
                   onClick={() => void toggleFavourite(restaurant.id)}
-                >{isFavourite ? '♥' : '♡'}</button>
+                >{isFavourite ? '♥' : '♡'}</button>}
               </article>
             )
           })}

@@ -35,6 +35,23 @@ Deno.serve(async (request) => {
     })
     const stripe = new Stripe(stripeSecretKey)
 
+    const { data: platformConfiguration, error: configurationError } = await supabase
+      .rpc('get_public_platform_configuration')
+
+    if (configurationError || !platformConfiguration) {
+      console.error('Unable to verify platform ordering configuration', configurationError)
+      return json({ error: 'Ordering controls could not be verified. Please try again shortly.' }, 503)
+    }
+
+    const controls = platformConfiguration as {
+      maintenance_mode: boolean
+      maintenance_message: string
+      ordering_enabled: boolean
+      ordering_pause_message: string
+    }
+    if (controls.maintenance_mode) return json({ error: controls.maintenance_message }, 409)
+    if (!controls.ordering_enabled) return json({ error: controls.ordering_pause_message }, 409)
+
     const { data: order, error: orderError } = await supabase
       .from('orders')
       .select(`
