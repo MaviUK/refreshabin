@@ -5,6 +5,7 @@ import AdminLayout, { useAdmin } from './components/AdminLayout'
 import { supabase } from './lib/supabase'
 import Admins from './pages/Admins'
 import AuditLog from './pages/AuditLog'
+import Customers from './pages/Customers'
 import ForgotPassword from './pages/ForgotPassword'
 import Fees from './pages/Fees'
 import Financials from './pages/Financials'
@@ -27,9 +28,6 @@ function hasPasswordRecoveryParams() {
 export default function App() {
   const location = useLocation()
 
-  // Older recovery emails return to the admin root with an implicit-flow token
-  // in the URL fragment. Keep that fragment intact until Supabase has consumed
-  // it; navigating before getSession() resolves discards the single-use token.
   if (hasPasswordRecoveryParams() && location.pathname !== '/reset-password') {
     return <RecoveryRedirect />
   }
@@ -43,6 +41,7 @@ export default function App() {
         <Route element={<AdminLayout />}>
           <Route index element={<Overview />} />
           <Route path="restaurants" element={<PermissionRoute permission="restaurants:view"><Restaurants /></PermissionRoute>} />
+          <Route path="customers" element={<PermissionRoute permission="customers:view"><Customers /></PermissionRoute>} />
           <Route path="orders" element={<PermissionRoute permission="orders:view"><Orders /></PermissionRoute>} />
           <Route path="support" element={<PermissionRoute permission="support:view"><Support /></PermissionRoute>} />
           <Route path="moderation" element={<PermissionRoute permission="moderation:view"><Moderation /></PermissionRoute>} />
@@ -76,8 +75,6 @@ function RecoveryRedirect() {
       }
     })
 
-    // getSession waits for the client's URL-session initialization. Only then
-    // is it safe to replace the URL and remove the recovery token fragment.
     void supabase.auth.getSession().then(() => {
       if (active) navigate('/reset-password', { replace: true })
     })
