@@ -19,6 +19,7 @@ const navItems: Array<{ to: string; label: string; icon: string; end: boolean; p
   { to: '/payments', label: 'Payments', icon: '¤', end: false, permission: 'finance:view' },
   { to: '/payouts', label: 'Payouts', icon: '⇄', end: false, permission: 'finance:view' },
   { to: '/financials', label: 'Financials', icon: '▤', end: false, permission: 'finance:view' },
+  { to: '/scheduled-reports', label: 'Scheduled reports', icon: '◫', end: false, permission: 'finance:view' },
   { to: '/fees', label: 'Fees', icon: '£', end: false, permission: 'finance:view' },
   { to: '/alerts', label: 'Alert centre', icon: '!', end: false, permission: 'settings:view' },
   { to: '/settings', label: 'Configuration', icon: '⚙', end: false, permission: 'settings:view' },
