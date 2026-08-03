@@ -4,6 +4,7 @@ import AdminGate from './components/AdminGate'
 import AdminLayout, { useAdmin } from './components/AdminLayout'
 import { supabase } from './lib/supabase'
 import Admins from './pages/Admins'
+import Alerts from './pages/Alerts'
 import Analytics from './pages/Analytics'
 import AuditLog from './pages/AuditLog'
 import Customers from './pages/Customers'
@@ -60,6 +61,7 @@ export default function App() {
           <Route path="payouts" element={<PermissionRoute permission="finance:view"><Payouts /></PermissionRoute>} />
           <Route path="fees" element={<PermissionRoute permission="finance:view"><Fees /></PermissionRoute>} />
           <Route path="financials" element={<PermissionRoute permission="finance:view"><Financials /></PermissionRoute>} />
+          <Route path="alerts" element={<PermissionRoute permission="settings:view"><Alerts /></PermissionRoute>} />
           <Route path="settings" element={<PermissionRoute permission="settings:view"><Settings /></PermissionRoute>} />
           <Route path="admins" element={<PermissionRoute permission="admins:view"><Admins /></PermissionRoute>} />
           <Route path="audit" element={<PermissionRoute permission="audit:view"><AuditLog /></PermissionRoute>} />
