@@ -20,6 +20,7 @@ import Overview from './pages/Overview'
 import ResetPassword from './pages/ResetPassword'
 import RestaurantActivityPage from './pages/RestaurantActivityPage'
 import Restaurants from './pages/Restaurants'
+import SecurityRisk from './pages/SecurityRisk'
 import Settings from './pages/Settings'
 import Support from './pages/Support'
 import SupportSla from './pages/SupportSla'
@@ -54,6 +55,7 @@ export default function App() {
           <Route path="support" element={<PermissionRoute permission="support:view"><Support /></PermissionRoute>} />
           <Route path="support-sla" element={<PermissionRoute permission="support:view"><SupportSla /></PermissionRoute>} />
           <Route path="moderation" element={<PermissionRoute permission="moderation:view"><Moderation /></PermissionRoute>} />
+          <Route path="security-risk" element={<PermissionRoute permission="moderation:view"><SecurityRisk /></PermissionRoute>} />
           <Route path="payments" element={<PermissionRoute permission="finance:view"><Payments /></PermissionRoute>} />
           <Route path="payouts" element={<PermissionRoute permission="finance:view"><Payouts /></PermissionRoute>} />
           <Route path="fees" element={<PermissionRoute permission="finance:view"><Fees /></PermissionRoute>} />
