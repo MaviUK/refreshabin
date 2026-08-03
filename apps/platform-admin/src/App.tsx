@@ -11,6 +11,7 @@ import Fees from './pages/Fees'
 import Financials from './pages/Financials'
 import Login from './pages/Login'
 import Moderation from './pages/Moderation'
+import OrderRecovery from './pages/OrderRecovery'
 import Orders from './pages/Orders'
 import Payments from './pages/Payments'
 import Overview from './pages/Overview'
@@ -45,6 +46,7 @@ export default function App() {
           <Route path="restaurant-activity" element={<PermissionRoute permission="restaurants:view"><RestaurantActivityPage /></PermissionRoute>} />
           <Route path="customers" element={<PermissionRoute permission="customers:view"><Customers /></PermissionRoute>} />
           <Route path="orders" element={<PermissionRoute permission="orders:view"><Orders /></PermissionRoute>} />
+          <Route path="order-recovery" element={<PermissionRoute permission="orders:view"><OrderRecovery /></PermissionRoute>} />
           <Route path="support" element={<PermissionRoute permission="support:view"><Support /></PermissionRoute>} />
           <Route path="moderation" element={<PermissionRoute permission="moderation:view"><Moderation /></PermissionRoute>} />
           <Route path="payments" element={<PermissionRoute permission="finance:view"><Payments /></PermissionRoute>} />
