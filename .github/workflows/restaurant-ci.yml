@@ -9,6 +9,7 @@ on:
       - 'apps/restaurant/**'
       - 'apps/platform-admin/**'
       - 'packages/**'
+      - 'scripts/**'
       - 'supabase/migrations/**'
       - 'supabase/functions/**'
       - 'package.json'
@@ -48,6 +49,9 @@ jobs:
             echo "$duplicates"
             exit 1
           fi
+
+      - name: Audit platform-admin RPC permissions
+        run: node scripts/audit-admin-rpc-permissions.mjs
 
       - name: Type-check restaurant app
         run: pnpm --filter @ordered/restaurant lint
