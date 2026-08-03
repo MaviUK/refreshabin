@@ -54,6 +54,9 @@ jobs:
       - name: Audit platform-admin RPC permissions
         run: node scripts/audit-admin-rpc-permissions.mjs
 
+      - name: Audit platform-admin table security
+        run: node scripts/audit-admin-table-security.mjs
+
       - name: Audit Edge Function security settings
         run: node scripts/audit-edge-functions.mjs
 
