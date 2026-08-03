@@ -20,6 +20,7 @@ import RestaurantActivityPage from './pages/RestaurantActivityPage'
 import Restaurants from './pages/Restaurants'
 import Settings from './pages/Settings'
 import Support from './pages/Support'
+import SupportSla from './pages/SupportSla'
 import { hasAdminPermission, type AdminPermission } from './types'
 
 function hasPasswordRecoveryParams() {
@@ -48,6 +49,7 @@ export default function App() {
           <Route path="orders" element={<PermissionRoute permission="orders:view"><Orders /></PermissionRoute>} />
           <Route path="order-recovery" element={<PermissionRoute permission="orders:view"><OrderRecovery /></PermissionRoute>} />
           <Route path="support" element={<PermissionRoute permission="support:view"><Support /></PermissionRoute>} />
+          <Route path="support-sla" element={<PermissionRoute permission="support:view"><SupportSla /></PermissionRoute>} />
           <Route path="moderation" element={<PermissionRoute permission="moderation:view"><Moderation /></PermissionRoute>} />
           <Route path="payments" element={<PermissionRoute permission="finance:view"><Payments /></PermissionRoute>} />
           <Route path="fees" element={<PermissionRoute permission="finance:view"><Fees /></PermissionRoute>} />
