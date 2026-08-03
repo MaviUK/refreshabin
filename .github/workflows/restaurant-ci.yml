@@ -60,6 +60,9 @@ jobs:
       - name: Audit operational RLS policies
         run: node scripts/audit-operational-rls.mjs
 
+      - name: Audit critical performance indexes
+        run: node scripts/audit-platform-performance-indexes.mjs
+
       - name: Audit Edge Function security settings
         run: node scripts/audit-edge-functions.mjs
 
