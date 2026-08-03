@@ -6,7 +6,7 @@ const functionsDir = path.join(root, 'supabase', 'functions')
 const configPath = path.join(root, 'supabase', 'config.toml')
 const publicWithoutJwt = new Set(['create-checkout-session', 'stripe-webhook'])
 const userContextFunctions = new Set(['admin-refund-payment', 'scan-menu-import'])
-const browserFacingFunctions = new Set(['create-checkout-session', 'scan-menu-import'])
+const browserFacingFunctions = new Set(['create-checkout-session', 'scan-menu-import', 'admin-refund-payment'])
 
 const entries = await readdir(functionsDir, { withFileTypes: true })
 const functionNames = entries.filter((entry) => entry.isDirectory()).map((entry) => entry.name).sort()
@@ -35,7 +35,7 @@ for (const name of functionNames) {
 
   if (browserFacingFunctions.has(name)) {
     if (/Access-Control-Allow-Origin['"]?\s*:\s*['"]\*['"]/.test(source)) failures.push(`${name}: browser-facing function must not use wildcard CORS`)
-    if (!/content-length|maxBodyBytes|Request body is too large/i.test(source)) failures.push(`${name}: browser-facing function must enforce a request-size limit`)
+    if (!/content-length|maxBodyBytes|MAX_BODY_BYTES|Request body is too large/i.test(source)) failures.push(`${name}: browser-facing function must enforce a request-size limit`)
     if (!/consume_edge_function_rate_limit/.test(source)) failures.push(`${name}: browser-facing function must use the database-backed rate limiter`)
     if (!/Retry-After/.test(source)) failures.push(`${name}: rate-limited responses must include Retry-After`)
     if (!/CORS_ALLOWED_ORIGINS/.test(source)) failures.push(`${name}: browser-facing function must use the configured origin allow-list`)
@@ -45,6 +45,13 @@ for (const name of functionNames) {
     if (!/allowedMimeTypes/.test(source) || !/application\/pdf/.test(source)) failures.push(`${name}: menu file MIME types must be allow-listed`)
     if (!/1500/.test(source) || !/scan_instructions/.test(source)) failures.push(`${name}: scan instructions must have a bounded length`)
     if (!/15 \* 1024 \* 1024/.test(source)) failures.push(`${name}: uploaded menu size must remain capped at 15 MB`)
+  }
+
+  if (name === 'admin-refund-payment') {
+    if (!/PLATFORM_ADMIN_URL/.test(source)) failures.push(`${name}: admin origin must be explicitly allow-listed`)
+    if (!/admin:\$\{userData\.user\.id\}/.test(source)) failures.push(`${name}: administrator-specific rate limiting was not detected`)
+    if (!/order:\$\{orderId\}/.test(source)) failures.push(`${name}: order-specific refund rate limiting was not detected`)
+    if (/return reply\(request,\s*\{\s*error:\s*(message|internalMessage)/.test(source)) failures.push(`${name}: internal Stripe errors must not be returned directly to clients`)
   }
 }
 
