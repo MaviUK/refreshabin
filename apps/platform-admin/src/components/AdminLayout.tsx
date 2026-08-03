@@ -9,6 +9,7 @@ const navItems: Array<{ to: string; label: string; icon: string; end: boolean; p
   { to: '/restaurants', label: 'Restaurants', icon: '▣', end: false, permission: 'restaurants:view' },
   { to: '/orders', label: 'Orders', icon: '◎', end: false, permission: 'orders:view' },
   { to: '/support', label: 'Support', icon: '◇', end: false, permission: 'support:view' },
+  { to: '/moderation', label: 'Moderation', icon: '◈', end: false, permission: 'moderation:view' },
   { to: '/payments', label: 'Payments', icon: '¤', end: false, permission: 'finance:view' },
   { to: '/financials', label: 'Financials', icon: '▤', end: false, permission: 'finance:view' },
   { to: '/fees', label: 'Fees', icon: '£', end: false, permission: 'finance:view' },

@@ -14,6 +14,8 @@ export type AdminPermission =
   | 'finance:manage'
   | 'settings:view'
   | 'settings:manage'
+  | 'moderation:view'
+  | 'moderation:manage'
   | 'audit:view'
   | 'admins:view'
   | 'admins:manage'

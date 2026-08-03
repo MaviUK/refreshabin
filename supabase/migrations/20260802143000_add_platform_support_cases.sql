@@ -3,9 +3,9 @@ begin;
 create or replace function private.platform_admin_permissions(p_role text)
 returns text[] language sql immutable set search_path='' as $f$
  select case p_role
-  when 'super_admin' then array['overview:view','restaurants:view','restaurants:manage','orders:view','orders:manage','orders:customer_details','customers:view','support:view','support:manage','finance:view','finance:manage','settings:view','settings:manage','audit:view','admins:view','admins:manage']::text[]
-  when 'operations' then array['overview:view','restaurants:view','restaurants:manage','orders:view','orders:manage','orders:customer_details','support:view','support:manage','settings:view','audit:view']::text[]
-  when 'support' then array['overview:view','restaurants:view','orders:view','orders:customer_details','customers:view','support:view','support:manage','audit:view']::text[]
+  when 'super_admin' then array['overview:view','restaurants:view','restaurants:manage','orders:view','orders:manage','orders:customer_details','customers:view','support:view','support:manage','finance:view','finance:manage','settings:view','settings:manage','moderation:view','moderation:manage','audit:view','admins:view','admins:manage']::text[]
+  when 'operations' then array['overview:view','restaurants:view','restaurants:manage','orders:view','orders:manage','orders:customer_details','support:view','support:manage','settings:view','moderation:view','moderation:manage','audit:view']::text[]
+  when 'support' then array['overview:view','restaurants:view','orders:view','orders:customer_details','customers:view','support:view','support:manage','moderation:view','audit:view']::text[]
   when 'finance' then array['overview:view','orders:view','support:view','finance:view','finance:manage','audit:view']::text[]
   else array[]::text[] end;
 $f$;
