@@ -53,6 +53,14 @@ for (const name of functionNames) {
     if (!/order:\$\{orderId\}/.test(source)) failures.push(`${name}: order-specific refund rate limiting was not detected`)
     if (/return reply\(request,\s*\{\s*error:\s*(message|internalMessage)/.test(source)) failures.push(`${name}: internal Stripe errors must not be returned directly to clients`)
   }
+
+  if (name === 'stripe-webhook') {
+    if (!/MAX_BODY_BYTES/.test(source) || !/413/.test(source)) failures.push(`${name}: webhook payload size must be capped`)
+    if (!/constructEventAsync[\s\S]*300/.test(source)) failures.push(`${name}: Stripe signature timestamp tolerance must remain explicit`)
+    if (!/MAX_EVENT_AGE_SECONDS/.test(source) || !/MAX_FUTURE_SKEW_SECONDS/.test(source)) failures.push(`${name}: event-age validation was not detected`)
+    if (!/claim_stripe_webhook_event/.test(source) || !/complete_stripe_webhook_event/.test(source)) failures.push(`${name}: atomic webhook event lifecycle was not detected`)
+    if (/console\.error\('Invalid Stripe signature',\s*error/.test(source)) failures.push(`${name}: signature failures must not log raw verification errors`)
+  }
 }
 
 for (const name of configured.keys()) {
