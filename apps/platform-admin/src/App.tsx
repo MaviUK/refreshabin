@@ -15,6 +15,7 @@ import Orders from './pages/Orders'
 import Payments from './pages/Payments'
 import Overview from './pages/Overview'
 import ResetPassword from './pages/ResetPassword'
+import RestaurantActivityPage from './pages/RestaurantActivityPage'
 import Restaurants from './pages/Restaurants'
 import Settings from './pages/Settings'
 import Support from './pages/Support'
@@ -41,6 +42,7 @@ export default function App() {
         <Route element={<AdminLayout />}>
           <Route index element={<Overview />} />
           <Route path="restaurants" element={<PermissionRoute permission="restaurants:view"><Restaurants /></PermissionRoute>} />
+          <Route path="restaurant-activity" element={<PermissionRoute permission="restaurants:view"><RestaurantActivityPage /></PermissionRoute>} />
           <Route path="customers" element={<PermissionRoute permission="customers:view"><Customers /></PermissionRoute>} />
           <Route path="orders" element={<PermissionRoute permission="orders:view"><Orders /></PermissionRoute>} />
           <Route path="support" element={<PermissionRoute permission="support:view"><Support /></PermissionRoute>} />
