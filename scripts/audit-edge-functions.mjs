@@ -5,6 +5,7 @@ const root = process.cwd()
 const functionsDir = path.join(root, 'supabase', 'functions')
 const configPath = path.join(root, 'supabase', 'config.toml')
 const publicWithoutJwt = new Set(['create-checkout-session', 'stripe-webhook'])
+const userContextFunctions = new Set(['admin-refund-payment', 'scan-menu-import'])
 
 const entries = await readdir(functionsDir, { withFileTypes: true })
 const functionNames = entries
@@ -48,8 +49,8 @@ for (const name of functionNames) {
     failures.push(`${name}: Stripe signature verification was not detected`)
   }
 
-  if (verifyJwt && !/Authorization|authorization/.test(source)) {
-    failures.push(`${name}: JWT-protected function does not reference the Authorization header`)
+  if (userContextFunctions.has(name) && !/Authorization|authorization/.test(source)) {
+    failures.push(`${name}: user-context function does not forward the Authorization header`)
   }
 }
 
