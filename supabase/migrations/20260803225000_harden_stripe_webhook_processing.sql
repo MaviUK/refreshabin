@@ -33,6 +33,7 @@ set search_path = ''
 as $function$
 declare
   existing public.stripe_webhook_events%rowtype;
+  inserted_count integer := 0;
 begin
   if coalesce(auth.jwt()->>'role', '') <> 'service_role' then
     raise exception 'Service role required' using errcode = '42501';
@@ -44,6 +45,11 @@ begin
   insert into public.stripe_webhook_events(event_id, event_type, status, attempts, last_error, updated_at)
   values(trim(p_event_id), trim(p_event_type), 'processing', 1, null, now())
   on conflict (event_id) do nothing;
+  get diagnostics inserted_count = row_count;
+
+  if inserted_count = 1 then
+    return jsonb_build_object('claimed', true, 'duplicate', false, 'status', 'processing');
+  end if;
 
   select * into existing
   from public.stripe_webhook_events
@@ -54,14 +60,14 @@ begin
     return jsonb_build_object('claimed', false, 'duplicate', true, 'status', existing.status);
   end if;
 
-  if existing.status = 'processing' and existing.updated_at > now() - interval '10 minutes' and existing.attempts > 1 then
+  if existing.status = 'processing' and existing.updated_at > now() - interval '10 minutes' then
     return jsonb_build_object('claimed', false, 'duplicate', true, 'status', existing.status);
   end if;
 
   update public.stripe_webhook_events
   set status = 'processing',
       event_type = trim(p_event_type),
-      attempts = case when existing.status = 'processing' and existing.attempts = 1 then existing.attempts else existing.attempts + 1 end,
+      attempts = existing.attempts + 1,
       last_error = null,
       updated_at = now()
   where event_id = trim(p_event_id);
