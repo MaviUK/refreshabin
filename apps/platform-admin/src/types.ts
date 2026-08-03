@@ -8,6 +8,7 @@ export type AdminPermission =
   | 'orders:manage'
   | 'orders:customer_details'
   | 'customers:view'
+  | 'customers:manage'
   | 'support:view'
   | 'support:manage'
   | 'finance:view'
@@ -38,7 +39,7 @@ export const adminRoleLabels: Record<AdminRole, string> = {
 export const adminRoleDescriptions: Record<AdminRole, string> = {
   super_admin: 'Full platform access, including administrator security and roles.',
   operations: 'Restaurants and order operations, without administrator or financial control.',
-  support: 'Read-only restaurant, order and customer support access.',
+  support: 'Customer support, account management and case-resolution access.',
   finance: 'Order, payment, refund and reporting access without restaurant control.',
 }
 
