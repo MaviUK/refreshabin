@@ -6,6 +6,7 @@ const functionsDir = path.join(root, 'supabase', 'functions')
 const configPath = path.join(root, 'supabase', 'config.toml')
 const publicWithoutJwt = new Set(['create-checkout-session', 'stripe-webhook'])
 const userContextFunctions = new Set(['admin-refund-payment', 'scan-menu-import'])
+const browserPublicFunctions = new Set(['create-checkout-session'])
 
 const entries = await readdir(functionsDir, { withFileTypes: true })
 const functionNames = entries
@@ -51,6 +52,21 @@ for (const name of functionNames) {
 
   if (userContextFunctions.has(name) && !/Authorization|authorization/.test(source)) {
     failures.push(`${name}: user-context function does not forward the Authorization header`)
+  }
+
+  if (browserPublicFunctions.has(name)) {
+    if (/Access-Control-Allow-Origin['"]?\s*:\s*['"]\*['"]/.test(source)) {
+      failures.push(`${name}: browser-facing public function must not use wildcard CORS`)
+    }
+    if (!/content-length|maxBodyBytes|Request body is too large/i.test(source)) {
+      failures.push(`${name}: browser-facing public function must enforce a request-size limit`)
+    }
+    if (!/consume_edge_function_rate_limit/.test(source)) {
+      failures.push(`${name}: browser-facing public function must use the database-backed rate limiter`)
+    }
+    if (!/Retry-After/.test(source)) {
+      failures.push(`${name}: rate-limited responses must include Retry-After`)
+    }
   }
 }
 
