@@ -107,7 +107,7 @@ async function buildRows(
   if (type === 'support_sla') {
     const { data, error } = await supabase
       .from('platform_support_cases')
-      .select('case_number,subject,status,priority,response_due_at,resolution_due_at,first_responded_at,last_contact_at,created_at')
+      .select('case_number,subject,status,priority,response_due_at,resolution_due_at,first_response_at,last_contact_at,created_at')
       .gte('created_at', `${from}T00:00:00Z`)
       .lte('created_at', `${to}T23:59:59Z`)
       .order('created_at')
