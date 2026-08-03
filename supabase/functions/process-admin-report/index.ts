@@ -90,9 +90,9 @@ async function buildRows(
   to: string,
 ): Promise<Record<string, unknown>[]> {
   if (type === 'financial_summary') {
-    const { data, error } = await supabase.rpc('get_platform_financial_report', { p_from: from, p_to: to })
+    const { data, error } = await supabase.rpc('get_service_financial_report_export', { p_from: from, p_to: to })
     if (error) throw error
-    return data?.restaurants ?? data?.rows ?? []
+    return data ?? []
   }
   if (type === 'order_operations') {
     const { data, error } = await supabase
@@ -125,8 +125,22 @@ async function buildRows(
     return data ?? []
   }
 
-  const days = Math.max(1, Math.ceil((new Date(to).getTime() - new Date(from).getTime()) / 86_400_000) + 1)
-  const { data, error } = await supabase.rpc('get_platform_analytics', { p_days: days })
+  const { data, error } = await supabase
+    .from('orders')
+    .select('restaurant_id,total_pence,order_status,created_at,restaurants(name)')
+    .gte('created_at', `${from}T00:00:00Z`)
+    .lte('created_at', `${to}T23:59:59Z`)
   if (error) throw error
-  return data?.restaurant_performance ?? []
+
+  const grouped = new Map<string, { restaurant: string; orders: number; gross_pence: number; cancelled_or_rejected: number }>()
+  for (const order of data ?? []) {
+    const id = String(order.restaurant_id)
+    const restaurant = Array.isArray(order.restaurants) ? order.restaurants[0]?.name : order.restaurants?.name
+    const current = grouped.get(id) ?? { restaurant: restaurant ?? 'Unknown restaurant', orders: 0, gross_pence: 0, cancelled_or_rejected: 0 }
+    current.orders += 1
+    current.gross_pence += Number(order.total_pence ?? 0)
+    if (['cancelled', 'rejected'].includes(String(order.order_status))) current.cancelled_or_rejected += 1
+    grouped.set(id, current)
+  }
+  return [...grouped.values()].sort((a, b) => b.gross_pence - a.gross_pence)
 }
