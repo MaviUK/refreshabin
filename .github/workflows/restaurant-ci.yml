@@ -63,6 +63,9 @@ jobs:
       - name: Audit critical performance indexes
         run: node scripts/audit-platform-performance-indexes.mjs
 
+      - name: Audit bounded admin query plans
+        run: node scripts/audit-admin-query-bounds.mjs
+
       - name: Audit Edge Function security settings
         run: node scripts/audit-edge-functions.mjs
 
