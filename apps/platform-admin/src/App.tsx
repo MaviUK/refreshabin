@@ -21,6 +21,7 @@ import Overview from './pages/Overview'
 import ResetPassword from './pages/ResetPassword'
 import RestaurantActivityPage from './pages/RestaurantActivityPage'
 import Restaurants from './pages/Restaurants'
+import ScheduledReports from './pages/ScheduledReports'
 import SecurityRisk from './pages/SecurityRisk'
 import Settings from './pages/Settings'
 import Support from './pages/Support'
@@ -61,6 +62,7 @@ export default function App() {
           <Route path="payouts" element={<PermissionRoute permission="finance:view"><Payouts /></PermissionRoute>} />
           <Route path="fees" element={<PermissionRoute permission="finance:view"><Fees /></PermissionRoute>} />
           <Route path="financials" element={<PermissionRoute permission="finance:view"><Financials /></PermissionRoute>} />
+          <Route path="scheduled-reports" element={<PermissionRoute permission="finance:view"><ScheduledReports /></PermissionRoute>} />
           <Route path="alerts" element={<PermissionRoute permission="settings:view"><Alerts /></PermissionRoute>} />
           <Route path="settings" element={<PermissionRoute permission="settings:view"><Settings /></PermissionRoute>} />
           <Route path="admins" element={<PermissionRoute permission="admins:view"><Admins /></PermissionRoute>} />
