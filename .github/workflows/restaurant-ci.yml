@@ -57,6 +57,9 @@ jobs:
       - name: Audit platform-admin table security
         run: node scripts/audit-admin-table-security.mjs
 
+      - name: Audit operational RLS policies
+        run: node scripts/audit-operational-rls.mjs
+
       - name: Audit Edge Function security settings
         run: node scripts/audit-edge-functions.mjs
 
