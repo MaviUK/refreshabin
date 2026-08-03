@@ -1,13 +1,20 @@
 project_id = "uvlzxrsqylwksgwpsslp"
 
+# Public customer checkout endpoint. It validates the order state server-side and must
+# remain callable before a customer signs in.
 [functions.create-checkout-session]
 verify_jwt = false
 
+# Stripe authenticates webhook requests with its signing secret rather than a Supabase JWT.
 [functions.stripe-webhook]
 verify_jwt = false
 
+# Privileged administrator operations must always require a valid Supabase access token.
 [functions.admin-refund-payment]
-verify_jwt = false
+verify_jwt = true
+
+[functions.scan-menu-import]
+verify_jwt = true
 
 [functions.process-admin-report]
 verify_jwt = true
