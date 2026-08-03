@@ -10,6 +10,7 @@ on:
       - 'apps/platform-admin/**'
       - 'packages/**'
       - 'scripts/**'
+      - 'supabase/config.toml'
       - 'supabase/migrations/**'
       - 'supabase/functions/**'
       - 'package.json'
@@ -52,6 +53,9 @@ jobs:
 
       - name: Audit platform-admin RPC permissions
         run: node scripts/audit-admin-rpc-permissions.mjs
+
+      - name: Audit Edge Function security settings
+        run: node scripts/audit-edge-functions.mjs
 
       - name: Type-check restaurant app
         run: pnpm --filter @ordered/restaurant lint
