@@ -1,4 +1,4 @@
-name: Restaurant CI
+name: Platform CI
 
 on:
   push:
@@ -7,7 +7,10 @@ on:
   pull_request:
     paths:
       - 'apps/restaurant/**'
+      - 'apps/platform-admin/**'
       - 'packages/**'
+      - 'supabase/migrations/**'
+      - 'supabase/functions/**'
       - 'package.json'
       - 'pnpm-workspace.yaml'
       - '.github/workflows/restaurant-ci.yml'
@@ -15,7 +18,7 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 12
 
     steps:
       - name: Checkout repository
@@ -32,8 +35,28 @@ jobs:
       - name: Install dependencies
         run: pnpm install --no-frozen-lockfile
 
-      - name: Lint restaurant app
+      - name: Validate Supabase migration versions
+        shell: bash
+        run: |
+          set -euo pipefail
+          duplicates="$(find supabase/migrations -maxdepth 1 -type f -name '*.sql' -printf '%f\n' \
+            | sed -E 's/^([0-9]{14}).*/\1/' \
+            | sort \
+            | uniq -d)"
+          if [ -n "$duplicates" ]; then
+            echo "Duplicate Supabase migration versions found:"
+            echo "$duplicates"
+            exit 1
+          fi
+
+      - name: Type-check restaurant app
         run: pnpm --filter @ordered/restaurant lint
 
       - name: Build restaurant app
         run: pnpm --filter @ordered/restaurant build
+
+      - name: Type-check platform admin
+        run: pnpm --filter @ordered/platform-admin lint
+
+      - name: Build platform admin
+        run: pnpm --filter @ordered/platform-admin build
