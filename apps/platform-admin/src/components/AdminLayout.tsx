@@ -1,30 +1,69 @@
-import type { CSSProperties } from 'react'
-import { NavLink, Outlet, useNavigate, useOutletContext } from 'react-router-dom'
+import { useState, type CSSProperties } from 'react'
+import { NavLink, Outlet, useLocation, useNavigate, useOutletContext } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { adminRoleLabels, hasAdminPermission, type AdminPermission } from '../types'
 import type { AdminOutletContext } from './AdminGate'
 
-const navItems: Array<{ to: string; label: string; icon: string; end: boolean; permission: AdminPermission }> = [
-  { to: '/', label: 'Overview', icon: '⌂', end: true, permission: 'overview:view' },
-  { to: '/analytics', label: 'Analytics', icon: '▥', end: false, permission: 'overview:view' },
-  { to: '/restaurants', label: 'Restaurants', icon: '▣', end: false, permission: 'restaurants:view' },
-  { to: '/restaurant-activity', label: 'Restaurant activity', icon: '≋', end: false, permission: 'restaurants:view' },
-  { to: '/customers', label: 'Customers', icon: '♧', end: false, permission: 'customers:view' },
-  { to: '/orders', label: 'Orders', icon: '◎', end: false, permission: 'orders:view' },
-  { to: '/order-recovery', label: 'Order recovery', icon: '↺', end: false, permission: 'orders:view' },
-  { to: '/support', label: 'Support', icon: '◇', end: false, permission: 'support:view' },
-  { to: '/support-sla', label: 'Support SLA', icon: '◷', end: false, permission: 'support:view' },
-  { to: '/moderation', label: 'Moderation', icon: '◈', end: false, permission: 'moderation:view' },
-  { to: '/security-risk', label: 'Security & risk', icon: '⚠', end: false, permission: 'moderation:view' },
-  { to: '/payments', label: 'Payments', icon: '¤', end: false, permission: 'finance:view' },
-  { to: '/payouts', label: 'Payouts', icon: '⇄', end: false, permission: 'finance:view' },
-  { to: '/financials', label: 'Financials', icon: '▤', end: false, permission: 'finance:view' },
-  { to: '/scheduled-reports', label: 'Scheduled reports', icon: '◫', end: false, permission: 'finance:view' },
-  { to: '/fees', label: 'Fees', icon: '£', end: false, permission: 'finance:view' },
-  { to: '/alerts', label: 'Alert centre', icon: '!', end: false, permission: 'settings:view' },
-  { to: '/settings', label: 'Configuration', icon: '⚙', end: false, permission: 'settings:view' },
-  { to: '/admins', label: 'Admin access', icon: '♙', end: false, permission: 'admins:view' },
-  { to: '/audit', label: 'Audit log', icon: '↻', end: false, permission: 'audit:view' },
+type NavItem = {
+  to: string
+  label: string
+  icon: string
+  end: boolean
+  permission: AdminPermission
+  mobilePrimary?: boolean
+}
+
+type NavGroup = {
+  label: string
+  items: NavItem[]
+}
+
+const navGroups: NavGroup[] = [
+  {
+    label: 'Platform',
+    items: [
+      { to: '/', label: 'Overview', icon: '⌂', end: true, permission: 'overview:view', mobilePrimary: true },
+      { to: '/analytics', label: 'Analytics', icon: '▥', end: false, permission: 'overview:view' },
+      { to: '/alerts', label: 'Alert centre', icon: '!', end: false, permission: 'settings:view' },
+    ],
+  },
+  {
+    label: 'Operations',
+    items: [
+      { to: '/restaurants', label: 'Restaurants', icon: '▣', end: false, permission: 'restaurants:view', mobilePrimary: true },
+      { to: '/restaurant-activity', label: 'Restaurant activity', icon: '≋', end: false, permission: 'restaurants:view' },
+      { to: '/orders', label: 'Orders', icon: '◎', end: false, permission: 'orders:view', mobilePrimary: true },
+      { to: '/order-recovery', label: 'Order recovery', icon: '↺', end: false, permission: 'orders:view' },
+      { to: '/customers', label: 'Customers', icon: '♧', end: false, permission: 'customers:view' },
+    ],
+  },
+  {
+    label: 'Service & trust',
+    items: [
+      { to: '/support', label: 'Support', icon: '◇', end: false, permission: 'support:view', mobilePrimary: true },
+      { to: '/support-sla', label: 'Support SLA', icon: '◷', end: false, permission: 'support:view' },
+      { to: '/moderation', label: 'Moderation', icon: '◈', end: false, permission: 'moderation:view' },
+      { to: '/security-risk', label: 'Security & risk', icon: '⚠', end: false, permission: 'moderation:view' },
+    ],
+  },
+  {
+    label: 'Finance',
+    items: [
+      { to: '/payments', label: 'Payments', icon: '¤', end: false, permission: 'finance:view', mobilePrimary: true },
+      { to: '/payouts', label: 'Payouts', icon: '⇄', end: false, permission: 'finance:view' },
+      { to: '/financials', label: 'Financials', icon: '▤', end: false, permission: 'finance:view' },
+      { to: '/scheduled-reports', label: 'Scheduled reports', icon: '◫', end: false, permission: 'finance:view' },
+      { to: '/fees', label: 'Fees', icon: '£', end: false, permission: 'finance:view' },
+    ],
+  },
+  {
+    label: 'Administration',
+    items: [
+      { to: '/settings', label: 'Configuration', icon: '⚙', end: false, permission: 'settings:view' },
+      { to: '/admins', label: 'Admin access', icon: '♙', end: false, permission: 'admins:view' },
+      { to: '/audit', label: 'Audit log', icon: '↻', end: false, permission: 'audit:view' },
+    ],
+  },
 ]
 
 export function useAdmin() {
@@ -34,11 +73,23 @@ export function useAdmin() {
 export default function AdminLayout() {
   const { admin } = useOutletContext<AdminOutletContext>()
   const navigate = useNavigate()
-  const visibleNavItems = navItems.filter((item) => hasAdminPermission(admin, item.permission))
+  const location = useLocation()
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+
+  const visibleGroups = navGroups
+    .map((group) => ({ ...group, items: group.items.filter((item) => hasAdminPermission(admin, item.permission)) }))
+    .filter((group) => group.items.length > 0)
+  const visibleNavItems = visibleGroups.flatMap((group) => group.items)
+  const mobilePrimaryItems = visibleNavItems.filter((item) => item.mobilePrimary).slice(0, 4)
+  const activeItem = visibleNavItems.find((item) => item.end ? location.pathname === item.to : location.pathname.startsWith(item.to))
 
   async function signOut() {
     await supabase.auth.signOut()
     navigate('/login', { replace: true })
+  }
+
+  function closeMobileMenu() {
+    setMobileMenuOpen(false)
   }
 
   return (
@@ -49,11 +100,16 @@ export default function AdminLayout() {
           <span><strong>ordered.food</strong><small>Platform admin</small></span>
         </div>
 
-        <nav className="admin-nav" aria-label="Platform administration">
-          {visibleNavItems.map((item) => (
-            <NavLink key={item.to} to={item.to} end={item.end}>
-              <span aria-hidden="true">{item.icon}</span>{item.label}
-            </NavLink>
+        <nav className="admin-nav admin-nav-grouped" aria-label="Platform administration">
+          {visibleGroups.map((group) => (
+            <section className="admin-nav-group" key={group.label}>
+              <span className="admin-nav-group-label">{group.label}</span>
+              {group.items.map((item) => (
+                <NavLink key={item.to} to={item.to} end={item.end}>
+                  <span aria-hidden="true">{item.icon}</span>{item.label}
+                </NavLink>
+              ))}
+            </section>
           ))}
         </nav>
 
@@ -66,23 +122,34 @@ export default function AdminLayout() {
 
       <main className="admin-content">
         <header className="mobile-admin-header">
-          <div className="admin-brand"><span className="admin-brand-mark">o.</span><strong>Admin</strong></div>
-          <button type="button" onClick={() => void signOut()}>Sign out</button>
+          <div className="admin-brand"><span className="admin-brand-mark">o.</span><span><strong>{activeItem?.label || 'Admin'}</strong><small>ordered.food</small></span></div>
+          <button type="button" className="mobile-menu-button" onClick={() => setMobileMenuOpen(true)} aria-label="Open admin menu" aria-expanded={mobileMenuOpen}>☰</button>
         </header>
         <Outlet context={{ admin } satisfies AdminOutletContext} />
       </main>
 
       <nav
         className="mobile-admin-nav"
-        aria-label="Platform administration"
-        style={{ '--admin-nav-count': visibleNavItems.length } as CSSProperties}
+        aria-label="Primary platform administration"
+        style={{ '--admin-nav-count': mobilePrimaryItems.length + 1 } as CSSProperties}
       >
-        {visibleNavItems.map((item) => (
+        {mobilePrimaryItems.map((item) => (
           <NavLink key={item.to} to={item.to} end={item.end}>
             <span aria-hidden="true">{item.icon}</span><small>{item.label}</small>
           </NavLink>
         ))}
+        <button type="button" onClick={() => setMobileMenuOpen(true)}><span aria-hidden="true">☰</span><small>More</small></button>
       </nav>
+
+      {mobileMenuOpen && <div className="mobile-admin-drawer-backdrop" role="presentation" onMouseDown={closeMobileMenu}>
+        <aside className="mobile-admin-drawer" role="dialog" aria-modal="true" aria-label="Admin navigation" onMouseDown={(event) => event.stopPropagation()}>
+          <header><div className="admin-brand"><span className="admin-brand-mark">o.</span><span><strong>ordered.food</strong><small>Platform admin</small></span></div><button type="button" onClick={closeMobileMenu} aria-label="Close admin menu">×</button></header>
+          <nav aria-label="All platform administration">
+            {visibleGroups.map((group) => <section className="mobile-admin-drawer-group" key={group.label}><span>{group.label}</span>{group.items.map((item) => <NavLink key={item.to} to={item.to} end={item.end} onClick={closeMobileMenu}><i aria-hidden="true">{item.icon}</i>{item.label}</NavLink>)}</section>)}
+          </nav>
+          <footer><span><strong>{admin.display_name}</strong><small>{adminRoleLabels[admin.role]}</small></span><button type="button" onClick={() => void signOut()}>Sign out</button></footer>
+        </aside>
+      </div>}
     </div>
   )
 }
