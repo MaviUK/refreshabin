@@ -34,6 +34,28 @@ function json(request: Request, body: unknown, status = 200) {
   })
 }
 
+function paymentErrorDetails(error: unknown) {
+  if (error instanceof Error) return { message: error.message, type: error.name }
+  if (typeof error === 'string') return { message: error }
+  if (error && typeof error === 'object') {
+    const value = error as Record<string, unknown>
+    const raw = value.raw && typeof value.raw === 'object' ? value.raw as Record<string, unknown> : undefined
+    const message = typeof value.message === 'string'
+      ? value.message
+      : typeof raw?.message === 'string'
+        ? raw.message
+        : 'Payment provider returned an unrecognised error.'
+    return {
+      message,
+      type: typeof value.type === 'string' ? value.type : typeof raw?.type === 'string' ? raw.type : undefined,
+      code: typeof value.code === 'string' ? value.code : typeof raw?.code === 'string' ? raw.code : undefined,
+      decline_code: typeof value.decline_code === 'string' ? value.decline_code : typeof raw?.decline_code === 'string' ? raw.decline_code : undefined,
+      request_id: typeof value.requestId === 'string' ? value.requestId : undefined,
+    }
+  }
+  return { message: 'Payment provider returned an unknown error.' }
+}
+
 Deno.serve(async (request) => {
   const cors = corsHeaders(request)
   if (request.method === 'OPTIONS') return new Response('ok', { status: 200, headers: cors })
@@ -129,8 +151,8 @@ Deno.serve(async (request) => {
     if (!updated) return json(request, { error: 'This order changed on another device.' }, 409)
     return json(request, { success: true, order_status: 'rejected', payment_status: rejectedPaymentStatus })
   } catch (error) {
-    console.error('Restaurant payment decision failed', error)
-    const message = error instanceof Error ? error.message : 'Unknown payment error.'
-    return json(request, { error: message }, 500)
+    const details = paymentErrorDetails(error)
+    console.error('Restaurant payment decision failed', JSON.stringify(details))
+    return json(request, { error: details.message, details }, 500)
   }
 })
