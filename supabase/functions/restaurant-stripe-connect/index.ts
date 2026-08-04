@@ -1,13 +1,41 @@
 import Stripe from 'npm:stripe@^22'
 import { createClient } from 'npm:@supabase/supabase-js@2'
 
-const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), {
+function allowedOrigins() {
+  const origins = (Deno.env.get('CORS_ALLOWED_ORIGINS') ?? '')
+    .split(',')
+    .map((value) => value.trim().replace(/\/$/, ''))
+    .filter(Boolean)
+  const siteUrl = (Deno.env.get('SITE_URL') ?? '').trim().replace(/\/$/, '')
+  if (siteUrl) origins.push(siteUrl)
+  return new Set(origins)
+}
+
+function corsHeaders(request: Request) {
+  const origin = request.headers.get('Origin')?.replace(/\/$/, '') ?? ''
+  const allowed = allowedOrigins()
+  return {
+    'Access-Control-Allow-Origin': origin && allowed.has(origin) ? origin : 'null',
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+    'Access-Control-Max-Age': '86400',
+    'Vary': 'Origin',
+  }
+}
+
+const json = (request: Request, body: unknown, status = 200) => new Response(JSON.stringify(body), {
   status,
-  headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' },
+  headers: { ...corsHeaders(request), 'Content-Type': 'application/json', 'Cache-Control': 'no-store' },
 })
 
 Deno.serve(async (request) => {
-  if (request.method !== 'POST') return json({ error: 'Method not allowed.' }, 405)
+  const headers = corsHeaders(request)
+  const origin = request.headers.get('Origin')?.replace(/\/$/, '') ?? ''
+  if (origin && headers['Access-Control-Allow-Origin'] === 'null') {
+    return json(request, { error: 'Origin is not allowed.' }, 403)
+  }
+  if (request.method === 'OPTIONS') return new Response('ok', { headers })
+  if (request.method !== 'POST') return json(request, { error: 'Method not allowed.' }, 405)
 
   const stripeKey = Deno.env.get('STRIPE_SECRET_KEY')
   const supabaseUrl = Deno.env.get('SUPABASE_URL')
@@ -16,7 +44,7 @@ Deno.serve(async (request) => {
   const authHeader = request.headers.get('Authorization')
 
   if (!stripeKey || !supabaseUrl || !serviceRoleKey || !siteUrl || !authHeader) {
-    return json({ error: 'Stripe Connect is not configured.' }, 500)
+    return json(request, { error: 'Stripe Connect is not configured.' }, 500)
   }
 
   const userClient = createClient(supabaseUrl, serviceRoleKey, {
@@ -28,12 +56,12 @@ Deno.serve(async (request) => {
   })
 
   const { data: userData, error: userError } = await userClient.auth.getUser(authHeader.replace(/^Bearer\s+/i, ''))
-  if (userError || !userData.user) return json({ error: 'Authentication required.' }, 401)
+  if (userError || !userData.user) return json(request, { error: 'Authentication required.' }, 401)
 
   let body: { action?: string }
-  try { body = await request.json() } catch { return json({ error: 'Invalid request body.' }, 400) }
+  try { body = await request.json() } catch { return json(request, { error: 'Invalid request body.' }, 400) }
   const action = body.action ?? 'status'
-  if (!['status', 'onboard', 'dashboard'].includes(action)) return json({ error: 'Unsupported action.' }, 400)
+  if (!['status', 'onboard', 'dashboard'].includes(action)) return json(request, { error: 'Unsupported action.' }, 400)
 
   const { data: membership, error: membershipError } = await serviceClient
     .from('restaurant_members')
@@ -42,14 +70,14 @@ Deno.serve(async (request) => {
     .limit(1)
     .single()
 
-  if (membershipError || !membership) return json({ error: 'Restaurant membership not found.' }, 403)
+  if (membershipError || !membership) return json(request, { error: 'Restaurant membership not found.' }, 403)
 
   const restaurant = Array.isArray(membership.restaurants) ? membership.restaurants[0] : membership.restaurants
   const stripe = new Stripe(stripeKey)
   let accountId = restaurant.stripe_account_id as string | null
 
   if (!accountId) {
-    if (action === 'dashboard') return json({ error: 'Connect Stripe before opening the dashboard.' }, 409)
+    if (action === 'dashboard') return json(request, { error: 'Connect Stripe before opening the dashboard.' }, 409)
     const account = await stripe.accounts.create({
       type: 'express',
       country: 'GB',
@@ -88,16 +116,16 @@ Deno.serve(async (request) => {
       return_url: `${siteUrl}/payments?stripe=return`,
       type: 'account_onboarding',
     })
-    return json({ url: link.url })
+    return json(request, { url: link.url })
   }
 
   if (action === 'dashboard') {
-    if (!account.details_submitted) return json({ error: 'Complete Stripe onboarding first.' }, 409)
+    if (!account.details_submitted) return json(request, { error: 'Complete Stripe onboarding first.' }, 409)
     const loginLink = await stripe.accounts.createLoginLink(account.id)
-    return json({ url: loginLink.url })
+    return json(request, { url: loginLink.url })
   }
 
-  return json({
+  return json(request, {
     restaurant_id: restaurant.id,
     stripe_account_id: account.id,
     status: account.charges_enabled && account.payouts_enabled ? 'enabled' : account.details_submitted ? 'restricted' : 'pending',
