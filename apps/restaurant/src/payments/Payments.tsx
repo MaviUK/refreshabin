@@ -47,6 +47,7 @@ export default function Payments() {
     try {
       const data = await invoke('status')
       setStatus(data as ConnectStatus)
+      setError('')
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'Unable to load payment status.')
     } finally {
@@ -56,17 +57,23 @@ export default function Payments() {
   }, [invoke])
 
   useEffect(() => {
-    void refresh()
-  }, [refresh])
+    let cancelled = false
 
-  useEffect(() => {
-    if (!searchParams.get('stripe')) return
-    void refresh().finally(() => {
+    async function load() {
+      await refresh()
+      if (cancelled || !searchParams.get('stripe')) return
       const next = new URLSearchParams(searchParams)
       next.delete('stripe')
       setSearchParams(next, { replace: true })
-    })
-  }, [refresh, searchParams, setSearchParams])
+    }
+
+    void load()
+    return () => { cancelled = true }
+    // Run once for this mounted page. The previous implementation launched two
+    // simultaneous refreshes after returning from Stripe, allowing a late failed
+    // request to leave an error banner over a successful status response.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   async function openStripe(action: 'onboard' | 'dashboard') {
     setBusy(action)
