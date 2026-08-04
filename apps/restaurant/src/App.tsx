@@ -78,7 +78,7 @@ function ApplicationRoutes() {
       <Route path="/restaurant-details" element={<ProtectedRoute><RestaurantDetails /></ProtectedRoute>} />
       <Route path="/delivery-areas" element={<ProtectedRoute><DeliveryAreas /></ProtectedRoute>} />
       <Route path="/delivery-map" element={<ProtectedRoute><DeliveryMap /></ProtectedRoute>} />
-      <Route path="/payments" element={<ProtectedRoute><Payments /></ProtectedRoute>} />
+      <Route path="/payments" element={<ProtectedRoute allowPaymentSetup><Payments /></ProtectedRoute>} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   )
