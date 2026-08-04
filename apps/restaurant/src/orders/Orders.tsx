@@ -486,7 +486,25 @@ export default function Orders() {
   }, [loadOrders, restaurantId])
 
   async function decideNewOrder(order: Order, action: 'accept' | 'reject', preparationMinutes?: number, promisedAt?: string) {
+    let { data: sessionData, error: sessionError } = await supabase.auth.getSession()
+    if (sessionError) throw sessionError
+
+    let session = sessionData.session
+    const expiresSoon = session?.expires_at && session.expires_at * 1000 <= Date.now() + 60_000
+    if (expiresSoon) {
+      const refreshed = await supabase.auth.refreshSession()
+      if (refreshed.error) throw refreshed.error
+      session = refreshed.data.session
+    }
+
+    if (!session?.access_token) {
+      throw new Error('Your session has expired. Please sign in again before accepting or rejecting orders.')
+    }
+
     const { data, error: decisionError } = await supabase.functions.invoke<PaymentDecisionResult>('restaurant-order-payment', {
+      headers: {
+        Authorization: `Bearer ${session.access_token}`,
+      },
       body: {
         order_id: order.id,
         action,
@@ -686,7 +704,6 @@ export default function Orders() {
                   <span className="order-number">Order #{order.order_number}</span>
                   <strong>{order.customer_first_name} {order.customer_last_name}</strong>
                   <small>{time.format(new Date(order.created_at))} · {order.fulfilment_method}</small>
-                  {order.order_status === 'placed' && order.payment_status === 'authorized' && <small className="requested-time">Card authorised — not charged yet</small>}
                   {order.requested_fulfilment_at && <small className="requested-time">Customer requested {time.format(new Date(order.requested_fulfilment_at))}</small>}
                   {order.estimated_ready_at && activeStatuses.includes(order.order_status) && <small className="ready-time">Due {time.format(new Date(order.estimated_ready_at))}</small>}
                 </div>
