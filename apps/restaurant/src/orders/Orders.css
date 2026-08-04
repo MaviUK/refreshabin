@@ -490,6 +490,42 @@
   color: #6b756e;
 }
 
+/* The first still-waiting order becomes a blocking modal. Because the active
+   queue is rendered oldest-first, accepting or rejecting it automatically
+   promotes the next oldest waiting order. */
+.orders-page:has(.orders-tabs button:first-child.active)
+  .orders-list
+  > .order-card.status-placed:not(.order-card.status-placed ~ .order-card.status-placed) {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  z-index: 1000;
+  width: min(720px, calc(100vw - 32px));
+  max-height: calc(100dvh - 32px);
+  overflow-y: auto;
+  transform: translate(-50%, -50%);
+  border-left-width: 8px;
+  box-shadow:
+    0 0 0 100vmax rgba(10, 18, 13, 0.72),
+    0 28px 80px rgba(0, 0, 0, 0.32);
+  overscroll-behavior: contain;
+}
+
+.orders-page:has(.orders-tabs button:first-child.active)
+  .orders-list
+  > .order-card.status-placed:not(.order-card.status-placed ~ .order-card.status-placed)
+  .order-card-header::before {
+  content: 'New order — action required';
+  display: block;
+  grid-column: 1 / -1;
+  margin-bottom: 4px;
+  color: #b91c1c;
+  font-size: 0.75rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
 @media (max-width: 760px) {
   .orders-page { padding: 0 14px 32px; }
   .orders-header { min-height: 68px; }
@@ -508,4 +544,14 @@
   .prep-time-picker button { flex: 1 1 calc(50% - 8px); }
   .prep-time-picker > span { flex-basis: 100%; }
   .custom-prep-time { flex: 1 1 100%; grid-template-columns: auto minmax(72px, 1fr) auto; }
+
+  .orders-page:has(.orders-tabs button:first-child.active)
+    .orders-list
+    > .order-card.status-placed:not(.order-card.status-placed ~ .order-card.status-placed) {
+    top: 12px;
+    width: calc(100vw - 24px);
+    max-height: calc(100dvh - 24px);
+    transform: translateX(-50%);
+    border-radius: 18px;
+  }
 }
