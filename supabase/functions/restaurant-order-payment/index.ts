@@ -68,10 +68,19 @@ Deno.serve(async (request) => {
   const authHeader = request.headers.get('Authorization')
   if (!stripeKey || !supabaseUrl || !serviceRoleKey || !authHeader) return json(request, { error: 'Payment service is not configured.' }, 500)
 
-  let body: { order_id?: unknown; action?: unknown; preparation_minutes?: unknown; promised_at?: unknown }
+  let body: {
+    order_id?: unknown
+    action?: unknown
+    preparation_minutes?: unknown
+    promised_at?: unknown
+    rejection_reason?: unknown
+  }
   try { body = await request.json() } catch { return json(request, { error: 'Invalid request body.' }, 400) }
   const orderId = typeof body.order_id === 'string' ? body.order_id : ''
   const action = body.action === 'accept' || body.action === 'reject' ? body.action : ''
+  const rejectionReason = typeof body.rejection_reason === 'string' && body.rejection_reason.trim()
+    ? body.rejection_reason.trim().slice(0, 500)
+    : 'Restaurant unable to fulfil the order'
   if (!/^[0-9a-f-]{36}$/i.test(orderId) || !action) return json(request, { error: 'A valid order and action are required.' }, 400)
 
   const client = createClient(supabaseUrl, serviceRoleKey, { auth: { persistSession: false, autoRefreshToken: false } })
@@ -145,11 +154,20 @@ Deno.serve(async (request) => {
     }
 
     const { data: updated, error } = await client.from('orders').update({
-      order_status: 'rejected', payment_status: rejectedPaymentStatus, cancelled_at: now, manual_payout_status: 'not_applicable',
+      order_status: 'rejected',
+      payment_status: rejectedPaymentStatus,
+      rejection_reason: rejectionReason,
+      cancelled_at: now,
+      manual_payout_status: 'not_applicable',
     }).eq('id', order.id).eq('order_status', 'placed').select('id').maybeSingle()
     if (error) throw error
     if (!updated) return json(request, { error: 'This order changed on another device.' }, 409)
-    return json(request, { success: true, order_status: 'rejected', payment_status: rejectedPaymentStatus })
+    return json(request, {
+      success: true,
+      order_status: 'rejected',
+      payment_status: rejectedPaymentStatus,
+      rejection_reason: rejectionReason,
+    })
   } catch (error) {
     const details = paymentErrorDetails(error)
     console.error('Restaurant payment decision failed', JSON.stringify(details))
