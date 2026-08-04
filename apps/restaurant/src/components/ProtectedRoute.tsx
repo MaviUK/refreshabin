@@ -9,15 +9,10 @@ type ProtectedRouteProps = {
   allowPaymentSetup?: boolean
 }
 
-export default function ProtectedRoute({
-  children,
-  allowApplication = false,
-  allowPaymentSetup = false,
-}: ProtectedRouteProps) {
+export default function ProtectedRoute({ children, allowApplication = false }: ProtectedRouteProps) {
   const [session, setSession] = useState<Session | null>(null)
   const [loading, setLoading] = useState(true)
   const [applicationRequired, setApplicationRequired] = useState(false)
-  const [paymentSetupRequired, setPaymentSetupRequired] = useState(false)
   const location = useLocation()
 
   useEffect(() => {
@@ -26,50 +21,33 @@ export default function ProtectedRoute({
     async function loadAccess() {
       const { data } = await supabase.auth.getSession()
       if (!active) return
-
       setSession(data.session)
       setApplicationRequired(false)
-      setPaymentSetupRequired(false)
 
       if (data.session) {
         const { data: membership } = await supabase
           .from('restaurant_members')
-          .select('restaurant_id,restaurants(status,stripe_charges_enabled,stripe_payouts_enabled)')
+          .select('restaurant_id,restaurants(status)')
           .eq('user_id', data.session.user.id)
           .order('created_at', { ascending: true })
           .limit(1)
           .maybeSingle()
 
         if (!active) return
-
         const relation = membership?.restaurants
-        const restaurant = (Array.isArray(relation) ? relation[0] : relation) as {
-          status?: string
-          stripe_charges_enabled?: boolean
-          stripe_payouts_enabled?: boolean
-        } | null
-        const approved = Boolean(restaurant && ['approved', 'active'].includes(restaurant.status ?? ''))
-
-        setApplicationRequired(!approved)
-        setPaymentSetupRequired(Boolean(
-          approved && (!restaurant?.stripe_charges_enabled || !restaurant?.stripe_payouts_enabled),
-        ))
+        const restaurant = (Array.isArray(relation) ? relation[0] : relation) as { status?: string } | null
+        setApplicationRequired(!restaurant || !['approved', 'active'].includes(restaurant.status ?? ''))
       }
-
       setLoading(false)
     }
 
     void loadAccess()
-
     const { data: listener } = supabase.auth.onAuthStateChange((_event, nextSession) => {
       setSession(nextSession)
       if (!nextSession) {
         setApplicationRequired(false)
-        setPaymentSetupRequired(false)
         setLoading(false)
-      } else {
-        void loadAccess()
-      }
+      } else void loadAccess()
     })
 
     return () => {
@@ -78,21 +56,8 @@ export default function ProtectedRoute({
     }
   }, [])
 
-  if (loading) {
-    return <div className="screen-message">Loading your restaurant portal…</div>
-  }
-
-  if (!session) {
-    return <Navigate to="/login" replace state={{ from: location.pathname }} />
-  }
-
-  if (applicationRequired && !allowApplication) {
-    return <Navigate to="/onboarding" replace />
-  }
-
-  if (!applicationRequired && paymentSetupRequired && !allowPaymentSetup) {
-    return <Navigate to="/payments" replace state={{ from: location.pathname }} />
-  }
-
+  if (loading) return <div className="screen-message">Loading your restaurant portal…</div>
+  if (!session) return <Navigate to="/login" replace state={{ from: location.pathname }} />
+  if (applicationRequired && !allowApplication) return <Navigate to="/onboarding" replace />
   return children
 }
