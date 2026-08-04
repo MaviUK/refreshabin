@@ -79,6 +79,14 @@ type AlertNote = {
   waveform?: 'sine' | 'square'
 }
 
+type PaymentDecisionResult = {
+  success?: boolean
+  error?: string
+  order_status?: string
+  payment_status?: string
+  estimated_ready_at?: string | null
+}
+
 const activeStatuses = ['placed', 'accepted', 'preparing', 'ready', 'out_for_delivery']
 const soundStorageKey = 'ordered-food-restaurant-order-sound'
 const soundToneStorageKey = 'ordered-food-restaurant-order-sound-tone'
@@ -477,6 +485,27 @@ export default function Orders() {
     }
   }, [loadOrders, restaurantId])
 
+  async function decideNewOrder(order: Order, action: 'accept' | 'reject', preparationMinutes?: number, promisedAt?: string) {
+    const { data, error: decisionError } = await supabase.functions.invoke<PaymentDecisionResult>('restaurant-order-payment', {
+      body: {
+        order_id: order.id,
+        action,
+        preparation_minutes: preparationMinutes,
+        promised_at: promisedAt,
+      },
+    })
+    if (decisionError) throw decisionError
+    if (!data?.success) throw new Error(data?.error ?? 'Unable to update the order payment.')
+
+    return {
+      order_status: data.order_status ?? (action === 'accept' ? 'accepted' : 'rejected'),
+      payment_status: data.payment_status ?? (action === 'accept' ? 'paid' : 'cancelled'),
+      estimated_ready_at: data.estimated_ready_at ?? null,
+      accepted_at: action === 'accept' ? new Date().toISOString() : null,
+      cancelled_at: action === 'reject' ? new Date().toISOString() : null,
+    }
+  }
+
   async function setOrderStatus(order: Order, orderStatus: string, preparationMinutes?: number, promisedAt?: string) {
     if (!restaurantId || updatingId) return
     if ((orderStatus === 'rejected' || orderStatus === 'cancelled') && !window.confirm(`Are you sure you want to ${orderStatus === 'rejected' ? 'reject' : 'cancel'} order #${order.order_number}?`)) return
@@ -484,34 +513,42 @@ export default function Orders() {
     setUpdatingId(order.id)
     setError('')
 
-    const now = new Date().toISOString()
-    const patch: Record<string, string | null> = { order_status: orderStatus }
-    if (orderStatus === 'accepted') {
-      patch.accepted_at = now
-      patch.estimated_ready_at = promisedAt ?? new Date(Date.now() + (preparationMinutes ?? 20) * 60_000).toISOString()
-    }
-    if (orderStatus === 'completed') patch.completed_at = now
-    if (orderStatus === 'rejected' || orderStatus === 'cancelled') patch.cancelled_at = now
+    try {
+      if (order.order_status === 'placed' && (orderStatus === 'accepted' || orderStatus === 'rejected')) {
+        const patch = await decideNewOrder(order, orderStatus === 'accepted' ? 'accept' : 'reject', preparationMinutes, promisedAt)
+        setOrders((current) => current.map((item) => item.id === order.id ? { ...item, ...patch } : item))
+        setChoosingTimeFor('')
+        return
+      }
 
-    const { data, error: updateError } = await supabase
-      .from('orders')
-      .update(patch)
-      .eq('id', order.id)
-      .eq('restaurant_id', restaurantId)
-      .eq('order_status', order.order_status)
-      .select('id')
-      .maybeSingle()
+      const now = new Date().toISOString()
+      const patch: Record<string, string | null> = { order_status: orderStatus }
+      if (orderStatus === 'completed') patch.completed_at = now
+      if (orderStatus === 'cancelled') patch.cancelled_at = now
 
-    if (updateError) {
-      setError(updateError.message)
-    } else if (!data) {
-      setError(`Order #${order.order_number} changed on another device. The latest status has been loaded.`)
+      const { data, error: updateError } = await supabase
+        .from('orders')
+        .update(patch)
+        .eq('id', order.id)
+        .eq('restaurant_id', restaurantId)
+        .eq('order_status', order.order_status)
+        .select('id')
+        .maybeSingle()
+
+      if (updateError) throw updateError
+      if (!data) {
+        setError(`Order #${order.order_number} changed on another device. The latest status has been loaded.`)
+        await loadOrders(restaurantId, true).catch(() => undefined)
+      } else {
+        setOrders((current) => current.map((item) => item.id === order.id ? { ...item, ...patch } : item))
+        setChoosingTimeFor('')
+      }
+    } catch (caughtError) {
+      setError(caughtError instanceof Error ? caughtError.message : 'Unable to update this order.')
       await loadOrders(restaurantId, true).catch(() => undefined)
-    } else {
-      setOrders((current) => current.map((item) => item.id === order.id ? { ...item, ...patch } : item))
-      setChoosingTimeFor('')
+    } finally {
+      setUpdatingId('')
     }
-    setUpdatingId('')
   }
 
   function nextActions(order: Order) {
@@ -539,9 +576,9 @@ export default function Orders() {
                 <button className="cancel" type="button" onClick={() => setChoosingTimeFor('')}>Cancel</button>
               </div>
             ) : (
-              <button className="order-action primary" type="button" onClick={() => setChoosingTimeFor(order.id)} disabled={Boolean(updatingId)}>Accept order</button>
+              <button className="order-action primary" type="button" onClick={() => setChoosingTimeFor(order.id)} disabled={Boolean(updatingId)}>Accept & charge</button>
             )}
-            <button className="order-action danger" type="button" onClick={() => void setOrderStatus(order, 'rejected')} disabled={Boolean(updatingId)}>Reject</button>
+            <button className="order-action danger" type="button" onClick={() => void setOrderStatus(order, 'rejected')} disabled={Boolean(updatingId)}>Reject & release hold</button>
           </>
         )
       case 'accepted':
@@ -578,7 +615,7 @@ export default function Orders() {
         <div>
           <span className="orders-eyebrow">Live order management</span>
           <h1>Orders</h1>
-          <p>New paid orders appear here automatically.</p>
+          <p>New authorised orders appear here automatically. Customers are charged only after acceptance.</p>
         </div>
         <div className="orders-title-actions">
           <div className={`order-live-status order-live-status--${liveStatus}`} role="status">
@@ -638,7 +675,7 @@ export default function Orders() {
         <section className="orders-empty">
           <span>{view === 'active' ? '🍽️' : '🧾'}</span>
           <h2>{view === 'active' ? 'No active orders' : 'No order history yet'}</h2>
-          <p>{view === 'active' ? 'Paid customer orders will appear here in real time.' : 'Completed, rejected and cancelled orders will appear here.'}</p>
+          <p>{view === 'active' ? 'Authorised customer orders will appear here in real time.' : 'Completed, rejected and cancelled orders will appear here.'}</p>
         </section>
       ) : (
         <section className="orders-list">
@@ -649,6 +686,7 @@ export default function Orders() {
                   <span className="order-number">Order #{order.order_number}</span>
                   <strong>{order.customer_first_name} {order.customer_last_name}</strong>
                   <small>{time.format(new Date(order.created_at))} · {order.fulfilment_method}</small>
+                  {order.order_status === 'placed' && order.payment_status === 'authorized' && <small className="requested-time">Card authorised — not charged yet</small>}
                   {order.requested_fulfilment_at && <small className="requested-time">Customer requested {time.format(new Date(order.requested_fulfilment_at))}</small>}
                   {order.estimated_ready_at && activeStatuses.includes(order.order_status) && <small className="ready-time">Due {time.format(new Date(order.estimated_ready_at))}</small>}
                 </div>
