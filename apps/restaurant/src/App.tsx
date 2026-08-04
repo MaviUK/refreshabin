@@ -17,6 +17,7 @@ import RestaurantDetails from './settings/RestaurantDetails'
 import DeliveryAreas from './settings/DeliveryAreas'
 import DeliveryMap from './settings/DeliveryMap'
 import Payments from './payments/Payments'
+import Finance from './finance/Finance'
 import Storefront from './storefront/Storefront'
 import Checkout from './checkout/Checkout'
 import OrderStatus from './order/OrderStatus'
@@ -79,6 +80,7 @@ function ApplicationRoutes() {
       <Route path="/delivery-areas" element={<ProtectedRoute><DeliveryAreas /></ProtectedRoute>} />
       <Route path="/delivery-map" element={<ProtectedRoute><DeliveryMap /></ProtectedRoute>} />
       <Route path="/payments" element={<ProtectedRoute allowPaymentSetup><Payments /></ProtectedRoute>} />
+      <Route path="/finance" element={<ProtectedRoute><Finance /></ProtectedRoute>} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   )
