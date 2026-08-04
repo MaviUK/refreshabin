@@ -211,6 +211,11 @@
   gap: 18px;
 }
 
+.orders-page:has(.orders-tabs button:first-child.active) .orders-list {
+  display: flex;
+  flex-direction: column-reverse;
+}
+
 .order-card {
   overflow: hidden;
   border: 1px solid #dfe4df;
