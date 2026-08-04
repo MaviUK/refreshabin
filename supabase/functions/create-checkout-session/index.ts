@@ -84,7 +84,7 @@ Deno.serve(async (request) => {
       .eq('id', orderId).single()
 
     if (orderError || !order) return json(request, { error: 'Order not found.' }, 404)
-    if (order.payment_status === 'paid') return json(request, { error: 'This order has already been paid.' }, 409)
+    if (['authorized', 'paid'].includes(order.payment_status)) return json(request, { error: 'This order already has a valid payment authorisation.' }, 409)
     if (order.order_status !== 'pending_payment') return json(request, { error: 'This order is no longer awaiting payment.' }, 409)
     if (!order.order_items?.length) return json(request, { error: 'This order has no items.' }, 400)
 
@@ -123,6 +123,7 @@ Deno.serve(async (request) => {
     }
 
     const paymentIntentData: Stripe.Checkout.SessionCreateParams.PaymentIntentData = {
+      capture_method: 'manual',
       description: `${restaurant.name} order #${order.order_number}`,
       receipt_email: order.customer_email,
       metadata,
@@ -135,13 +136,14 @@ Deno.serve(async (request) => {
 
     const session = await stripe.checkout.sessions.create({
       mode: 'payment', customer_email: order.customer_email, line_items: lineItems,
+      payment_method_types: ['card'],
       success_url: `${siteUrl}/r/${restaurant.slug}/checkout/success?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${siteUrl}/r/${restaurant.slug}/checkout?payment=cancelled`,
       client_reference_id: order.id,
       metadata,
       payment_intent_data: paymentIntentData,
       expires_at: Math.floor(Date.now() / 1000) + 30 * 60,
-    }, { idempotencyKey: `ordered-food-${payoutMode}-order-${order.id}` })
+    }, { idempotencyKey: `ordered-food-authorise-${payoutMode}-order-${order.id}` })
 
     if (!session.url) return json(request, { error: 'Payment provider did not return a checkout URL.' }, 502)
     const { error: updateError } = await supabase.from('orders').update({
@@ -153,7 +155,7 @@ Deno.serve(async (request) => {
     }).eq('id', order.id).eq('order_status', 'pending_payment')
     if (updateError) return json(request, { error: 'Unable to attach payment session to the order.' }, 500)
 
-    return json(request, { checkout_url: session.url, session_id: session.id, payout_mode: payoutMode })
+    return json(request, { checkout_url: session.url, session_id: session.id, payout_mode: payoutMode, capture_method: 'manual' })
   } catch (error) {
     console.error('Unexpected checkout error', error)
     return json(request, { error: 'Unable to create payment session. Please try again.' }, 500)
