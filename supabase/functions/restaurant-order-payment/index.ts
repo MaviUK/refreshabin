@@ -67,7 +67,7 @@ Deno.serve(async (request) => {
 
   const { data: order, error: orderError } = await client
     .from('orders')
-    .select('id,order_number,restaurant_id,order_status,payment_status,stripe_payment_intent_id')
+    .select('id,order_number,restaurant_id,order_status,payment_status,restaurant_payout_mode,stripe_payment_intent_id')
     .eq('id', orderId)
     .single()
   if (orderError || !order) return json(request, { error: 'Order not found.' }, 404)
@@ -115,12 +115,15 @@ Deno.serve(async (request) => {
         cancellation_reason: 'requested_by_customer',
       }, { idempotencyKey: `cancel-order-${order.id}` })
     } else {
-      await stripe.refunds.create({
+      const refund: Stripe.RefundCreateParams = {
         payment_intent: order.stripe_payment_intent_id,
-        reverse_transfer: true,
-        refund_application_fee: true,
         metadata: { order_id: order.id, reason: 'restaurant_rejected' },
-      }, { idempotencyKey: `reject-refund-order-${order.id}` })
+      }
+      if (order.restaurant_payout_mode === 'stripe_connect') {
+        refund.reverse_transfer = true
+        refund.refund_application_fee = true
+      }
+      await stripe.refunds.create(refund, { idempotencyKey: `reject-refund-order-${order.id}` })
     }
 
     const rejectedPaymentStatus = order.payment_status === 'authorized' ? 'cancelled' : 'refunded'
