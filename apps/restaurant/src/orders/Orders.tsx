@@ -516,7 +516,7 @@ export default function Orders() {
 
   function nextActions(order: Order) {
     const defaultMinutes = order.fulfilment_method === 'delivery' ? deliveryDefaultMinutes : collectionDefaultMinutes
-    const preparationChoices = Array.from(new Set([defaultMinutes, 30, 45, 60, 90])).filter((minutes) => minutes >= 5 && minutes <= 480).sort((a, b) => a - b)
+    const preparationChoices = Array.from(new Set([defaultMinutes, 30, 45, 60])).filter((minutes) => minutes >= 5 && minutes <= 480).sort((a, b) => a - b)
     const customMinutes = Number.parseInt(customPreparationMinutes, 10)
     const customMinutesValid = Number.isInteger(customMinutes) && customMinutes >= 5 && customMinutes <= 480
     switch (order.order_status) {
