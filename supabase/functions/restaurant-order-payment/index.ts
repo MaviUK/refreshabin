@@ -58,42 +58,60 @@ Deno.serve(async (request) => {
     .eq('restaurant_id', order.restaurant_id)
     .maybeSingle()
   if (!membership) return json(request, { error: 'You cannot manage this order.' }, 403)
-  if (order.order_status !== 'placed' || order.payment_status !== 'authorized' || !order.stripe_payment_intent_id) {
-    return json(request, { error: 'This order is no longer awaiting payment approval.' }, 409)
+  if (order.order_status !== 'placed' || !['authorized', 'paid'].includes(order.payment_status) || !order.stripe_payment_intent_id) {
+    return json(request, { error: 'This order is no longer awaiting restaurant acceptance.' }, 409)
   }
 
   const stripe = new Stripe(stripeKey)
   const now = new Date().toISOString()
+  const expectedPaymentStatus = order.payment_status
 
   try {
     if (action === 'accept') {
-      const intent = await stripe.paymentIntents.capture(order.stripe_payment_intent_id, {}, {
-        idempotencyKey: `capture-order-${order.id}`,
-      })
-      if (intent.status !== 'succeeded') return json(request, { error: 'Payment could not be captured.' }, 409)
+      if (order.payment_status === 'authorized') {
+        const intent = await stripe.paymentIntents.capture(order.stripe_payment_intent_id, {}, {
+          idempotencyKey: `capture-order-${order.id}`,
+        })
+        if (intent.status !== 'succeeded') return json(request, { error: 'Payment could not be captured.' }, 409)
+      }
 
       const minutes = Number(body.preparation_minutes)
       const promisedAt = typeof body.promised_at === 'string' && !Number.isNaN(Date.parse(body.promised_at))
         ? body.promised_at
         : new Date(Date.now() + (Number.isInteger(minutes) && minutes >= 5 && minutes <= 480 ? minutes : 20) * 60_000).toISOString()
-      const { error } = await client.from('orders').update({
-        order_status: 'accepted', payment_status: 'paid', accepted_at: now, paid_at: now, estimated_ready_at: promisedAt,
-      }).eq('id', order.id).eq('order_status', 'placed').eq('payment_status', 'authorized')
+      const { data: updated, error } = await client.from('orders').update({
+        order_status: 'accepted', payment_status: 'paid', accepted_at: now,
+        paid_at: order.payment_status === 'authorized' ? now : undefined,
+        estimated_ready_at: promisedAt,
+      }).eq('id', order.id).eq('order_status', 'placed').eq('payment_status', expectedPaymentStatus).select('id').maybeSingle()
       if (error) throw error
+      if (!updated) return json(request, { error: 'This order changed on another device.' }, 409)
       return json(request, { success: true, order_status: 'accepted', payment_status: 'paid', estimated_ready_at: promisedAt })
     }
 
-    const intent = await stripe.paymentIntents.cancel(order.stripe_payment_intent_id, {
-      cancellation_reason: 'requested_by_customer',
-    }, { idempotencyKey: `cancel-order-${order.id}` })
-    const { error } = await client.from('orders').update({
-      order_status: 'rejected', payment_status: 'cancelled', cancelled_at: now,
+    if (order.payment_status === 'authorized') {
+      await stripe.paymentIntents.cancel(order.stripe_payment_intent_id, {
+        cancellation_reason: 'requested_by_customer',
+      }, { idempotencyKey: `cancel-order-${order.id}` })
+    } else {
+      await stripe.refunds.create({
+        payment_intent: order.stripe_payment_intent_id,
+        reverse_transfer: true,
+        refund_application_fee: true,
+        metadata: { order_id: order.id, reason: 'restaurant_rejected' },
+      }, { idempotencyKey: `reject-refund-order-${order.id}` })
+    }
+
+    const rejectedPaymentStatus = order.payment_status === 'authorized' ? 'cancelled' : 'refunded'
+    const { data: updated, error } = await client.from('orders').update({
+      order_status: 'rejected', payment_status: rejectedPaymentStatus, cancelled_at: now,
       manual_payout_status: 'not_applicable',
-    }).eq('id', order.id).eq('order_status', 'placed').eq('payment_status', 'authorized')
+    }).eq('id', order.id).eq('order_status', 'placed').eq('payment_status', expectedPaymentStatus).select('id').maybeSingle()
     if (error) throw error
-    return json(request, { success: true, order_status: 'rejected', payment_status: 'cancelled', stripe_status: intent.status })
+    if (!updated) return json(request, { error: 'This order changed on another device.' }, 409)
+    return json(request, { success: true, order_status: 'rejected', payment_status: rejectedPaymentStatus })
   } catch (error) {
     console.error('Restaurant payment decision failed', error)
-    return json(request, { error: action === 'accept' ? 'Unable to capture payment.' : 'Unable to release payment authorisation.' }, 500)
+    return json(request, { error: action === 'accept' ? 'Unable to accept and capture this order.' : 'Unable to reject and release/refund this order.' }, 500)
   }
 })
