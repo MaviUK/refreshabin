@@ -1,15 +1,36 @@
 import Stripe from 'npm:stripe@^22'
 import { createClient } from 'npm:@supabase/supabase-js@2'
 
-function corsHeaders(request: Request) {
-  const origin = request.headers.get('Origin') ?? ''
-  const allowed = new Set((Deno.env.get('CORS_ALLOWED_ORIGINS') ?? '').split(',').map((v) => v.trim()).filter(Boolean))
-  const siteUrl = (Deno.env.get('SITE_URL') ?? '').replace(/\/$/, '')
+function normaliseOrigin(value: string) {
+  return value.trim().replace(/\/$/, '')
+}
+
+function allowedOrigins() {
+  const allowed = new Set<string>([
+    'https://ordered.food',
+    'https://www.ordered.food',
+  ])
+
+  const siteUrl = normaliseOrigin(Deno.env.get('SITE_URL') ?? '')
   if (siteUrl) allowed.add(siteUrl)
+
+  for (const value of (Deno.env.get('CORS_ALLOWED_ORIGINS') ?? '').split(',')) {
+    const origin = normaliseOrigin(value)
+    if (origin) allowed.add(origin)
+  }
+
+  return allowed
+}
+
+function corsHeaders(request: Request) {
+  const requestOrigin = normaliseOrigin(request.headers.get('Origin') ?? '')
+  const allowedOrigin = requestOrigin && allowedOrigins().has(requestOrigin) ? requestOrigin : 'null'
+
   return {
-    'Access-Control-Allow-Origin': allowed.has(origin.replace(/\/$/, '')) ? origin : 'null',
+    'Access-Control-Allow-Origin': allowedOrigin,
     'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
     'Access-Control-Allow-Methods': 'POST, OPTIONS',
+    'Access-Control-Max-Age': '86400',
     'Vary': 'Origin',
   }
 }
@@ -23,7 +44,7 @@ function json(request: Request, body: unknown, status = 200) {
 
 Deno.serve(async (request) => {
   const cors = corsHeaders(request)
-  if (request.method === 'OPTIONS') return new Response('ok', { headers: cors })
+  if (request.method === 'OPTIONS') return new Response('ok', { status: 200, headers: cors })
   if (request.method !== 'POST') return json(request, { error: 'Method not allowed.' }, 405)
   if (request.headers.get('Origin') && cors['Access-Control-Allow-Origin'] === 'null') return json(request, { error: 'Origin is not allowed.' }, 403)
 
