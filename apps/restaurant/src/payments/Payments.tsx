@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 
@@ -19,8 +19,8 @@ type ConnectStatus = {
 }
 
 const labels: Record<ConnectStatus['status'], string> = {
-  not_started: 'Not connected',
-  pending: 'Setup in progress',
+  not_started: 'Connect your Stripe account',
+  pending: 'Stripe setup in progress',
   restricted: 'More information required',
   enabled: 'Payments enabled',
 }
@@ -31,6 +31,7 @@ export default function Payments() {
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState<'onboard' | 'dashboard' | 'refresh' | null>(null)
   const [error, setError] = useState('')
+  const refreshId = useRef(0)
 
   const invoke = useCallback(async (action: 'status' | 'onboard' | 'dashboard') => {
     const { data, error: invokeError } = await supabase.functions.invoke('restaurant-stripe-connect', {
@@ -42,38 +43,35 @@ export default function Payments() {
   }, [])
 
   const refresh = useCallback(async () => {
+    const requestId = ++refreshId.current
     setBusy('refresh')
     setError('')
     try {
       const data = await invoke('status')
+      if (requestId !== refreshId.current) return
       setStatus(data as ConnectStatus)
       setError('')
     } catch (caught) {
+      if (requestId !== refreshId.current) return
       setError(caught instanceof Error ? caught.message : 'Unable to load payment status.')
     } finally {
-      setBusy(null)
-      setLoading(false)
+      if (requestId === refreshId.current) {
+        setBusy(null)
+        setLoading(false)
+      }
     }
   }, [invoke])
 
   useEffect(() => {
-    let cancelled = false
+    void refresh()
+  }, [refresh])
 
-    async function load() {
-      await refresh()
-      if (cancelled || !searchParams.get('stripe')) return
-      const next = new URLSearchParams(searchParams)
-      next.delete('stripe')
-      setSearchParams(next, { replace: true })
-    }
-
-    void load()
-    return () => { cancelled = true }
-    // Run once for this mounted page. The previous implementation launched two
-    // simultaneous refreshes after returning from Stripe, allowing a late failed
-    // request to leave an error banner over a successful status response.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  useEffect(() => {
+    if (!searchParams.get('stripe')) return
+    const next = new URLSearchParams(searchParams)
+    next.delete('stripe')
+    setSearchParams(next, { replace: true })
+  }, [searchParams, setSearchParams])
 
   async function openStripe(action: 'onboard' | 'dashboard') {
     setBusy(action)
@@ -89,12 +87,20 @@ export default function Payments() {
   }
 
   const due = status?.requirements?.currently_due ?? []
+  const enabled = Boolean(status?.charges_enabled && status?.payouts_enabled)
 
   return (
     <main style={{ maxWidth: 900, margin: '0 auto', padding: '28px 20px 64px' }}>
-      <Link to="/dashboard">← Back to dashboard</Link>
-      <h1>Payments</h1>
-      <p>Connect Stripe so customer payments are split automatically and your restaurant receives its share directly.</p>
+      {enabled && <Link to="/dashboard">← Back to dashboard</Link>}
+      <p style={{ marginTop: enabled ? 28 : 0, fontWeight: 700, color: '#6b3f86' }}>
+        {enabled ? 'Setup complete' : 'Application approved · One final step'}
+      </p>
+      <h1>{enabled ? 'You are ready to take payments' : 'Connect Stripe'}</h1>
+      <p>
+        {enabled
+          ? 'Your restaurant can receive customer payments and Stripe can pay out your share automatically.'
+          : 'Before your restaurant can go live, connect Stripe and complete the secure business and bank verification.'}
+      </p>
 
       {error && <div className="error-message" role="alert">{error}</div>}
       {loading ? <p>Loading payment status…</p> : status && (
@@ -105,6 +111,7 @@ export default function Payments() {
                 <small>Stripe Connect status</small>
                 <h2 style={{ marginTop: 6 }}>{labels[status.status]}</h2>
                 <p>
+                  Application approved: <strong>Yes</strong><br />
                   Card payments: <strong>{status.charges_enabled ? 'Enabled' : 'Not enabled'}</strong><br />
                   Payouts: <strong>{status.payouts_enabled ? 'Enabled' : 'Not enabled'}</strong>
                 </p>
@@ -116,15 +123,20 @@ export default function Payments() {
 
             {status.updated_at && <p><small>Last checked {new Date(status.updated_at).toLocaleString('en-GB')}</small></p>}
 
-            {status.status !== 'enabled' && (
+            {!enabled && (
               <button type="button" onClick={() => void openStripe('onboard')} disabled={busy !== null}>
                 {busy === 'onboard' ? 'Opening Stripe…' : status.stripe_account_id ? 'Continue Stripe setup' : 'Connect with Stripe'}
               </button>
             )}
             {status.details_submitted && (
-              <button type="button" onClick={() => void openStripe('dashboard')} disabled={busy !== null} style={{ marginLeft: 12 }}>
+              <button type="button" onClick={() => void openStripe('dashboard')} disabled={busy !== null} style={{ marginLeft: enabled ? 0 : 12 }}>
                 {busy === 'dashboard' ? 'Opening dashboard…' : 'Open Stripe dashboard'}
               </button>
+            )}
+            {enabled && (
+              <Link to="/dashboard" className="button" style={{ display: 'inline-block', marginLeft: 12 }}>
+                Continue to dashboard
+              </Link>
             )}
           </section>
 
