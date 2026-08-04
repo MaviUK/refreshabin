@@ -48,10 +48,7 @@ Deno.serve(async (request) => {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')
     const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
     const siteUrl = (Deno.env.get('SITE_URL') ?? '').replace(/\/$/, '')
-    if (!stripeSecretKey || !supabaseUrl || !serviceRoleKey || !siteUrl) {
-      console.error('Missing payment service configuration')
-      return json(request, { error: 'Payment service is not configured.' }, 500)
-    }
+    if (!stripeSecretKey || !supabaseUrl || !serviceRoleKey || !siteUrl) return json(request, { error: 'Payment service is not configured.' }, 500)
 
     let body: { order_id?: unknown }
     try { body = await request.json() } catch { return json(request, { error: 'Invalid request body.' }, 400) }
@@ -67,10 +64,7 @@ Deno.serve(async (request) => {
         p_function_name: 'create-checkout-session', p_subject_key: check.key,
         p_window_seconds: check.window, p_max_requests: check.limit,
       })
-      if (error) {
-        console.error('Checkout rate limit failed', error)
-        return json(request, { error: 'Payment service is temporarily unavailable.' }, 503)
-      }
+      if (error) return json(request, { error: 'Payment service is temporarily unavailable.' }, 503)
       const result = data as { allowed?: boolean; retry_after_seconds?: number }
       if (!result.allowed) return json(request, { error: 'Too many payment attempts. Please wait and try again.' }, 429, {
         'Retry-After': String(result.retry_after_seconds ?? check.window),
@@ -79,22 +73,14 @@ Deno.serve(async (request) => {
 
     const stripe = new Stripe(stripeSecretKey)
     const { data: platformConfiguration, error: configurationError } = await supabase.rpc('get_public_platform_configuration')
-    if (configurationError || !platformConfiguration) {
-      console.error('Unable to verify platform ordering configuration', configurationError)
-      return json(request, { error: 'Ordering controls could not be verified. Please try again shortly.' }, 503)
-    }
+    if (configurationError || !platformConfiguration) return json(request, { error: 'Ordering controls could not be verified.' }, 503)
     const controls = platformConfiguration as { maintenance_mode: boolean; maintenance_message: string; ordering_enabled: boolean; ordering_pause_message: string }
     if (controls.maintenance_mode) return json(request, { error: controls.maintenance_message }, 409)
     if (!controls.ordering_enabled) return json(request, { error: controls.ordering_pause_message }, 409)
 
     const { data: order, error: orderError } = await supabase
       .from('orders')
-      .select(`
-        id, order_number, customer_email, payment_status, order_status, total_pence, currency,
-        delivery_fee_pence, service_fee_pence, restaurant_net_pence, stripe_checkout_session_id,
-        restaurants!inner(id,name,slug,stripe_account_id,stripe_connect_status,stripe_charges_enabled),
-        order_items(id,item_name,unit_price_pence,quantity)
-      `)
+      .select(`id,order_number,customer_email,payment_status,order_status,total_pence,currency,delivery_fee_pence,service_fee_pence,restaurant_net_pence,stripe_checkout_session_id,restaurants!inner(id,name,slug,stripe_account_id,stripe_connect_status,stripe_charges_enabled,stripe_payouts_enabled),order_items(id,item_name,unit_price_pence,quantity)`)
       .eq('id', orderId).single()
 
     if (orderError || !order) return json(request, { error: 'Order not found.' }, 404)
@@ -103,15 +89,19 @@ Deno.serve(async (request) => {
     if (!order.order_items?.length) return json(request, { error: 'This order has no items.' }, 400)
 
     const restaurant = Array.isArray(order.restaurants) ? order.restaurants[0] : order.restaurants
-    if (!restaurant?.stripe_account_id || restaurant.stripe_connect_status !== 'enabled' || !restaurant.stripe_charges_enabled) {
-      return json(request, { error: 'This restaurant is still completing payment setup and cannot accept online payments yet.' }, 409)
-    }
+    const connectEnabled = Boolean(
+      restaurant?.stripe_account_id
+      && restaurant.stripe_connect_status === 'enabled'
+      && restaurant.stripe_charges_enabled
+      && restaurant.stripe_payouts_enabled,
+    )
+    const payoutMode = connectEnabled ? 'stripe_connect' : 'platform_manual'
 
     if (order.stripe_checkout_session_id) {
       try {
         const existing = await stripe.checkout.sessions.retrieve(order.stripe_checkout_session_id)
         if (existing.status === 'open' && existing.url) return json(request, { checkout_url: existing.url, session_id: existing.id })
-      } catch (error) { console.warn('Unable to reuse previous Checkout Session', error) }
+      } catch { /* create a replacement session */ }
     }
 
     const lineItems: Stripe.Checkout.SessionCreateParams.LineItem[] = order.order_items.map((item: { item_name: string; unit_price_pence: number; quantity: number }) => ({
@@ -123,36 +113,47 @@ Deno.serve(async (request) => {
 
     const restaurantNet = Math.max(0, Math.min(order.restaurant_net_pence, order.total_pence))
     const applicationFee = order.total_pence - restaurantNet
-    if (restaurantNet <= 0) return json(request, { error: 'The restaurant payment amount is invalid.' }, 409)
+    const metadata = {
+      order_id: order.id,
+      order_number: String(order.order_number),
+      restaurant_id: restaurant.id,
+      restaurant_slug: restaurant.slug,
+      restaurant_payout_mode: payoutMode,
+      restaurant_net_pence: String(restaurantNet),
+    }
+
+    const paymentIntentData: Stripe.Checkout.SessionCreateParams.PaymentIntentData = {
+      description: `${restaurant.name} order #${order.order_number}`,
+      receipt_email: order.customer_email,
+      metadata,
+    }
+    if (connectEnabled) {
+      paymentIntentData.application_fee_amount = applicationFee
+      paymentIntentData.transfer_data = { destination: restaurant.stripe_account_id }
+      paymentIntentData.on_behalf_of = restaurant.stripe_account_id
+    }
 
     const session = await stripe.checkout.sessions.create({
       mode: 'payment', customer_email: order.customer_email, line_items: lineItems,
       success_url: `${siteUrl}/r/${restaurant.slug}/checkout/success?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${siteUrl}/r/${restaurant.slug}/checkout?payment=cancelled`,
       client_reference_id: order.id,
-      metadata: { order_id: order.id, order_number: String(order.order_number), restaurant_id: restaurant.id, restaurant_slug: restaurant.slug },
-      payment_intent_data: {
-        description: `${restaurant.name} order #${order.order_number}`,
-        receipt_email: order.customer_email,
-        application_fee_amount: applicationFee,
-        transfer_data: { destination: restaurant.stripe_account_id },
-        on_behalf_of: restaurant.stripe_account_id,
-        metadata: { order_id: order.id, order_number: String(order.order_number), restaurant_id: restaurant.id, restaurant_slug: restaurant.slug },
-      },
+      metadata,
+      payment_intent_data: paymentIntentData,
       expires_at: Math.floor(Date.now() / 1000) + 30 * 60,
-    }, { idempotencyKey: `ordered-food-connect-order-${order.id}` })
+    }, { idempotencyKey: `ordered-food-${payoutMode}-order-${order.id}` })
 
     if (!session.url) return json(request, { error: 'Payment provider did not return a checkout URL.' }, 502)
     const { error: updateError } = await supabase.from('orders').update({
       stripe_checkout_session_id: session.id,
       stripe_payment_intent_id: typeof session.payment_intent === 'string' ? session.payment_intent : null,
       payment_status: 'pending',
+      restaurant_payout_mode: payoutMode,
+      manual_payout_status: connectEnabled ? 'not_applicable' : 'unsettled',
     }).eq('id', order.id).eq('order_status', 'pending_payment')
-    if (updateError) {
-      console.error('Failed to save Stripe Checkout Session', updateError)
-      return json(request, { error: 'Unable to attach payment session to the order.' }, 500)
-    }
-    return json(request, { checkout_url: session.url, session_id: session.id })
+    if (updateError) return json(request, { error: 'Unable to attach payment session to the order.' }, 500)
+
+    return json(request, { checkout_url: session.url, session_id: session.id, payout_mode: payoutMode })
   } catch (error) {
     console.error('Unexpected checkout error', error)
     return json(request, { error: 'Unable to create payment session. Please try again.' }, 500)
