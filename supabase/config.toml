@@ -22,3 +22,7 @@ verify_jwt = true
 # Restaurant owners must be signed in before creating onboarding or dashboard links.
 [functions.restaurant-stripe-connect]
 verify_jwt = true
+
+# Restaurant owners must be signed in before capturing or cancelling an authorised order.
+[functions.restaurant-order-payment]
+verify_jwt = true
