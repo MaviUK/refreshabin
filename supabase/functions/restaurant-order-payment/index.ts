@@ -83,7 +83,7 @@ Deno.serve(async (request) => {
 
     if (action === 'accept') {
       if (intent.status === 'requires_capture') {
-        const captured = await stripe.paymentIntents.capture(intent.id, {}, { idempotencyKey: `capture-order-${order.id}` })
+        const captured = await stripe.paymentIntents.capture(intent.id, {}, { idempotencyKey: `capture-v2-${intent.id}` })
         if (captured.status !== 'succeeded') return json(request, { error: 'Payment could not be captured.' }, 409)
       } else if (intent.status !== 'succeeded') {
         return json(request, { error: `Payment cannot be accepted while Stripe status is ${intent.status}.` }, 409)
@@ -103,9 +103,7 @@ Deno.serve(async (request) => {
 
     let rejectedPaymentStatus: 'cancelled' | 'refunded'
     if (intent.status === 'requires_capture' || intent.status === 'requires_payment_method' || intent.status === 'requires_confirmation' || intent.status === 'requires_action' || intent.status === 'processing') {
-      if (intent.status !== 'canceled') {
-        await stripe.paymentIntents.cancel(intent.id, { cancellation_reason: 'requested_by_customer' }, { idempotencyKey: `cancel-order-${order.id}` })
-      }
+      await stripe.paymentIntents.cancel(intent.id, { cancellation_reason: 'requested_by_customer' }, { idempotencyKey: `reject-cancel-v2-${intent.id}` })
       rejectedPaymentStatus = 'cancelled'
     } else if (intent.status === 'succeeded') {
       const refund: Stripe.RefundCreateParams = {
@@ -116,7 +114,7 @@ Deno.serve(async (request) => {
         refund.reverse_transfer = true
         refund.refund_application_fee = true
       }
-      await stripe.refunds.create(refund, { idempotencyKey: `reject-refund-order-${order.id}` })
+      await stripe.refunds.create(refund, { idempotencyKey: `reject-refund-v2-${order.restaurant_payout_mode}-${intent.id}` })
       rejectedPaymentStatus = 'refunded'
     } else if (intent.status === 'canceled') {
       rejectedPaymentStatus = 'cancelled'
