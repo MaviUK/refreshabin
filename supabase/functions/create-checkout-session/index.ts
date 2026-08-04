@@ -8,6 +8,7 @@ function allowedOrigins() {
     .split(',').map((value) => value.trim().replace(/\/$/, '')).filter(Boolean)
   const siteUrl = (Deno.env.get('SITE_URL') ?? '').trim().replace(/\/$/, '')
   if (siteUrl) configured.push(siteUrl)
+  configured.push('https://ordered.food', 'https://www.ordered.food')
   return new Set(configured)
 }
 
@@ -31,6 +32,26 @@ function clientIp(request: Request) {
     ?? request.headers.get('x-real-ip')
     ?? request.headers.get('x-forwarded-for')?.split(',')[0]?.trim()
     ?? 'unknown'
+}
+
+function errorDetails(error: unknown) {
+  if (error instanceof Error) return { message: error.message, type: error.name }
+  if (typeof error === 'string') return { message: error }
+  if (error && typeof error === 'object') {
+    const value = error as Record<string, unknown>
+    const raw = value.raw && typeof value.raw === 'object' ? value.raw as Record<string, unknown> : undefined
+    return {
+      message: typeof value.message === 'string'
+        ? value.message
+        : typeof raw?.message === 'string'
+          ? raw.message
+          : 'Payment provider returned an unrecognised error.',
+      type: typeof value.type === 'string' ? value.type : typeof raw?.type === 'string' ? raw.type : undefined,
+      code: typeof value.code === 'string' ? value.code : typeof raw?.code === 'string' ? raw.code : undefined,
+      request_id: typeof value.requestId === 'string' ? value.requestId : undefined,
+    }
+  }
+  return { message: 'Payment provider returned an unknown error.' }
 }
 
 Deno.serve(async (request) => {
@@ -80,7 +101,7 @@ Deno.serve(async (request) => {
 
     const { data: order, error: orderError } = await supabase
       .from('orders')
-      .select(`id,order_number,customer_email,payment_status,order_status,total_pence,currency,delivery_fee_pence,service_fee_pence,restaurant_net_pence,stripe_checkout_session_id,restaurants!inner(id,name,slug,stripe_account_id,stripe_connect_status,stripe_charges_enabled,stripe_payouts_enabled),order_items(id,item_name,unit_price_pence,quantity)`)
+      .select(`id,order_number,customer_email,payment_status,order_status,total_pence,currency,subtotal_pence,discount_pence,delivery_fee_pence,service_fee_pence,platform_commission_pence,platform_commission_vat_pence,restaurant_net_pence,stripe_checkout_session_id,restaurants!inner(id,name,slug,stripe_account_id,stripe_connect_status,stripe_charges_enabled,stripe_payouts_enabled),order_items(id,item_name,unit_price_pence,quantity)`)
       .eq('id', orderId).single()
 
     if (orderError || !order) return json(request, { error: 'Order not found.' }, 404)
@@ -111,8 +132,25 @@ Deno.serve(async (request) => {
     if (order.delivery_fee_pence > 0) lineItems.push({ quantity: 1, price_data: { currency: order.currency, unit_amount: order.delivery_fee_pence, product_data: { name: 'Delivery fee' } } })
     if (order.service_fee_pence > 0) lineItems.push({ quantity: 1, price_data: { currency: order.currency, unit_amount: order.service_fee_pence, product_data: { name: 'ordered.food service fee' } } })
 
-    const restaurantNet = Math.max(0, Math.min(order.restaurant_net_pence, order.total_pence))
-    const applicationFee = order.total_pence - restaurantNet
+    const calculatedRestaurantNet = Math.max(
+      0,
+      (order.subtotal_pence ?? 0)
+        + (order.delivery_fee_pence ?? 0)
+        - (order.discount_pence ?? 0)
+        - (order.platform_commission_pence ?? 0)
+        - (order.platform_commission_vat_pence ?? 0),
+    )
+    const storedRestaurantNet = Number(order.restaurant_net_pence ?? 0)
+    const restaurantNet = Math.max(0, Math.min(storedRestaurantNet > 0 ? storedRestaurantNet : calculatedRestaurantNet, order.total_pence))
+    const applicationFee = Math.max(0, order.total_pence - restaurantNet)
+
+    if (connectEnabled && restaurantNet <= 0) {
+      return json(request, { error: 'Restaurant payout could not be calculated. Please try again or contact support.' }, 409)
+    }
+    if (applicationFee >= order.total_pence) {
+      return json(request, { error: 'Platform fee calculation is invalid for this order.' }, 409)
+    }
+
     const metadata = {
       order_id: order.id,
       order_number: String(order.order_number),
@@ -120,6 +158,7 @@ Deno.serve(async (request) => {
       restaurant_slug: restaurant.slug,
       restaurant_payout_mode: payoutMode,
       restaurant_net_pence: String(restaurantNet),
+      application_fee_pence: String(applicationFee),
     }
 
     const paymentIntentData: Stripe.Checkout.SessionCreateParams.PaymentIntentData = {
@@ -129,7 +168,7 @@ Deno.serve(async (request) => {
       metadata,
     }
     if (connectEnabled) {
-      paymentIntentData.application_fee_amount = applicationFee
+      if (applicationFee > 0) paymentIntentData.application_fee_amount = applicationFee
       paymentIntentData.transfer_data = { destination: restaurant.stripe_account_id }
       paymentIntentData.on_behalf_of = restaurant.stripe_account_id
     }
@@ -143,21 +182,30 @@ Deno.serve(async (request) => {
       metadata,
       payment_intent_data: paymentIntentData,
       expires_at: Math.floor(Date.now() / 1000) + 30 * 60,
-    }, { idempotencyKey: `ordered-food-authorise-${payoutMode}-order-${order.id}` })
+    }, { idempotencyKey: `ordered-food-authorise-v2-${payoutMode}-order-${order.id}` })
 
     if (!session.url) return json(request, { error: 'Payment provider did not return a checkout URL.' }, 502)
     const { error: updateError } = await supabase.from('orders').update({
       stripe_checkout_session_id: session.id,
       stripe_payment_intent_id: typeof session.payment_intent === 'string' ? session.payment_intent : null,
       payment_status: 'pending',
+      restaurant_net_pence: restaurantNet,
       restaurant_payout_mode: payoutMode,
       manual_payout_status: connectEnabled ? 'not_applicable' : 'unsettled',
     }).eq('id', order.id).eq('order_status', 'pending_payment')
     if (updateError) return json(request, { error: 'Unable to attach payment session to the order.' }, 500)
 
-    return json(request, { checkout_url: session.url, session_id: session.id, payout_mode: payoutMode, capture_method: 'manual' })
+    return json(request, {
+      checkout_url: session.url,
+      session_id: session.id,
+      payout_mode: payoutMode,
+      capture_method: 'manual',
+      restaurant_net_pence: restaurantNet,
+      application_fee_pence: applicationFee,
+    })
   } catch (error) {
-    console.error('Unexpected checkout error', error)
-    return json(request, { error: 'Unable to create payment session. Please try again.' }, 500)
+    const details = errorDetails(error)
+    console.error('Unexpected checkout error', JSON.stringify(details))
+    return json(request, { error: details.message, details }, 500)
   }
 })
