@@ -44,7 +44,7 @@ revoke all on function public.update_platform_customer_profile_unrestricted(uuid
 revoke all on function public.set_platform_customer_suspension_unrestricted(uuid,boolean,text) from public, anon, authenticated;
 revoke all on function public.add_platform_customer_note_unrestricted(uuid,text) from public, anon, authenticated;
 
-create function public.get_platform_customers(p_search text default null)
+create or replace function public.get_platform_customers(p_search text default null)
 returns jsonb
 language plpgsql
 stable
@@ -59,7 +59,7 @@ begin
 end;
 $function$;
 
-create function public.get_platform_customer(p_user_id uuid)
+create or replace function public.get_platform_customer(p_user_id uuid)
 returns jsonb
 language plpgsql
 stable
@@ -74,7 +74,7 @@ begin
 end;
 $function$;
 
-create function public.update_platform_customer_profile(
+create or replace function public.update_platform_customer_profile(
   p_user_id uuid,
   p_first_name text,
   p_last_name text,
@@ -99,7 +99,7 @@ begin
 end;
 $function$;
 
-create function public.set_platform_customer_suspension(
+create or replace function public.set_platform_customer_suspension(
   p_user_id uuid,
   p_suspended boolean,
   p_reason text default null
@@ -117,7 +117,7 @@ begin
 end;
 $function$;
 
-create function public.add_platform_customer_note(p_user_id uuid,p_note text)
+create or replace function public.add_platform_customer_note(p_user_id uuid,p_note text)
 returns void
 language plpgsql
 security definer
