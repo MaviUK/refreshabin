@@ -4,9 +4,9 @@ import path from 'node:path'
 const root = process.cwd()
 const functionsDir = path.join(root, 'supabase', 'functions')
 const configPath = path.join(root, 'supabase', 'config.toml')
-const publicWithoutJwt = new Set(['create-checkout-session', 'stripe-webhook'])
+const publicWithoutJwt = new Set(['create-checkout-session', 'create-gift-card-checkout', 'finalize-gift-card-purchase', 'stripe-webhook'])
 const userContextFunctions = new Set(['admin-refund-payment', 'scan-menu-import'])
-const browserFacingFunctions = new Set(['create-checkout-session', 'scan-menu-import', 'admin-refund-payment'])
+const browserFacingFunctions = new Set(['create-checkout-session', 'create-gift-card-checkout', 'finalize-gift-card-purchase', 'scan-menu-import', 'admin-refund-payment'])
 
 const entries = await readdir(functionsDir, { withFileTypes: true })
 const functionNames = entries.filter((entry) => entry.isDirectory()).map((entry) => entry.name).sort()
