@@ -22,6 +22,8 @@ import Subscription from './subscription/Subscription'
 import { SubscriptionAccessProvider } from './subscription/SubscriptionAccess'
 import Marketing from './marketing/Marketing'
 import GiftCards from './gift-cards/GiftCards'
+import BuyGiftCard from './gift-cards/BuyGiftCard'
+import GiftCardSuccess from './gift-cards/GiftCardSuccess'
 import Storefront from './storefront/Storefront'
 import Checkout from './checkout/Checkout'
 import OrderStatus from './order/OrderStatus'
@@ -63,6 +65,8 @@ function ApplicationRoutes() {
       <Route path="/restaurants" element={<Restaurants />} />
       <Route path="/r/:slug" element={<Storefront />} />
       <Route path="/r/:slug/checkout" element={<Checkout />} />
+      <Route path="/r/:slug/gift-card" element={<BuyGiftCard />} />
+      <Route path="/r/:slug/gift-card/success" element={<GiftCardSuccess />} />
       <Route path="/order/success" element={<OrderStatus />} />
       <Route path="/account/login" element={<CustomerLogin />} />
       <Route path="/account/register" element={<CustomerRegister />} />
