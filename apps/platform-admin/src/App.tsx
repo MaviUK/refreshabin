@@ -11,6 +11,7 @@ import Customers from './pages/Customers'
 import ForgotPassword from './pages/ForgotPassword'
 import Fees from './pages/Fees'
 import Financials from './pages/Financials'
+import GiftCards from './pages/GiftCards'
 import Login from './pages/Login'
 import Moderation from './pages/Moderation'
 import OrderRecovery from './pages/OrderRecovery'
@@ -35,10 +36,7 @@ function hasPasswordRecoveryParams() {
 
 export default function App() {
   const location = useLocation()
-
-  if (hasPasswordRecoveryParams() && location.pathname !== '/reset-password') {
-    return <RecoveryRedirect />
-  }
+  if (hasPasswordRecoveryParams() && location.pathname !== '/reset-password') return <RecoveryRedirect />
 
   return (
     <Routes>
@@ -60,6 +58,7 @@ export default function App() {
           <Route path="security-risk" element={<PermissionRoute permission="moderation:view"><SecurityRisk /></PermissionRoute>} />
           <Route path="payments" element={<PermissionRoute permission="finance:view"><Payments /></PermissionRoute>} />
           <Route path="payouts" element={<PermissionRoute permission="finance:view"><Payouts /></PermissionRoute>} />
+          <Route path="gift-cards" element={<PermissionRoute permission="finance:view"><GiftCards /></PermissionRoute>} />
           <Route path="fees" element={<PermissionRoute permission="finance:view"><Fees /></PermissionRoute>} />
           <Route path="financials" element={<PermissionRoute permission="finance:view"><Financials /></PermissionRoute>} />
           <Route path="scheduled-reports" element={<PermissionRoute permission="finance:view"><ScheduledReports /></PermissionRoute>} />
@@ -81,43 +80,23 @@ function PermissionRoute({ permission, children }: { permission: AdminPermission
 
 function RecoveryRedirect() {
   const navigate = useNavigate()
-
   useEffect(() => {
     let active = true
-
     const { data } = supabase.auth.onAuthStateChange((event) => {
-      if (active && event === 'PASSWORD_RECOVERY') {
-        navigate('/reset-password', { replace: true })
-      }
+      if (active && event === 'PASSWORD_RECOVERY') navigate('/reset-password', { replace: true })
     })
-
-    void supabase.auth.getSession().then(() => {
-      if (active) navigate('/reset-password', { replace: true })
-    })
-
-    return () => {
-      active = false
-      data.subscription.unsubscribe()
-    }
+    void supabase.auth.getSession().then(() => { if (active) navigate('/reset-password', { replace: true }) })
+    return () => { active = false; data.subscription.unsubscribe() }
   }, [navigate])
 
   return (
     <main className="admin-auth-page">
       <section className="admin-auth-intro">
         <div className="admin-auth-logo"><span>o.</span>ordered.food</div>
-        <div>
-          <span className="admin-kicker">Secure recovery</span>
-          <h1>Checking your recovery link.</h1>
-          <p>Please wait while we verify this single-use link.</p>
-        </div>
+        <div><span className="admin-kicker">Secure recovery</span><h1>Checking your recovery link.</h1><p>Please wait while we verify this single-use link.</p></div>
         <small>Restricted access · Authorised administrators only</small>
       </section>
-      <section className="admin-auth-panel">
-        <div className="admin-auth-card auth-recovery-check">
-          <div className="gate-spinner" />
-          <p>Verifying securely…</p>
-        </div>
-      </section>
+      <section className="admin-auth-panel"><div className="admin-auth-card auth-recovery-check"><div className="gate-spinner" /><p>Verifying securely…</p></div></section>
     </main>
   )
 }
