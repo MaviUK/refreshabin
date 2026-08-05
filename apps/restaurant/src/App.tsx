@@ -19,6 +19,7 @@ import DeliveryMap from './settings/DeliveryMap'
 import Payments from './payments/Payments'
 import Finance from './finance/Finance'
 import Subscription from './subscription/Subscription'
+import { SubscriptionAccessProvider } from './subscription/SubscriptionAccess'
 import Storefront from './storefront/Storefront'
 import Checkout from './checkout/Checkout'
 import OrderStatus from './order/OrderStatus'
@@ -40,7 +41,15 @@ import './checkout/CheckoutAccount.css'
 import './checkout/CheckoutAddresses.css'
 
 export default function App() {
-  return <PlatformConfigurationProvider><PlatformStatusBoundary><ApplicationRoutes /></PlatformStatusBoundary></PlatformConfigurationProvider>
+  return (
+    <PlatformConfigurationProvider>
+      <PlatformStatusBoundary>
+        <SubscriptionAccessProvider>
+          <ApplicationRoutes />
+        </SubscriptionAccessProvider>
+      </PlatformStatusBoundary>
+    </PlatformConfigurationProvider>
+  )
 }
 
 function ApplicationRoutes() {
