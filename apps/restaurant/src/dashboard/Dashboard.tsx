@@ -315,6 +315,9 @@ export default function Dashboard() {
             <Link to="/orders">Manage orders <span>→</span></Link>
             <Link to="/kds">Open kitchen display <span>→</span></Link>
             <Link to="/menu">Build your menu <span>→</span></Link>
+            <Link to="/marketing">Marketing & promotions <span>→</span></Link>
+            <Link to="/finance">Finance & statements <span>→</span></Link>
+            <Link to="/subscription">Plan & billing <span>→</span></Link>
             <Link to="/opening-hours">Set opening hours <span>→</span></Link>
             <Link to="/branding">Update branding <span>→</span></Link>
             <Link to="/settings">Restaurant settings <span>→</span></Link>
