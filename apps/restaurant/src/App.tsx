@@ -37,6 +37,7 @@ import CustomerProfile from './customer/CustomerProfile'
 import CustomerOrders from './customer/CustomerOrders'
 import CustomerAddresses from './customer/CustomerAddresses'
 import CustomerFavourites from './customer/CustomerFavourites'
+import CustomerWallet from './customer/CustomerWallet'
 import { PlatformConfigurationProvider, PlatformStatusBoundary, usePlatformConfiguration } from './lib/platformConfiguration'
 import './checkout/CheckoutAccount.css'
 import './checkout/CheckoutAddresses.css'
@@ -70,6 +71,7 @@ function ApplicationRoutes() {
       <Route path="/account/profile" element={<CustomerProfile />} />
       <Route path="/account/orders" element={<CustomerOrders />} />
       <Route path="/account/addresses" element={<CustomerAddresses />} />
+      <Route path="/account/wallet" element={<CustomerWallet />} />
       <Route path="/account/favourites" element={configuration.feature_flags.customer_favourites ? <CustomerFavourites /> : <Navigate to="/account" replace />} />
       <Route path="/login" element={<Login />} />
       <Route path="/register" element={<Register />} />
