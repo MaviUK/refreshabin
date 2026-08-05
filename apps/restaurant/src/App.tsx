@@ -20,6 +20,7 @@ import Payments from './payments/Payments'
 import Finance from './finance/Finance'
 import Subscription from './subscription/Subscription'
 import { SubscriptionAccessProvider } from './subscription/SubscriptionAccess'
+import Marketing from './marketing/Marketing'
 import Storefront from './storefront/Storefront'
 import Checkout from './checkout/Checkout'
 import OrderStatus from './order/OrderStatus'
@@ -92,6 +93,7 @@ function ApplicationRoutes() {
       <Route path="/payments" element={<ProtectedRoute allowPaymentSetup><Payments /></ProtectedRoute>} />
       <Route path="/finance" element={<ProtectedRoute><Finance /></ProtectedRoute>} />
       <Route path="/subscription" element={<ProtectedRoute allowPaymentSetup><Subscription /></ProtectedRoute>} />
+      <Route path="/marketing" element={<ProtectedRoute><Marketing /></ProtectedRoute>} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   )
