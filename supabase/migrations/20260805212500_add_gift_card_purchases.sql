@@ -36,7 +36,7 @@ set search_path = ''
 as $function$
   select jsonb_build_object('id', r.id, 'name', r.name, 'slug', r.slug)
   from public.restaurants r
-  where r.slug = p_slug and r.status in ('approved','active')
+  where r.slug = p_slug and r.status = 'active'
   limit 1
 $function$;
 
