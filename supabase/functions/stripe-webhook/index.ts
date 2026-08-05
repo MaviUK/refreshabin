@@ -98,6 +98,10 @@ Deno.serve(async (request) => {
         const authorized = intent.status === 'requires_capture'
         const { error } = await supabase.from('orders').update({ payment_status: authorized ? 'authorized' : 'paid', order_status: 'placed', paid_at: authorized ? null : new Date(event.created * 1000).toISOString(), stripe_checkout_session_id: session.id, stripe_payment_intent_id: intent.id }).eq('id', orderId).in('payment_status', ['pending', 'requires_action'])
         if (error) throw error
+        if (!authorized) {
+          const { error: redemptionError } = await supabase.rpc('record_order_promotion_redemption', { p_order_id: orderId })
+          if (redemptionError) throw redemptionError
+        }
         break
       }
       case 'customer.subscription.created':
@@ -158,6 +162,8 @@ Deno.serve(async (request) => {
         if (!orderId) break
         const { error } = await supabase.from('orders').update({ payment_status: 'paid', paid_at: new Date(event.created * 1000).toISOString(), stripe_payment_intent_id: intent.id }).eq('id', orderId).neq('payment_status', 'paid')
         if (error) throw error
+        const { error: redemptionError } = await supabase.rpc('record_order_promotion_redemption', { p_order_id: orderId })
+        if (redemptionError) throw redemptionError
         break
       }
       case 'payment_intent.canceled': {
