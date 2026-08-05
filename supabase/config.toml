@@ -26,3 +26,11 @@ verify_jwt = true
 # Restaurant owners must be signed in before capturing or cancelling an authorised order.
 [functions.restaurant-order-payment]
 verify_jwt = true
+
+# Weekly invoice processing is privileged and may only be invoked with a valid JWT.
+[functions.process-weekly-restaurant-invoices]
+verify_jwt = true
+
+# Restaurant subscription billing requires an authenticated restaurant owner.
+[functions.restaurant-subscription-billing]
+verify_jwt = true
