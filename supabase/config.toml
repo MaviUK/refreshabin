@@ -32,3 +32,6 @@ verify_jwt = true
 
 [functions.restaurant-subscription-billing]
 verify_jwt = true
+
+[functions.process-gift-card-deliveries]
+verify_jwt = true
