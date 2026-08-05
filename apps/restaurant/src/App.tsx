@@ -21,6 +21,7 @@ import Finance from './finance/Finance'
 import Subscription from './subscription/Subscription'
 import { SubscriptionAccessProvider } from './subscription/SubscriptionAccess'
 import Marketing from './marketing/Marketing'
+import GiftCards from './gift-cards/GiftCards'
 import Storefront from './storefront/Storefront'
 import Checkout from './checkout/Checkout'
 import OrderStatus from './order/OrderStatus'
@@ -96,6 +97,7 @@ function ApplicationRoutes() {
       <Route path="/finance" element={<ProtectedRoute><Finance /></ProtectedRoute>} />
       <Route path="/subscription" element={<ProtectedRoute allowPaymentSetup><Subscription /></ProtectedRoute>} />
       <Route path="/marketing" element={<ProtectedRoute><Marketing /></ProtectedRoute>} />
+      <Route path="/gift-cards" element={<ProtectedRoute><GiftCards /></ProtectedRoute>} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   )
