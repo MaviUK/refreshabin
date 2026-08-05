@@ -209,6 +209,7 @@ export default function CustomerAccountHome() {
 
       <section className="customer-home-grid" aria-label="Account sections">
         <Link to="/account/orders"><span className="customer-home-icon">↻</span><div><strong>Orders</strong><small>{account.orderCount} order{account.orderCount === 1 ? '' : 's'}</small></div><span>›</span></Link>
+        <Link to="/account/wallet"><span className="customer-home-icon">£</span><div><strong>Wallet</strong><small>Store credit and gift cards</small></div><span>›</span></Link>
         {favouritesEnabled && <Link to="/account/favourites"><span className="customer-home-icon">♥</span><div><strong>Favourites</strong><small>{account.favouriteCount} saved</small></div><span>›</span></Link>}
         <Link to="/account/addresses"><span className="customer-home-icon">⌂</span><div><strong>Addresses</strong><small>{account.addressCount} saved</small></div><span>›</span></Link>
         <Link to="/account/profile"><span className="customer-home-icon">◉</span><div><strong>Your details</strong><small>Name, mobile and password</small></div><span>›</span></Link>
