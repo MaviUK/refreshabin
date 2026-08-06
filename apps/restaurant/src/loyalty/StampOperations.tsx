@@ -40,7 +40,9 @@ export default function StampOperations() {
 
   useEffect(() => { void load() }, [])
 
+  const selectedProgram = programs.find((program) => program.id === programId)
   const fullClaimUrl = useMemo(() => createdQr ? `${window.location.origin}${createdQr.claim_url}` : '', [createdQr])
+  const qrImageUrl = useMemo(() => fullClaimUrl ? `https://quickchart.io/qr?size=700&margin=3&text=${encodeURIComponent(fullClaimUrl)}` : '', [fullClaimUrl])
 
   async function createQr(event: FormEvent) {
     event.preventDefault(); setBusy(true); setError(''); setMessage(''); setCreatedQr(null)
@@ -51,7 +53,7 @@ export default function StampOperations() {
       p_valid_minutes: Number(validMinutes),
     })
     if (error) setError(error.message)
-    else { setCreatedQr(data as CreatedQr); setMessage('Secure claim link created.'); await load() }
+    else { setCreatedQr(data as CreatedQr); setMessage('Secure QR campaign created.'); await load() }
     setBusy(false)
   }
 
@@ -59,6 +61,32 @@ export default function StampOperations() {
     if (!fullClaimUrl) return
     await navigator.clipboard.writeText(fullClaimUrl)
     setMessage('Claim link copied.')
+  }
+
+  async function downloadQr() {
+    if (!qrImageUrl) return
+    try {
+      const response = await fetch(qrImageUrl)
+      if (!response.ok) throw new Error('Unable to render QR code')
+      const blob = await response.blob()
+      const objectUrl = URL.createObjectURL(blob)
+      const anchor = document.createElement('a')
+      anchor.href = objectUrl
+      anchor.download = `${(selectedProgram?.name || 'stamp-campaign').toLowerCase().replace(/[^a-z0-9]+/g, '-')}-qr.png`
+      anchor.click()
+      URL.revokeObjectURL(objectUrl)
+      setMessage('QR image downloaded.')
+    } catch {
+      window.open(qrImageUrl, '_blank', 'noopener,noreferrer')
+      setMessage('QR image opened in a new tab for saving.')
+    }
+  }
+
+  function printPoster() {
+    if (!createdQr) return
+    document.body.classList.add('printing-stamp-poster')
+    window.print()
+    window.setTimeout(() => document.body.classList.remove('printing-stamp-poster'), 300)
   }
 
   async function awardManual(event: FormEvent) {
@@ -75,11 +103,11 @@ export default function StampOperations() {
   }
 
   return <main className="stamp-ops-page">
-    <header><div><span>Loyalty operations</span><h1>QR & staff stamping</h1><p>Create short-lived claim links and issue audited manual stamps.</p></div><nav><Link to="/loyalty/stamps">Campaigns</Link><Link to="/loyalty/rewards">Rewards</Link></nav></header>
+    <header><div><span>Loyalty operations</span><h1>QR & staff stamping</h1><p>Create short-lived QR campaigns, printable counter posters and audited staff adjustments.</p></div><nav><Link to="/loyalty/stamps">Campaigns</Link><Link to="/loyalty/stamps/analytics">Analytics</Link></nav></header>
     {error && <p className="stamp-ops-error">{error}</p>}{message && <p className="stamp-ops-message">{message}</p>}
     <section className="stamp-ops-grid">
-      <form onSubmit={createQr}><span>Customer claim</span><h2>Create secure claim link</h2><label>Stamp programme<select value={programId} onChange={(event) => setProgramId(event.target.value)} required>{programs.map((program) => <option key={program.id} value={program.id}>{program.name}</option>)}</select></label><div className="stamp-ops-row"><label>Stamps<input type="number" min="1" max="20" value={stamps} onChange={(event) => setStamps(event.target.value)} /></label><label>Maximum claims<input type="number" min="1" max="10000" value={maxClaims} onChange={(event) => setMaxClaims(event.target.value)} /></label><label>Valid minutes<input type="number" min="1" max="1440" value={validMinutes} onChange={(event) => setValidMinutes(event.target.value)} /></label></div><button disabled={busy || !programId}>{busy ? 'Creating…' : 'Create claim link'}</button>
-        {createdQr && <div className="stamp-ops-link"><strong>Ready until {dateTime.format(new Date(createdQr.expires_at))}</strong><input readOnly value={fullClaimUrl}/><div><button type="button" onClick={() => void copyClaimLink()}>Copy link</button><button type="button" onClick={() => window.print()}>Print</button></div></div>}
+      <form onSubmit={createQr}><span>Customer claim</span><h2>Create secure QR campaign</h2><label>Stamp programme<select value={programId} onChange={(event) => setProgramId(event.target.value)} required>{programs.map((program) => <option key={program.id} value={program.id}>{program.name}</option>)}</select></label><div className="stamp-ops-row"><label>Stamps<input type="number" min="1" max="20" value={stamps} onChange={(event) => setStamps(event.target.value)} /></label><label>Maximum claims<input type="number" min="1" max="10000" value={maxClaims} onChange={(event) => setMaxClaims(event.target.value)} /></label><label>Valid minutes<input type="number" min="1" max="1440" value={validMinutes} onChange={(event) => setValidMinutes(event.target.value)} /></label></div><button disabled={busy || !programId}>{busy ? 'Creating…' : 'Create QR campaign'}</button>
+        {createdQr && <div className="stamp-ops-link"><strong>Ready until {dateTime.format(new Date(createdQr.expires_at))}</strong><div className="stamp-qr-preview"><img src={qrImageUrl} alt={`QR code for ${selectedProgram?.name || 'stamp campaign'}`} /><div><h3>{selectedProgram?.name || 'Stamp reward'}</h3><p>Scan to collect {stamps} stamp{Number(stamps) === 1 ? '' : 's'}.</p><small>{fullClaimUrl}</small></div></div><input readOnly value={fullClaimUrl}/><div><button type="button" onClick={() => void copyClaimLink()}>Copy link</button><button type="button" onClick={() => void downloadQr()}>Download PNG</button><button type="button" onClick={printPoster}>Print poster</button></div></div>}
       </form>
       <form onSubmit={awardManual}><span>Staff adjustment</span><h2>Award stamps manually</h2><label>Stamp programme<select value={programId} onChange={(event) => setProgramId(event.target.value)} required>{programs.map((program) => <option key={program.id} value={program.id}>{program.name}</option>)}</select></label><label>Customer user ID<input value={customerId} onChange={(event) => setCustomerId(event.target.value)} placeholder="Customer UUID" required /></label><label>Stamps<input type="number" min="1" max="20" value={manualStamps} onChange={(event) => setManualStamps(event.target.value)} required /></label><label>Audit note<textarea rows={3} value={manualNote} onChange={(event) => setManualNote(event.target.value)} required /></label><button disabled={busy || !programId || !customerId.trim()}>{busy ? 'Awarding…' : 'Award stamps'}</button></form>
     </section>
