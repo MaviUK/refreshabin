@@ -12,6 +12,7 @@ import ForgotPassword from './pages/ForgotPassword'
 import Fees from './pages/Fees'
 import Financials from './pages/Financials'
 import GiftCards from './pages/GiftCards'
+import StampCards from './pages/StampCards'
 import Login from './pages/Login'
 import Moderation from './pages/Moderation'
 import OrderRecovery from './pages/OrderRecovery'
@@ -47,6 +48,7 @@ export default function App() {
         <Route element={<AdminLayout />}>
           <Route index element={<Overview />} />
           <Route path="analytics" element={<PermissionRoute permission="overview:view"><Analytics /></PermissionRoute>} />
+          <Route path="stamp-cards" element={<PermissionRoute permission="overview:view"><StampCards /></PermissionRoute>} />
           <Route path="restaurants" element={<PermissionRoute permission="restaurants:view"><Restaurants /></PermissionRoute>} />
           <Route path="restaurant-activity" element={<PermissionRoute permission="restaurants:view"><RestaurantActivityPage /></PermissionRoute>} />
           <Route path="customers" element={<PermissionRoute permission="customers:view"><Customers /></PermissionRoute>} />
