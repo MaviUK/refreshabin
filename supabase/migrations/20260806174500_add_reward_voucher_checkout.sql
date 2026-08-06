@@ -198,7 +198,7 @@ as $function$
 begin
   if new.reward_voucher_id is null then return new; end if;
 
-  if new.payment_status in ('paid','authorized','partially_refunded','refunded')
+  if new.payment_status in ('paid','partially_refunded','refunded')
      and old.payment_status is distinct from new.payment_status then
     perform public.finalize_order_reward_voucher(new.id, true);
   elsif new.payment_status in ('failed','cancelled')
