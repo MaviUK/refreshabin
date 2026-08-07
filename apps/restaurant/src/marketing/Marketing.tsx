@@ -156,7 +156,7 @@ export default function Marketing() {
     <main className="marketing-shell">
       <header className="marketing-header">
         <div><Link className="brand" to="/dashboard">ordered.food</Link><p>Restaurant marketing</p></div>
-        <div className="marketing-header-actions"><Link className="secondary-button button-link" to="/dashboard">Dashboard</Link><button className="primary-button" type="button" onClick={() => setShowForm((value) => !value)}>{showForm ? 'Close builder' : 'New promotion'}</button></div>
+        <div className="marketing-header-actions"><Link className="secondary-button button-link" to="/marketing/milestones">Birthdays & milestones</Link><Link className="secondary-button button-link" to="/dashboard">Dashboard</Link><button className="primary-button" type="button" onClick={() => setShowForm((value) => !value)}>{showForm ? 'Close builder' : 'New promotion'}</button></div>
       </header>
 
       <section className="marketing-hero">
@@ -175,9 +175,10 @@ export default function Marketing() {
 
       <section className="marketing-tools-grid">
         <article className="marketing-tool-card marketing-tool-card--active"><span>Promotions</span><strong>Create voucher campaigns</strong><small>Live now</small></article>
-        <article className="marketing-tool-card"><span>Loyalty</span><strong>Points and rewards</strong><small>Coming next</small></article>
-        <article className="marketing-tool-card"><span>Gift cards</span><strong>Sell digital credit</strong><small>Coming next</small></article>
-        <article className="marketing-tool-card"><span>Referrals</span><strong>Reward recommendations</strong><small>Coming next</small></article>
+        <Link className="marketing-tool-card marketing-tool-card--active" to="/marketing/milestones"><span>Milestones</span><strong>Birthdays & customer milestones</strong><small>Live now</small></Link>
+        <Link className="marketing-tool-card marketing-tool-card--active" to="/loyalty"><span>Loyalty</span><strong>Points and rewards</strong><small>Live now</small></Link>
+        <Link className="marketing-tool-card marketing-tool-card--active" to="/gift-cards"><span>Gift cards</span><strong>Sell digital credit</strong><small>Live now</small></Link>
+        <Link className="marketing-tool-card marketing-tool-card--active" to="/loyalty/referrals"><span>Referrals</span><strong>Reward recommendations</strong><small>Live now</small></Link>
       </section>
 
       {showForm && (
