@@ -1,0 +1,40 @@
+name: Birthday & Milestone Rewards
+
+on:
+  schedule:
+    - cron: '17 * * * *'
+  workflow_dispatch:
+  push:
+    branches:
+      - agent/platform-foundation
+    paths:
+      - '.github/workflows/birthday-milestones.yml'
+      - 'supabase/functions/process-birthday-milestones/**'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: birthday-milestones
+  cancel-in-progress: false
+
+jobs:
+  process:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Validate scheduler secret
+        env:
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          set -euo pipefail
+          test -n "${SUPABASE_SERVICE_ROLE_KEY:-}" || { echo '::error title=Missing scheduler secret::SUPABASE_SERVICE_ROLE_KEY is not configured.'; exit 1; }
+      - name: Process birthday and milestone rewards
+        env:
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          set -euo pipefail
+          response_file="$(mktemp)"
+          status="$(curl --silent --show-error --output "$response_file" --write-out '%{http_code}' --retry 2 --retry-all-errors --request POST --header "Authorization: Bearer ${SUPABASE_SERVICE_ROLE_KEY}" --header "Content-Type: application/json" --data '{}' 'https://uvlzxrsqylwksgwpsslp.supabase.co/functions/v1/process-birthday-milestones')"
+          cat "$response_file"
+          if [ "$status" -lt 200 ] || [ "$status" -ge 300 ]; then echo "::error title=Birthday milestone processor failed::Edge Function returned HTTP ${status}."; exit 1; fi
