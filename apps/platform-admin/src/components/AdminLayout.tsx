@@ -13,6 +13,7 @@ const navGroups: NavGroup[] = [
     { to: '/analytics', label: 'Analytics', icon: '▥', end: false, permission: 'overview:view' },
     { to: '/stamp-cards', label: 'Stamp cards', icon: '●', end: false, permission: 'overview:view' },
     { to: '/referrals', label: 'Referrals', icon: '↗', end: false, permission: 'overview:view' },
+    { to: '/milestones', label: 'Birthdays & milestones', icon: '★', end: false, permission: 'overview:view' },
     { to: '/alerts', label: 'Alert centre', icon: '!', end: false, permission: 'settings:view' },
   ] },
   { label: 'Operations', items: [
