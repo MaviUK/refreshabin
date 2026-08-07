@@ -1,13 +1,13 @@
 import { createClient } from 'npm:@supabase/supabase-js@2'
 
 const esc=(v:string)=>v.replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]||c))
+function isServiceRoleRequest(req:Request){const auth=req.headers.get('Authorization')||'';const token=auth.replace(/^Bearer\s+/i,'');const parts=token.split('.');if(parts.length!==3)return false;try{let payload=parts[1].replace(/-/g,'+').replace(/_/g,'/');payload=payload.padEnd(Math.ceil(payload.length/4)*4,'=');const claims=JSON.parse(atob(payload));return claims?.role==='service_role'}catch{return false}}
 async function sendEmail(apiKey:string,from:string,to:string,subject:string,html:string){const response=await fetch('https://api.resend.com/emails',{method:'POST',headers:{Authorization:`Bearer ${apiKey}`,'Content-Type':'application/json'},body:JSON.stringify({from,to:[to],subject,html})});if(!response.ok)throw new Error(`Resend returned ${response.status}`)}
 Deno.serve(async(req)=>{
   if(req.method!=='POST')return new Response(JSON.stringify({error:'Method not allowed'}),{status:405,headers:{'Content-Type':'application/json'}})
   const url=Deno.env.get('SUPABASE_URL'),service=Deno.env.get('SUPABASE_SERVICE_ROLE_KEY'),resend=Deno.env.get('RESEND_API_KEY'),from=Deno.env.get('RESEND_FROM_EMAIL')||'ordered.food <orders@ordered.food>',site=(Deno.env.get('SITE_URL')||'https://ordered.food').replace(/\/$/,'')
   if(!url||!service||!resend)return new Response(JSON.stringify({error:'Referral notification processor is not configured'}),{status:500,headers:{'Content-Type':'application/json'}})
-  const auth=req.headers.get('Authorization')||''
-  if(auth!==`Bearer ${service}`)return new Response(JSON.stringify({error:'Service role authorization required'}),{status:401,headers:{'Content-Type':'application/json'}})
+  if(!isServiceRoleRequest(req))return new Response(JSON.stringify({error:'Service role authorization required'}),{status:401,headers:{'Content-Type':'application/json'}})
   const db=createClient(url,service,{auth:{persistSession:false,autoRefreshToken:false}})
   const{error:rewardError}=await db.rpc('process_due_referral_rewards',{p_limit:100})
   if(rewardError)return new Response(JSON.stringify({error:rewardError.message}),{status:500,headers:{'Content-Type':'application/json'}})
