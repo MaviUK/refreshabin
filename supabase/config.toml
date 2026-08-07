@@ -44,3 +44,6 @@ verify_jwt = true
 
 [functions.process-vip-memberships]
 verify_jwt = true
+
+[functions.process-challenges]
+verify_jwt = true
