@@ -1,0 +1,3 @@
+-- Phase 5.7 challenge integration hardening was introduced in this live migration.
+-- Final idempotent engine, reward, trigger, notification and analytics definitions
+-- are replayed by 20260807230000_reconcile_challenge_engine.sql for fresh installs.
