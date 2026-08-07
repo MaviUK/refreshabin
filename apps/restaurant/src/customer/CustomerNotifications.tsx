@@ -28,12 +28,18 @@ function iconFor(type: string) {
   return '⭐'
 }
 
+function safeActionUrl(value: string | null) {
+  if (!value || !value.startsWith('/') || value.startsWith('//')) return '/account/notifications'
+  return value
+}
+
 export default function CustomerNotifications() {
   const navigate = useNavigate()
   const [data, setData] = useState<NotificationResponse>({ unread_count: 0, notifications: [] })
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [filter, setFilter] = useState<'all' | 'unread'>('all')
+  const [markingAll, setMarkingAll] = useState(false)
 
   async function load() {
     setLoading(true)
@@ -54,15 +60,32 @@ export default function CustomerNotifications() {
   const rows = useMemo(() => filter === 'unread' ? data.notifications.filter((item) => !item.read_at) : data.notifications, [data, filter])
 
   async function openNotification(item: NotificationRow) {
-    if (!item.read_at) await supabase.rpc('mark_customer_notification_read', { p_notification_id: item.id })
-    if (item.action_url) navigate(item.action_url)
-    else await load()
+    setError('')
+    if (!item.read_at) {
+      const { error: readError } = await supabase.rpc('mark_customer_notification_read', { p_notification_id: item.id })
+      if (readError) {
+        setError(readError.message)
+        return
+      }
+      setData((current) => ({
+        unread_count: Math.max(0, current.unread_count - 1),
+        notifications: current.notifications.map((row) => row.id === item.id ? { ...row, read_at: new Date().toISOString() } : row),
+      }))
+    }
+    navigate(safeActionUrl(item.action_url))
   }
 
   async function markAllRead() {
-    const unread = data.notifications.filter((item) => !item.read_at)
-    await Promise.all(unread.map((item) => supabase.rpc('mark_customer_notification_read', { p_notification_id: item.id })))
-    await load()
+    if (!data.unread_count || markingAll) return
+    setMarkingAll(true)
+    setError('')
+    const { error: markError } = await supabase.rpc('mark_all_customer_notifications_read')
+    if (markError) setError(markError.message)
+    else {
+      const now = new Date().toISOString()
+      setData((current) => ({ unread_count: 0, notifications: current.notifications.map((item) => item.read_at ? item : { ...item, read_at: now }) }))
+    }
+    setMarkingAll(false)
   }
 
   if (loading) return <main className="customer-notifications-state">Loading notifications…</main>
@@ -70,7 +93,7 @@ export default function CustomerNotifications() {
   return <main className="customer-notifications-page">
     <header className="customer-notifications-header">
       <div><Link to="/account">← Account</Link><span>Loyalty updates</span><h1>Notifications</h1><p>Rewards, stamp-card progress and reminders from restaurants you order from.</p></div>
-      <button type="button" onClick={() => void markAllRead()} disabled={!data.unread_count}>Mark all read</button>
+      <button type="button" onClick={() => void markAllRead()} disabled={!data.unread_count || markingAll}>{markingAll ? 'Marking read…' : 'Mark all read'}</button>
     </header>
 
     {error && <div className="customer-notifications-error" role="alert">{error}</div>}
