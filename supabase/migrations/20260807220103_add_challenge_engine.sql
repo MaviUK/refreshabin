@@ -1,0 +1,4 @@
+-- Phase 5.7 challenge engine was introduced in this live migration.
+-- The final consolidated definitions are intentionally replayed in
+-- 20260807230000_reconcile_challenge_engine.sql so fresh databases and the
+-- already-migrated production project converge on exactly the same state.
