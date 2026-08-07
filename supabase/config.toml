@@ -38,3 +38,6 @@ verify_jwt = true
 
 [functions.process-referral-notifications]
 verify_jwt = true
+
+[functions.process-birthday-milestones]
+verify_jwt = true
