@@ -41,3 +41,6 @@ verify_jwt = true
 
 [functions.process-birthday-milestones]
 verify_jwt = true
+
+[functions.process-vip-memberships]
+verify_jwt = true
