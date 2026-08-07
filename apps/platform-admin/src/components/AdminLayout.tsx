@@ -15,6 +15,7 @@ const navGroups: NavGroup[] = [
     { to: '/referrals', label: 'Referrals', icon: '↗', end: false, permission: 'overview:view' },
     { to: '/milestones', label: 'Birthdays & milestones', icon: '★', end: false, permission: 'overview:view' },
     { to: '/vip', label: 'VIP programmes', icon: '✦', end: false, permission: 'overview:view' },
+    { to: '/challenges', label: 'Challenges', icon: '◆', end: false, permission: 'overview:view' },
     { to: '/alerts', label: 'Alert centre', icon: '!', end: false, permission: 'settings:view' },
   ] },
   { label: 'Operations', items: [
