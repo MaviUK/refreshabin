@@ -35,3 +35,6 @@ verify_jwt = true
 
 [functions.process-gift-card-deliveries]
 verify_jwt = true
+
+[functions.process-referral-notifications]
+verify_jwt = true
