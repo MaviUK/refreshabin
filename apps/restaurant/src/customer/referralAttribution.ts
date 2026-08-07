@@ -2,7 +2,7 @@ import { supabase } from '../lib/supabase'
 
 const STORAGE_KEY = 'ordered-food-referral-attribution'
 
-type PendingReferral = { token: string; expiresAt?: string; restaurantSlug?: string }
+type PendingReferral = { token: string; expiresAt?: string | undefined; restaurantSlug?: string | undefined }
 
 export function saveReferralAttribution(value: PendingReferral) {
   window.localStorage.setItem(STORAGE_KEY, JSON.stringify(value))
