@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { usePlatformConfiguration } from '../lib/platformConfiguration'
+import CustomerNotificationBell from './CustomerNotificationBell'
 import './CustomerAccountHome.css'
 
 type ReorderItem = {
@@ -196,7 +197,10 @@ export default function CustomerAccountHome() {
     <main className="customer-home-page">
       <header className="customer-home-header">
         <Link className="customer-home-brand" to="/restaurants">ordered.food</Link>
-        <button type="button" onClick={signOut} disabled={signingOut}>{signingOut ? 'Signing out…' : 'Sign out'}</button>
+        <div className="customer-home-header-actions">
+          <CustomerNotificationBell />
+          <button type="button" onClick={signOut} disabled={signingOut}>{signingOut ? 'Signing out…' : 'Sign out'}</button>
+        </div>
       </header>
 
       <section className="customer-home-hero">
@@ -209,6 +213,7 @@ export default function CustomerAccountHome() {
 
       <section className="customer-home-grid" aria-label="Account sections">
         <Link to="/account/orders"><span className="customer-home-icon">↻</span><div><strong>Orders</strong><small>{account.orderCount} order{account.orderCount === 1 ? '' : 's'}</small></div><span>›</span></Link>
+        <Link to="/account/notifications"><span className="customer-home-icon">♢</span><div><strong>Notifications</strong><small>Stamp progress, rewards and reminders</small></div><span>›</span></Link>
         <Link to="/account/wallet"><span className="customer-home-icon">£</span><div><strong>Wallet</strong><small>Store credit and gift cards</small></div><span>›</span></Link>
         {favouritesEnabled && <Link to="/account/favourites"><span className="customer-home-icon">♥</span><div><strong>Favourites</strong><small>{account.favouriteCount} saved</small></div><span>›</span></Link>}
         <Link to="/account/addresses"><span className="customer-home-icon">⌂</span><div><strong>Addresses</strong><small>{account.addressCount} saved</small></div><span>›</span></Link>
