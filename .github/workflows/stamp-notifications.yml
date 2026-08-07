@@ -1,0 +1,59 @@
+name: Stamp Notifications
+
+on:
+  schedule:
+    - cron: '*/15 * * * *'
+  workflow_dispatch:
+  push:
+    branches:
+      - agent/platform-foundation
+    paths:
+      - '.github/workflows/stamp-notifications.yml'
+      - 'supabase/functions/process-stamp-notifications/**'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: stamp-notifications
+  cancel-in-progress: false
+
+jobs:
+  process:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Validate scheduler secret
+        env:
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          set -euo pipefail
+          if [ -z "${SUPABASE_SERVICE_ROLE_KEY:-}" ]; then
+            echo '::error title=Missing scheduler secret::SUPABASE_SERVICE_ROLE_KEY is not configured for this repository.'
+            exit 1
+          fi
+
+      - name: Process stamp notifications and expiry reminders
+        env:
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          set -euo pipefail
+          response_file="$(mktemp)"
+          status="$(curl --silent --show-error --output "$response_file" --write-out '%{http_code}' \
+            --retry 2 \
+            --retry-all-errors \
+            --request POST \
+            --header "Authorization: Bearer ${SUPABASE_SERVICE_ROLE_KEY}" \
+            --header "Content-Type: application/json" \
+            --data '{}' \
+            'https://uvlzxrsqylwksgwpsslp.supabase.co/functions/v1/process-stamp-notifications')"
+          cat "$response_file"
+          if [ "$status" -lt 200 ] || [ "$status" -ge 300 ]; then
+            echo "::error title=Stamp notification processor failed::Edge Function returned HTTP ${status}."
+            exit 1
+          fi
+
+          if grep -q '"status":"failed"' "$response_file"; then
+            echo '::error title=Stamp notification delivery failure::One or more queued notifications failed to send.'
+            exit 1
+          fi
