@@ -22,7 +22,9 @@ Deno.serve(async(req)=>{
   const results=[]
   for(const row of rows||[]){
     try{
-      await db.from('reward_notification_queue').update({status:'processing',attempts:(row.attempts||0)+1,last_error:null,updated_at:new Date().toISOString()}).eq('id',row.id).in('status',['pending','failed'])
+      const{data:claimed,error:claimError}=await db.from('reward_notification_queue').update({status:'processing',attempts:(row.attempts||0)+1,last_error:null,updated_at:new Date().toISOString()}).eq('id',row.id).in('status',['pending','failed']).select('id').maybeSingle()
+      if(claimError)throw claimError
+      if(!claimed)continue
       const{data:userData,error:userError}=await db.auth.admin.getUserById(row.customer_user_id)
       if(userError||!userData.user?.email)throw userError||new Error('Customer email unavailable')
       const action=`${site}${row.action_url||'/account/milestones'}`
@@ -32,7 +34,7 @@ Deno.serve(async(req)=>{
       if(pushUrl){try{await dispatchPush(pushUrl,pushSecret,{customer_user_id:row.customer_user_id,event_type:row.event_type,...(row.push_payload||{})});pushStatus='dispatched'}catch(pushError){pushStatus='failed';console.error('Push hook failed',pushError)}}
       await db.from('reward_notification_queue').update({status:'sent',push_status:pushStatus,sent_at:new Date().toISOString(),last_error:null,updated_at:new Date().toISOString()}).eq('id',row.id)
       results.push({id:row.id,status:'sent',push_status:pushStatus})
-    }catch(caught){const message=caught instanceof Error?caught.message.slice(0,500):'Notification failed';const attempts=(row.attempts||0)+1;await db.from('reward_notification_queue').update({status:attempts>=5?'failed':'pending',last_error:message,available_at:new Date(Date.now()+60*60*1000).toISOString(),updated_at:new Date().toISOString()}).eq('id',row.id);results.push({id:row.id,status:'failed',error:message})}
+    }catch(caught){const message=caught instanceof Error?caught.message.slice(0,500):'Notification failed';const attempts=(row.attempts||0)+1;await db.from('reward_notification_queue').update({status:attempts>=5?'failed':'pending',last_error:message,available_at:new Date(Date.now()+60*60*1000).toISOString(),updated_at:new Date().toISOString()}).eq('id',row.id).eq('status','processing');results.push({id:row.id,status:'failed',error:message})}
   }
   return new Response(JSON.stringify({birthday,expiry,processed:results.length,results}),{headers:{'Content-Type':'application/json','Cache-Control':'no-store'}})
 })
