@@ -17,11 +17,7 @@ export default function Login() {
     setError('')
     setLoading(true)
 
-    const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
-      email: email.trim(),
-      password,
-    })
-
+    const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({ email: email.trim(), password })
     if (signInError) {
       setLoading(false)
       setError(signInError.message)
@@ -42,15 +38,14 @@ export default function Login() {
     }
 
     const [{ data: membership }, { data: groupContext }] = await Promise.all([
-      supabase
-        .from('restaurant_members')
-        .select('id')
-        .eq('user_id', userId)
-        .eq('status', 'active')
-        .limit(1)
-        .maybeSingle(),
+      supabase.from('restaurant_members').select('id').eq('user_id', userId).eq('status', 'active').limit(1).maybeSingle(),
       supabase.rpc('get_my_restaurant_group_context'),
     ])
+
+    if (membership) {
+      const { error: auditError } = await supabase.rpc('record_platform_sign_in', { p_actor_type: 'restaurant' })
+      if (auditError) console.warn('Could not record restaurant sign-in', auditError)
+    }
 
     setLoading(false)
     const hasGroupAccess = Array.isArray(groupContext) && groupContext.length > 0
@@ -58,48 +53,15 @@ export default function Login() {
   }
 
   return (
-    <main className="auth-shell">
-      <section className="auth-card">
-        <Link className="brand" to="/">ordered.food</Link>
-        <span className="eyebrow">Restaurant portal</span>
-        <h1>Welcome back</h1>
-        <p>Sign in to manage your restaurant, menu and incoming orders.</p>
-
-        <form className="auth-form" onSubmit={handleSubmit}>
-          <label>
-            Email address
-            <input
-              type="email"
-              value={email}
-              onChange={(event) => setEmail(event.target.value)}
-              autoComplete="email"
-              required
-            />
-          </label>
-
-          <label>
-            Password
-            <input
-              type="password"
-              value={password}
-              onChange={(event) => setPassword(event.target.value)}
-              autoComplete="current-password"
-              required
-            />
-          </label>
-
-          {error && <div className="form-error" role="alert">{error}</div>}
-
-          <button className="primary-button" type="submit" disabled={loading}>
-            {loading ? 'Signing in…' : 'Sign in'}
-          </button>
-        </form>
-
-        <div className="auth-links">
-          <Link to="/forgot-password">Forgot password?</Link>
-          <span>New to ordered.food? <Link to="/register">Create an account</Link></span>
-        </div>
-      </section>
-    </main>
+    <main className="auth-shell"><section className="auth-card">
+      <Link className="brand" to="/">ordered.food</Link><span className="eyebrow">Restaurant portal</span><h1>Welcome back</h1><p>Sign in to manage your restaurant, menu and incoming orders.</p>
+      <form className="auth-form" onSubmit={handleSubmit}>
+        <label>Email address<input type="email" value={email} onChange={(event) => setEmail(event.target.value)} autoComplete="email" required /></label>
+        <label>Password<input type="password" value={password} onChange={(event) => setPassword(event.target.value)} autoComplete="current-password" required /></label>
+        {error && <div className="form-error" role="alert">{error}</div>}
+        <button className="primary-button" type="submit" disabled={loading}>{loading ? 'Signing in…' : 'Sign in'}</button>
+      </form>
+      <div className="auth-links"><Link to="/forgot-password">Forgot password?</Link><span>New to ordered.food? <Link to="/register">Create an account</Link></span></div>
+    </section></main>
   )
 }
