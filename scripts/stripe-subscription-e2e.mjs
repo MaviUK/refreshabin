@@ -15,7 +15,7 @@ assertTestKey(key)
 const api='https://api.stripe.com/v1'
 const created={customers:[],products:[]}
 const form=(data)=>{const p=new URLSearchParams();for(const[key,value]of Object.entries(data)){if(value===undefined||value===null)continue;p.set(key,String(value))}return p}
-async function stripe(path,{method='GET',data}={}){const response=await fetch(`${api}${path}`,{method,headers:{Authorization:`Bearer ${key}`,...(data?{'Content-Type':'application/x-www-form-urlencoded'}:{})},body:data?form(data):undefined});const json=await response.json();if(!response.ok)throw new Error(`${method} ${path}: ${json?.error?.message||response.status}`);return json}
+async function stripe(path,{method='GET',data}={}){const response=await fetch(`${api}${path}`,{method,headers:{Authorization:`Bearer ${key}`,...(data?{'Content-Type':'application/x-www-form-urlencoded'}:{})},body:data?form(data):undefined});const json=await response.json();if(!response.ok){const error=new Error(`${method} ${path}: ${json?.error?.message||response.status}`);error.stripe=json?.error||null;error.status=response.status;throw error}return json}
 async function cleanup(){for(const id of created.customers.reverse()){try{await stripe(`/customers/${id}`,{method:'DELETE'})}catch{}}for(const id of created.products.reverse()){try{await stripe(`/products/${id}`,{method:'POST',data:{active:false}})}catch{}}}
 
 const checks=[]
@@ -60,12 +60,12 @@ try{
   check('Refund',refund.status==='succeeded'||refund.status==='pending',refund.status)
 
   const declineCustomer=await stripe('/customers',{method:'POST',data:{email:`ordered-food-decline-${Date.now()}@example.test`}});created.customers.push(declineCustomer.id)
-  const declinePm=await stripe('/payment_methods',{method:'POST',data:{type:'card','card[token]':'tok_chargeDeclined'}})
-  await stripe(`/payment_methods/${declinePm.id}/attach`,{method:'POST',data:{customer:declineCustomer.id}})
-  await stripe(`/customers/${declineCustomer.id}`,{method:'POST',data:{'invoice_settings[default_payment_method]':declinePm.id}})
-  let declined=false
-  try{await stripe('/subscriptions',{method:'POST',data:{customer:declineCustomer.id,'items[0][price]':priceA.id,payment_behavior:'error_if_incomplete'}})}catch{declined=true}
-  check('Failed-payment handling',declined)
+  const declinePmId='pm_card_chargeCustomerFail'
+  await stripe(`/payment_methods/${declinePmId}/attach`,{method:'POST',data:{customer:declineCustomer.id}})
+  await stripe(`/customers/${declineCustomer.id}`,{method:'POST',data:{'invoice_settings[default_payment_method]':declinePmId}})
+  let declineError=null
+  try{await stripe('/subscriptions',{method:'POST',data:{customer:declineCustomer.id,'items[0][price]':priceA.id,payment_behavior:'error_if_incomplete'}})}catch(error){declineError=error}
+  check('Failed-payment handling',declineError?.stripe?.code==='card_declined',declineError?.stripe?.code||declineError?.message||'payment unexpectedly succeeded')
 
   const checkout=await stripe('/checkout/sessions',{method:'POST',data:{mode:'subscription',customer:customer.id,'line_items[0][price]':priceA.id,'line_items[0][quantity]':1,success_url:'https://ordered.food/subscription?e2e=success',cancel_url:'https://ordered.food/subscription?e2e=cancel'}})
   check('Checkout Session',Boolean(checkout.url))
