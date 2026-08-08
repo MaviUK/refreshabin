@@ -35,11 +35,7 @@ export default function CustomerLogin() {
     setError('')
     setLoading(true)
 
-    const { error: signInError } = await supabase.auth.signInWithPassword({
-      email: email.trim(),
-      password,
-    })
-
+    const { error: signInError } = await supabase.auth.signInWithPassword({ email: email.trim(), password })
     if (signInError) {
       setLoading(false)
       setError(signInError.message)
@@ -47,6 +43,8 @@ export default function CustomerLogin() {
     }
 
     await supabase.rpc('claim_customer_orders')
+    const { error: auditError } = await supabase.rpc('record_platform_sign_in', { p_actor_type: 'user' })
+    if (auditError) console.warn('Could not record customer sign-in', auditError)
     setLoading(false)
     navigate(destination, { replace: true })
   }
@@ -58,21 +56,13 @@ export default function CustomerLogin() {
         <span className="customer-account-eyebrow">Customer account</span>
         <h1>Sign in</h1>
         <p>View your orders and use your saved details at checkout.</p>
-
         <form className="customer-account-form" onSubmit={handleSubmit}>
-          <label>
-            Email address
-            <input type="email" value={email} onChange={(event) => setEmail(event.target.value)} autoComplete="email" required />
-          </label>
-          <label>
-            Password
-            <input type="password" value={password} onChange={(event) => setPassword(event.target.value)} autoComplete="current-password" required />
-          </label>
+          <label>Email address<input type="email" value={email} onChange={(event) => setEmail(event.target.value)} autoComplete="email" required /></label>
+          <label>Password<input type="password" value={password} onChange={(event) => setPassword(event.target.value)} autoComplete="current-password" required /></label>
           <div className="customer-account-inline-link"><Link to="/account/forgot-password">Forgotten your password?</Link></div>
           {error && <div className="customer-account-error" role="alert">{error}</div>}
           <button type="submit" disabled={loading}>{loading ? 'Signing in…' : 'Sign in'}</button>
         </form>
-
         <p className="customer-account-note">New customer? <Link to="/account/register" state={{ from: destination }}>Create an account</Link></p>
       </section>
     </main>
