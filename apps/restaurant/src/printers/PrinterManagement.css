@@ -1,0 +1,242 @@
+.printers-page {
+  padding-bottom: 4rem;
+}
+
+.printer-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.05fr) minmax(320px, 0.95fr);
+  gap: 1.5rem;
+  align-items: start;
+}
+
+.printer-form {
+  position: sticky;
+  top: 1rem;
+}
+
+.printer-checks {
+  display: grid;
+  gap: 0.75rem;
+  margin-top: 1.25rem;
+}
+
+.printer-checks label {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  font-weight: 700;
+  color: #1f2937;
+}
+
+.printer-checks input {
+  width: 1.1rem;
+  height: 1.1rem;
+  accent-color: #111827;
+}
+
+.printer-form-actions,
+.printer-card-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  margin-top: 1.5rem;
+}
+
+.printer-list {
+  display: grid;
+  gap: 1rem;
+}
+
+.printer-card {
+  display: grid;
+  gap: 1.1rem;
+}
+
+.printer-card-top {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  align-items: flex-start;
+}
+
+.printer-card-top h2,
+.printer-empty h2 {
+  margin: 0.45rem 0 0.25rem;
+}
+
+.printer-card-top p,
+.printer-empty p {
+  margin: 0;
+  color: #6b7280;
+}
+
+.printer-card-top > strong {
+  min-width: 2.5rem;
+  height: 2.5rem;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  background: #f3f4f6;
+}
+
+.printer-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  border-radius: 999px;
+  padding: 0.28rem 0.65rem;
+  background: #f3f4f6;
+  color: #6b7280;
+  font-size: 0.76rem;
+  font-weight: 800;
+}
+
+.printer-status-dot {
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 999px;
+  background: currentColor;
+}
+
+.printer-status.online {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.printer-status.printing {
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+
+.printer-status.error {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+
+.printer-status.offline {
+  background: #f3f4f6;
+  color: #6b7280;
+}
+
+.printer-health-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+.printer-health-grid > div {
+  display: grid;
+  gap: 0.2rem;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.8rem;
+  padding: 0.8rem;
+  background: #f8fafc;
+}
+
+.printer-health-grid span {
+  color: #64748b;
+  font-size: 0.76rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.printer-health-grid strong {
+  color: #1f2937;
+  font-size: 0.9rem;
+}
+
+.printer-error-panel {
+  border: 1px solid #fecaca;
+  border-radius: 0.85rem;
+  padding: 0.85rem;
+  background: #fff7f7;
+  color: #991b1b;
+}
+
+.printer-error-panel p {
+  margin: 0.35rem 0;
+  color: #7f1d1d;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.printer-error-panel span {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #b91c1c;
+}
+
+.printer-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.printer-tags span {
+  border-radius: 999px;
+  padding: 0.4rem 0.7rem;
+  background: #f8fafc;
+  border: 1px solid #e5e7eb;
+  color: #475569;
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.printer-empty {
+  min-height: 18rem;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  text-align: center;
+}
+
+.printer-icon {
+  width: 3.5rem;
+  height: 3.5rem;
+  display: grid;
+  place-items: center;
+  border-radius: 1rem;
+  background: #f3f4f6;
+  font-size: 1.6rem;
+}
+
+.danger-text-button {
+  border: 0;
+  background: transparent;
+  color: #b91c1c;
+  font: inherit;
+  font-weight: 800;
+  cursor: pointer;
+  padding: 0.65rem 0.8rem;
+}
+
+.danger-text-button:hover {
+  color: #7f1d1d;
+}
+
+@media (max-width: 900px) {
+  .printer-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .printer-form {
+    position: static;
+  }
+}
+
+@media (max-width: 620px) {
+  .printer-form-actions,
+  .printer-card-actions {
+    flex-direction: column-reverse;
+  }
+
+  .printer-form-actions button,
+  .printer-card-actions button {
+    width: 100%;
+  }
+
+  .printer-health-grid {
+    grid-template-columns: 1fr;
+  }
+}

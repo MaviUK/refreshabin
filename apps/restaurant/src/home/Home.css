@@ -1,0 +1,352 @@
+.home-page {
+  min-height: 100vh;
+  background: #f7f4ec;
+  color: #17211b;
+}
+
+.home-header {
+  max-width: 1240px;
+  margin: 0 auto;
+  min-height: 78px;
+  padding: 0 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+}
+
+.home-logo {
+  color: #17211b;
+  font-size: 1.35rem;
+  font-weight: 900;
+  letter-spacing: -0.04em;
+  text-decoration: none;
+}
+
+.home-nav {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+.home-nav a {
+  color: #344039;
+  font-weight: 800;
+  text-decoration: none;
+}
+
+.home-customer-link {
+  border: 1px solid #d8d1c4;
+  border-radius: 999px;
+  padding: 10px 15px;
+  background: rgba(255,255,255,.6);
+}
+
+.home-business-button,
+.business-banner > a {
+  border-radius: 999px;
+  background: #17211b;
+  color: #fff !important;
+  padding: 12px 18px;
+}
+
+.home-hero {
+  max-width: 1240px;
+  min-height: 650px;
+  margin: 0 auto;
+  padding: 70px 24px 90px;
+  display: grid;
+  grid-template-columns: 1.05fr 0.95fr;
+  align-items: center;
+  gap: 60px;
+}
+
+.home-eyebrow {
+  color: #de5b2d;
+  font-size: 0.75rem;
+  font-weight: 900;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.home-hero h1 {
+  max-width: 700px;
+  margin: 16px 0 22px;
+  font-size: clamp(4rem, 8vw, 7.8rem);
+  line-height: 0.88;
+  letter-spacing: -0.075em;
+}
+
+.home-hero-copy > p {
+  max-width: 620px;
+  margin: 0;
+  color: #536058;
+  font-size: 1.15rem;
+  line-height: 1.65;
+}
+
+.postcode-search {
+  max-width: 620px;
+  margin-top: 34px;
+}
+
+.postcode-search label {
+  display: block;
+  margin-bottom: 9px;
+  font-size: 0.8rem;
+  font-weight: 900;
+}
+
+.postcode-search > div {
+  display: flex;
+  gap: 10px;
+  padding: 8px;
+  border: 1px solid #ded7c9;
+  border-radius: 18px;
+  background: #fff;
+  box-shadow: 0 18px 45px rgba(55, 44, 27, 0.08);
+}
+
+.postcode-search input {
+  min-width: 0;
+  flex: 1;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: #17211b;
+  font: inherit;
+  padding: 0 14px;
+}
+
+.postcode-search button {
+  min-height: 52px;
+  border: 0;
+  border-radius: 12px;
+  background: #de5b2d;
+  color: #fff;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 900;
+  padding: 0 24px;
+}
+
+.home-trust-row {
+  margin-top: 22px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 22px;
+  color: #6b756e;
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+.home-trust-row span::before {
+  content: '✓';
+  margin-right: 7px;
+  color: #278553;
+}
+
+.home-hero-art {
+  min-height: 520px;
+  position: relative;
+  display: grid;
+  place-items: center;
+  border-radius: 44px;
+  background: #e9c85c;
+  overflow: hidden;
+}
+
+.home-hero-art::before,
+.home-hero-art::after {
+  content: '';
+  position: absolute;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.34);
+}
+
+.home-hero-art::before { width: 330px; height: 330px; top: -110px; right: -80px; }
+.home-hero-art::after { width: 210px; height: 210px; bottom: -80px; left: -50px; }
+
+.hero-dish {
+  width: 270px;
+  height: 270px;
+  display: grid;
+  place-items: center;
+  border: 22px solid rgba(255,255,255,0.92);
+  border-radius: 50%;
+  background: #fff7df;
+  font-size: 8.5rem;
+  box-shadow: 0 30px 70px rgba(67, 47, 0, 0.22);
+  transform: rotate(-7deg);
+}
+
+.hero-food-card {
+  position: absolute;
+  z-index: 2;
+  min-width: 210px;
+  display: grid;
+  gap: 5px;
+  border: 1px solid rgba(255,255,255,0.65);
+  border-radius: 18px;
+  background: rgba(255,255,255,0.92);
+  box-shadow: 0 18px 45px rgba(60, 43, 6, 0.16);
+  padding: 17px;
+  backdrop-filter: blur(12px);
+}
+
+.hero-food-card span,
+.hero-food-card small { color: #6b756e; font-size: 0.75rem; }
+.hero-card-one { top: 48px; left: 28px; }
+.hero-card-two { right: 24px; bottom: 42px; }
+
+.cuisine-section,
+.how-it-works,
+.business-banner,
+.home-footer {
+  max-width: 1240px;
+  margin: 0 auto;
+  padding-left: 24px;
+  padding-right: 24px;
+}
+
+.cuisine-section,
+.how-it-works { padding-top: 88px; padding-bottom: 88px; }
+
+.section-heading {
+  margin-bottom: 28px;
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 20px;
+}
+
+.section-heading h2,
+.business-banner h2 {
+  margin: 8px 0 0;
+  font-size: clamp(2.2rem, 5vw, 4rem);
+  line-height: 1;
+  letter-spacing: -0.055em;
+}
+
+.section-heading > a {
+  color: #17211b;
+  font-weight: 900;
+}
+
+.cuisine-grid {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.cuisine-grid a {
+  min-height: 150px;
+  display: grid;
+  align-content: space-between;
+  border: 1px solid #e0dbcf;
+  border-radius: 22px;
+  background: #fff;
+  color: #17211b;
+  text-decoration: none;
+  padding: 20px;
+  transition: transform 160ms ease, box-shadow 160ms ease;
+}
+
+.cuisine-grid a:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 20px 40px rgba(48, 42, 28, 0.08);
+}
+
+.cuisine-grid span { font-size: 2.4rem; }
+.cuisine-grid strong { font-size: 1rem; }
+
+.how-it-works {
+  border-top: 1px solid #ded8cb;
+}
+
+.steps-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 18px;
+}
+
+.steps-grid article {
+  border-radius: 26px;
+  background: #1d2b22;
+  color: #fff;
+  padding: 30px;
+}
+
+.steps-grid article > span {
+  color: #e9c85c;
+  font-size: 0.75rem;
+  font-weight: 900;
+  letter-spacing: 0.15em;
+}
+
+.steps-grid h3 { margin: 52px 0 10px; font-size: 1.35rem; }
+.steps-grid p { margin: 0; color: #cbd3cd; line-height: 1.6; }
+
+.business-banner {
+  margin-top: 40px;
+  margin-bottom: 80px;
+  padding-top: 58px;
+  padding-bottom: 58px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 50px;
+  border-radius: 32px;
+  background: #f0d76f;
+}
+
+.business-banner > div { max-width: 760px; }
+.business-banner p { max-width: 700px; margin: 18px 0 0; color: #4f513b; line-height: 1.6; }
+.business-banner > a { flex: none; font-weight: 900; text-decoration: none; }
+
+.home-footer {
+  min-height: 120px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  border-top: 1px solid #ded8cb;
+}
+
+.home-footer p { color: #69736c; }
+.home-footer div { display: flex; gap: 18px; }
+.home-footer div a { color: #344039; font-weight: 800; }
+
+@media (max-width: 920px) {
+  .home-hero { grid-template-columns: 1fr; padding-top: 48px; }
+  .home-hero-art { min-height: 430px; }
+  .cuisine-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+
+@media (max-width: 640px) {
+  .home-header { min-height: 68px; padding: 0 16px; }
+  .home-nav { gap: 8px; }
+  .home-restaurant-login { display: none; }
+  .home-customer-link { padding: 9px 11px; font-size: .82rem; }
+  .home-business-button { padding: 10px 14px; font-size: 0.82rem; }
+  .home-hero { padding: 44px 16px 64px; gap: 42px; }
+  .home-hero h1 { font-size: clamp(3.6rem, 19vw, 5.5rem); }
+  .home-hero-copy > p { font-size: 1rem; }
+  .postcode-search > div { display: grid; }
+  .postcode-search input { min-height: 48px; }
+  .postcode-search button { width: 100%; }
+  .home-hero-art { min-height: 390px; border-radius: 28px; }
+  .hero-dish { width: 210px; height: 210px; border-width: 16px; font-size: 6.2rem; }
+  .hero-food-card { min-width: 180px; padding: 13px; }
+  .hero-card-one { top: 22px; left: 14px; }
+  .hero-card-two { right: 12px; bottom: 24px; }
+  .cuisine-section, .how-it-works { padding: 66px 16px; }
+  .section-heading { align-items: flex-start; }
+  .section-heading > a { display: none; }
+  .cuisine-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .cuisine-grid a { min-height: 130px; }
+  .steps-grid { grid-template-columns: 1fr; }
+  .steps-grid h3 { margin-top: 34px; }
+  .business-banner { margin: 20px 16px 56px; padding: 36px 24px; flex-direction: column; align-items: flex-start; }
+  .home-footer { margin: 0 16px; padding: 28px 0; flex-direction: column; align-items: flex-start; }
+}

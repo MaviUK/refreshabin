@@ -1,0 +1,2 @@
+alter table public.reward_notification_queue drop constraint if exists reward_notification_queue_event_type_check;
+alter table public.reward_notification_queue add constraint reward_notification_queue_event_type_check check (event_type in ('happy_birthday','birthday_reward_available','birthday_reward_expiring','milestone_reached','reward_earned','vip_tier_upgraded','vip_tier_downgraded','vip_reward_available','vip_birthday_bonus','vip_milestone','challenge_reward_earned'));
