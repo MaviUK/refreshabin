@@ -5,91 +5,61 @@ const trimOrigin=(value:string)=>value.trim().replace(/\/$/,'')
 function cors(request:Request){const origin=trimOrigin(request.headers.get('Origin')??'');const allowed=new Set(['https://ordered.food','https://www.ordered.food',trimOrigin(Deno.env.get('SITE_URL')??''),...(Deno.env.get('CORS_ALLOWED_ORIGINS')??'').split(',').map(trimOrigin)].filter(Boolean));return{'Access-Control-Allow-Origin':origin&&allowed.has(origin)?origin:'null','Access-Control-Allow-Headers':'authorization, x-client-info, apikey, content-type','Access-Control-Allow-Methods':'POST, OPTIONS','Access-Control-Max-Age':'86400','Vary':'Origin'}}
 function json(request:Request,body:unknown,status=200){return new Response(JSON.stringify(body),{status,headers:{...cors(request),'Content-Type':'application/json','Cache-Control':'no-store'}})}
 function errorDetails(error:unknown){if(error instanceof Error)return error.message;if(error&&typeof error==='object'&&'message'in error&&typeof(error as{message?:unknown}).message==='string')return(error as{message:string}).message;return'Unable to manage subscription billing.'}
+const toIso=(unix:number|null|undefined)=>unix?new Date(unix*1000).toISOString():null
 
 Deno.serve(async(request)=>{
-  const headers=cors(request)
-  if(request.method==='OPTIONS')return new Response('ok',{headers})
-  if(request.method!=='POST')return json(request,{error:'Method not allowed.'},405)
-  if(request.headers.get('Origin')&&headers['Access-Control-Allow-Origin']==='null')return json(request,{error:'Origin is not allowed.'},403)
-
-  const stripeKey=Deno.env.get('STRIPE_SECRET_KEY')
-  const supabaseUrl=Deno.env.get('SUPABASE_URL')
-  const serviceKey=Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
-  const siteUrl=trimOrigin(Deno.env.get('SITE_URL')??'')
-  const authHeader=request.headers.get('Authorization')
-  if(!stripeKey||!supabaseUrl||!serviceKey||!siteUrl||!authHeader)return json(request,{error:'Subscription billing is not configured.'},500)
-
-  let body:{action?:unknown;plan_id?:unknown;billing_interval?:unknown}
-  try{body=await request.json()}catch{return json(request,{error:'Invalid request body.'},400)}
-  const action=body.action==='status'||body.action==='checkout'||body.action==='portal'?body.action:''
-  if(!action)return json(request,{error:'Unsupported subscription action.'},400)
-
-  const admin=createClient(supabaseUrl,serviceKey,{auth:{persistSession:false,autoRefreshToken:false}})
-  const token=authHeader.replace(/^Bearer\s+/i,'')
-  const{data:userData}=await admin.auth.getUser(token)
-  if(!userData.user)return json(request,{error:'Authentication required.'},401)
-
-  const{data:membership,error:membershipError}=await admin.from('restaurant_members').select('restaurant_id,restaurants(id,name,email)').eq('user_id',userData.user.id).limit(1).maybeSingle()
-  if(membershipError||!membership)return json(request,{error:'Restaurant membership not found.'},403)
-  const restaurant=Array.isArray(membership.restaurants)?membership.restaurants[0]:membership.restaurants
-  if(!restaurant)return json(request,{error:'Restaurant not found.'},404)
-
-  if(action==='status'){
-    const{data,error}=await admin.rpc('get_restaurant_subscription_status')
-    if(error)return json(request,{error:error.message},500)
-    return json(request,data)
+ const headers=cors(request)
+ if(request.method==='OPTIONS')return new Response('ok',{headers})
+ if(request.method!=='POST')return json(request,{error:'Method not allowed.'},405)
+ if(request.headers.get('Origin')&&headers['Access-Control-Allow-Origin']==='null')return json(request,{error:'Origin is not allowed.'},403)
+ const stripeKey=Deno.env.get('STRIPE_SECRET_KEY'),supabaseUrl=Deno.env.get('SUPABASE_URL'),serviceKey=Deno.env.get('SUPABASE_SERVICE_ROLE_KEY'),anonKey=Deno.env.get('SUPABASE_ANON_KEY'),siteUrl=trimOrigin(Deno.env.get('SITE_URL')??''),authHeader=request.headers.get('Authorization')
+ if(!stripeKey||!supabaseUrl||!serviceKey||!anonKey||!siteUrl||!authHeader)return json(request,{error:'Subscription billing is not configured.'},500)
+ let body:{action?:unknown;plan_id?:unknown;billing_interval?:unknown;reason?:unknown}
+ try{body=await request.json()}catch{return json(request,{error:'Invalid request body.'},400)}
+ const supported=new Set(['status','checkout','portal','change_plan','cancel','restart','pause','resume','sync_invoices'])
+ const action=typeof body.action==='string'&&supported.has(body.action)?body.action:''
+ if(!action)return json(request,{error:'Unsupported subscription action.'},400)
+ const admin=createClient(supabaseUrl,serviceKey,{auth:{persistSession:false,autoRefreshToken:false}})
+ const userClient=createClient(supabaseUrl,anonKey,{auth:{persistSession:false,autoRefreshToken:false},global:{headers:{Authorization:authHeader}}})
+ const token=authHeader.replace(/^Bearer\s+/i,'')
+ const{data:userData}=await admin.auth.getUser(token)
+ if(!userData.user)return json(request,{error:'Authentication required.'},401)
+ const{data:membership,error:membershipError}=await admin.from('restaurant_members').select('restaurant_id,role,status,restaurants(id,name,email)').eq('user_id',userData.user.id).eq('status','active').limit(1).maybeSingle()
+ if(membershipError||!membership)return json(request,{error:'Restaurant membership not found.'},403)
+ const restaurant=Array.isArray(membership.restaurants)?membership.restaurants[0]:membership.restaurants
+ if(!restaurant)return json(request,{error:'Restaurant not found.'},404)
+ const owner=membership.role==='owner',stripe=new Stripe(stripeKey)
+ async function dashboard(){const{data,error}=await userClient.rpc('get_restaurant_billing_dashboard');if(error)throw error;return data}
+ if(action==='status'){try{return json(request,await dashboard())}catch(error){return json(request,{error:errorDetails(error)},500)}}
+ if(!owner)return json(request,{error:'Restaurant owner access required for billing changes.'},403)
+ try{
+  let{data:subscription,error:subError}=await admin.from('restaurant_subscriptions').select('*,subscription_plans(*)').eq('restaurant_id',membership.restaurant_id).maybeSingle();if(subError)throw subError
+  async function ensureCustomer(){if(subscription?.stripe_customer_id)return subscription.stripe_customer_id;const customer=await stripe.customers.create({email:restaurant.email??userData.user.email??undefined,name:restaurant.name,metadata:{restaurant_id:membership.restaurant_id}},{idempotencyKey:`restaurant-subscription-customer-${membership.restaurant_id}`});const{data:updated,error}=await admin.from('restaurant_subscriptions').upsert({restaurant_id:membership.restaurant_id,stripe_customer_id:customer.id,updated_at:new Date().toISOString()},{onConflict:'restaurant_id'}).select('*,subscription_plans(*)').single();if(error)throw error;subscription=updated;return customer.id}
+  async function ensurePrice(plan:Record<string,unknown>,interval:'monthly'|'annual'){if(plan.custom_pricing)throw new Error('This plan requires a custom commercial agreement.');if(interval==='monthly'&&!plan.supports_monthly||interval==='annual'&&!plan.supports_annual)throw new Error(`The ${plan.name} plan does not support ${interval} billing.`);let priceId=(interval==='annual'?plan.stripe_annual_price_id:plan.stripe_monthly_price_id) as string|null;const amount=Number(interval==='annual'?plan.annual_price_pence:plan.monthly_price_pence);if(amount===0)return null;if(!Number.isInteger(amount)||amount<0)throw new Error(`The ${plan.name} ${interval} price is invalid.`);if(priceId)return priceId;const product=await stripe.products.create({name:`ordered.food ${plan.name}`,description:String(plan.description||'')||undefined,metadata:{ordered_food_plan_id:String(plan.id),ordered_food_plan_code:String(plan.code)}},{idempotencyKey:`ordered-food-plan-product-${plan.id}`});const price=await stripe.prices.create({currency:String(plan.currency||'gbp'),unit_amount:amount,recurring:{interval:interval==='annual'?'year':'month'},product:product.id,nickname:`${plan.name} ${interval}`,metadata:{ordered_food_plan_id:String(plan.id),billing_interval:interval}},{idempotencyKey:`ordered-food-plan-price-v3-${plan.id}-${interval}-${amount}`});priceId=price.id;const update=interval==='annual'?{stripe_annual_price_id:price.id,updated_at:new Date().toISOString()}:{stripe_monthly_price_id:price.id,updated_at:new Date().toISOString()};const{error}=await admin.from('subscription_plans').update(update).eq('id',plan.id);if(error)throw error;return priceId}
+  async function loadPlan(){const planId=typeof body.plan_id==='string'?body.plan_id:'';if(!/^[0-9a-f-]{36}$/i.test(planId))throw new Error('Choose a valid subscription plan.');const{data:plan,error}=await admin.from('subscription_plans').select('*').eq('id',planId).eq('is_active',true).single();if(error||!plan)throw new Error('Subscription plan not found.');return plan}
+  async function syncInvoices(customerId:string){const invoices=await stripe.invoices.list({customer:customerId,limit:24});for(const invoice of invoices.data){const period=invoice.lines.data[0]?.period;const anyInvoice=invoice as Stripe.Invoice&{total_taxes?:Array<{amount?:number}>;total_excluding_tax?:number|null};await admin.from('restaurant_subscription_invoices').upsert({restaurant_id:membership.restaurant_id,subscription_id:subscription?.id??null,stripe_invoice_id:invoice.id,invoice_number:invoice.number,status:invoice.status??'draft',currency:invoice.currency,subtotal_pence:invoice.subtotal??0,discount_pence:Math.max(0,(invoice.subtotal??0)-(anyInvoice.total_excluding_tax??invoice.subtotal??0)),tax_pence:(anyInvoice.total_taxes??[]).reduce((n,t)=>n+(t.amount??0),0),total_pence:invoice.total??0,amount_paid_pence:invoice.amount_paid??0,amount_due_pence:invoice.amount_due??0,hosted_invoice_url:invoice.hosted_invoice_url,invoice_pdf_url:invoice.invoice_pdf,period_start:toIso(period?.start),period_end:toIso(period?.end),due_at:toIso(invoice.due_date),paid_at:invoice.status_transitions?.paid_at?toIso(invoice.status_transitions.paid_at):null,updated_at:new Date().toISOString()},{onConflict:'stripe_invoice_id'})}}
+  if(action==='portal'){if(!subscription?.stripe_customer_id)return json(request,{error:'No subscription billing account exists yet.'},409);const session=await stripe.billingPortal.sessions.create({customer:subscription.stripe_customer_id,return_url:`${siteUrl}/subscription`});return json(request,{url:session.url})}
+  if(action==='sync_invoices'){if(subscription?.stripe_customer_id)await syncInvoices(subscription.stripe_customer_id);return json(request,await dashboard())}
+  if(action==='checkout'){
+   const plan=await loadPlan();if(!plan.is_public)return json(request,{error:'This plan is available by invitation only.'},403);const interval=body.billing_interval==='annual'?'annual':'monthly';const currentCode=subscription?.subscription_plans?.code;const isLocalFree=subscription?.status==='active'&&currentCode==='free'&&!subscription?.stripe_subscription_id
+   if(subscription&&!isLocalFree&&['active','trialing','past_due','paused','unpaid','incomplete'].includes(subscription.status))return json(request,{error:'A subscription already exists. Change or manage the current plan instead.'},409)
+   const priceId=await ensurePrice(plan,interval),amount=Number(interval==='annual'?plan.annual_price_pence:plan.monthly_price_pence)
+   if(amount===0&&Number(plan.setup_fee_pence||0)===0){const{data:row,error}=await admin.from('restaurant_subscriptions').upsert({restaurant_id:membership.restaurant_id,plan_id:plan.id,status:'active',billing_interval:interval,cancel_at_period_end:false,pending_plan_id:null,pending_billing_interval:null,updated_at:new Date().toISOString()},{onConflict:'restaurant_id'}).select('id').single();if(error)throw error;await admin.from('restaurant_subscription_events').insert({restaurant_id:membership.restaurant_id,subscription_id:row.id,event_type:'subscription_started',details:{plan_id:plan.id,billing_interval:interval,free:true}});return json(request,{direct:true,dashboard:await dashboard()})}
+   const customerId=await ensureCustomer();const{data:priorTrials}=await admin.from('restaurant_subscription_trial_history').select('id').or(`restaurant_id.eq.${membership.restaurant_id},user_id.eq.${userData.user.id}`).limit(1);const trialDays=priorTrials?.length?0:Number(plan.trial_days||0)
+   const lineItems:Stripe.Checkout.SessionCreateParams.LineItem[]=[];if(priceId)lineItems.push({price:priceId,quantity:1});if(Number(plan.setup_fee_pence||0)>0)lineItems.push({price_data:{currency:String(plan.currency||'gbp'),unit_amount:Number(plan.setup_fee_pence),product_data:{name:`${plan.name} setup fee`}},quantity:1})
+   const checkout=await stripe.checkout.sessions.create({mode:'subscription',customer:customerId,line_items:lineItems,subscription_data:{...(trialDays>0?{trial_period_days:trialDays}:{}),metadata:{restaurant_id:membership.restaurant_id,plan_id:plan.id,billing_interval:interval,user_id:userData.user.id}},success_url:`${siteUrl}/subscription?subscription=success&session_id={CHECKOUT_SESSION_ID}`,cancel_url:`${siteUrl}/subscription?subscription=cancelled`,client_reference_id:membership.restaurant_id,metadata:{restaurant_id:membership.restaurant_id,plan_id:plan.id,billing_interval:interval,user_id:userData.user.id},allow_promotion_codes:true},{idempotencyKey:`restaurant-subscription-checkout-v4-${membership.restaurant_id}-${plan.id}-${interval}`})
+   await admin.from('restaurant_subscriptions').upsert({restaurant_id:membership.restaurant_id,plan_id:plan.id,status:'incomplete',billing_interval:interval,stripe_customer_id:customerId,stripe_price_id:priceId,pending_plan_id:null,pending_billing_interval:null,cancel_at_period_end:false,updated_at:new Date().toISOString()},{onConflict:'restaurant_id'});return json(request,{url:checkout.url,session_id:checkout.id})
   }
-
-  const stripe=new Stripe(stripeKey)
-  try{
-    let{data:subscription}=await admin.from('restaurant_subscriptions').select('*,subscription_plans(*)').eq('restaurant_id',membership.restaurant_id).maybeSingle()
-
-    async function ensureCustomer(){
-      if(subscription?.stripe_customer_id)return subscription.stripe_customer_id
-      const customer=await stripe.customers.create({email:restaurant.email??userData.user.email??undefined,name:restaurant.name,metadata:{restaurant_id:membership.restaurant_id}},{idempotencyKey:`restaurant-subscription-customer-${membership.restaurant_id}`})
-      const payload={restaurant_id:membership.restaurant_id,stripe_customer_id:customer.id,updated_at:new Date().toISOString()}
-      const{data:updated,error}=await admin.from('restaurant_subscriptions').upsert(payload,{onConflict:'restaurant_id'}).select('*,subscription_plans(*)').single()
-      if(error)throw error
-      subscription=updated
-      return customer.id
-    }
-
-    if(action==='portal'){
-      if(!subscription?.stripe_customer_id)return json(request,{error:'No subscription billing account exists yet.'},409)
-      const session=await stripe.billingPortal.sessions.create({customer:subscription.stripe_customer_id,return_url:`${siteUrl}/subscription`})
-      return json(request,{url:session.url})
-    }
-
-    const planId=typeof body.plan_id==='string'?body.plan_id:''
-    const interval=body.billing_interval==='annual'?'annual':'monthly'
-    if(!/^[0-9a-f-]{36}$/i.test(planId))return json(request,{error:'Choose a valid subscription plan.'},400)
-    const{data:plan,error:planError}=await admin.from('subscription_plans').select('*').eq('id',planId).eq('is_active',true).single()
-    if(planError||!plan)return json(request,{error:'Subscription plan not found.'},404)
-
-    let priceId=interval==='annual'?plan.stripe_annual_price_id:plan.stripe_monthly_price_id
-    if(!priceId){
-      const product=await stripe.products.create({name:`ordered.food ${plan.name}`,description:plan.description||undefined,metadata:{ordered_food_plan_id:plan.id,ordered_food_plan_code:plan.code}},{idempotencyKey:`ordered-food-plan-product-${plan.id}`})
-      const unitAmount=interval==='annual'?plan.annual_price_pence:plan.monthly_price_pence
-      if(!Number.isInteger(unitAmount)||unitAmount<=0)return json(request,{error:`The ${plan.name} ${interval} price is invalid.`},409)
-      const price=await stripe.prices.create({currency:'gbp',unit_amount:unitAmount,recurring:{interval:interval==='annual'?'year':'month'},product:product.id,nickname:`${plan.name} ${interval}`,metadata:{ordered_food_plan_id:plan.id,billing_interval:interval}},{idempotencyKey:`ordered-food-plan-price-${plan.id}-${interval}-${unitAmount}`})
-      priceId=price.id
-      const update=interval==='annual'?{stripe_annual_price_id:price.id,updated_at:new Date().toISOString()}:{stripe_monthly_price_id:price.id,updated_at:new Date().toISOString()}
-      const{error:updateError}=await admin.from('subscription_plans').update(update).eq('id',plan.id)
-      if(updateError)throw updateError
-    }
-
-    if(subscription?.status==='active'||subscription?.status==='trialing')return json(request,{error:'Manage your current subscription from the billing portal.'},409)
-    const customerId=await ensureCustomer()
-    const checkout=await stripe.checkout.sessions.create({
-      mode:'subscription',customer:customerId,line_items:[{price:priceId,quantity:1}],
-      subscription_data:{trial_period_days:plan.trial_days,metadata:{restaurant_id:membership.restaurant_id,plan_id:plan.id,billing_interval:interval}},
-      success_url:`${siteUrl}/subscription?subscription=success&session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url:`${siteUrl}/subscription?subscription=cancelled`,
-      client_reference_id:membership.restaurant_id,
-      metadata:{restaurant_id:membership.restaurant_id,plan_id:plan.id,billing_interval:interval},allow_promotion_codes:true,
-    },{idempotencyKey:`restaurant-subscription-checkout-v2-${membership.restaurant_id}-${plan.id}-${interval}`})
-
-    await admin.from('restaurant_subscriptions').upsert({restaurant_id:membership.restaurant_id,plan_id:plan.id,status:'incomplete',billing_interval:interval,stripe_customer_id:customerId,updated_at:new Date().toISOString()},{onConflict:'restaurant_id'})
-    return json(request,{url:checkout.url,session_id:checkout.id})
-  }catch(error){console.error('Subscription billing failed',error);return json(request,{error:errorDetails(error)},500)}
+  if(!subscription?.stripe_subscription_id)return json(request,{error:'No active Stripe subscription is available for this action.'},409)
+  if(action==='change_plan'){
+   const plan=await loadPlan(),interval=body.billing_interval==='annual'?'annual':'monthly';if(!plan.is_public&&subscription.plan_id!==plan.id)return json(request,{error:'This plan is available by invitation only.'},403);const priceId=await ensurePrice(plan,interval);const oldMonthly=subscription.billing_interval==='annual'?Number(subscription.subscription_plans?.annual_price_pence||0)/12:Number(subscription.subscription_plans?.monthly_price_pence||0);const newMonthly=interval==='annual'?Number(plan.annual_price_pence||0)/12:Number(plan.monthly_price_pence||0)
+   if(!priceId){const remote=await stripe.subscriptions.update(subscription.stripe_subscription_id,{cancel_at_period_end:true});await admin.from('restaurant_subscriptions').update({cancel_at_period_end:true,pending_plan_id:plan.id,pending_billing_interval:interval,cancellation_reason:'plan_downgrade',updated_at:new Date().toISOString()}).eq('id',subscription.id);await admin.from('restaurant_subscription_events').insert({restaurant_id:membership.restaurant_id,subscription_id:subscription.id,event_type:'subscription_downgraded',details:{from_plan_id:subscription.plan_id,to_plan_id:plan.id,billing_interval:interval,effective_at:toIso(remote.current_period_end)}});return json(request,await dashboard())}
+   const remote=await stripe.subscriptions.retrieve(subscription.stripe_subscription_id),item=remote.items.data[0];if(!item)throw new Error('Stripe subscription item not found.');await stripe.subscriptions.update(remote.id,{items:[{id:item.id,price:priceId}],cancel_at_period_end:false,metadata:{...remote.metadata,restaurant_id:membership.restaurant_id,plan_id:plan.id,billing_interval:interval,user_id:userData.user.id},proration_behavior:'create_prorations'});await admin.from('restaurant_subscriptions').update({plan_id:plan.id,billing_interval:interval,stripe_price_id:priceId,pending_plan_id:null,pending_billing_interval:null,cancel_at_period_end:false,updated_at:new Date().toISOString()}).eq('id',subscription.id);await admin.from('restaurant_subscription_events').insert({restaurant_id:membership.restaurant_id,subscription_id:subscription.id,event_type:newMonthly>=oldMonthly?'subscription_upgraded':'subscription_downgraded',details:{from_plan_id:subscription.plan_id,to_plan_id:plan.id,billing_interval:interval}});return json(request,await dashboard())
+  }
+  if(action==='cancel'){const reason=typeof body.reason==='string'?body.reason.trim().slice(0,500):'other';await stripe.subscriptions.update(subscription.stripe_subscription_id,{cancel_at_period_end:true});await admin.from('restaurant_subscriptions').update({cancel_at_period_end:true,pending_plan_id:null,pending_billing_interval:null,cancellation_reason:reason,updated_at:new Date().toISOString()}).eq('id',subscription.id);await admin.from('restaurant_subscription_cancellations').insert({restaurant_id:membership.restaurant_id,subscription_id:subscription.id,reason_code:'customer_requested',reason_text:reason,requested_by:userData.user.id,effective_at:subscription.current_period_end});await admin.from('restaurant_subscription_events').insert({restaurant_id:membership.restaurant_id,subscription_id:subscription.id,event_type:'subscription_cancelled',details:{at_period_end:true,reason}});return json(request,await dashboard())}
+  if(action==='restart'){if(subscription.status==='cancelled')return json(request,{error:'A fully cancelled subscription cannot be reactivated. Choose a plan to start a new subscription.'},409);await stripe.subscriptions.update(subscription.stripe_subscription_id,{cancel_at_period_end:false});await admin.from('restaurant_subscriptions').update({cancel_at_period_end:false,cancelled_at:null,cancellation_reason:null,pending_plan_id:null,pending_billing_interval:null,updated_at:new Date().toISOString()}).eq('id',subscription.id);await admin.from('restaurant_subscription_cancellations').update({reversed_at:new Date().toISOString()}).eq('subscription_id',subscription.id).is('reversed_at',null);await admin.from('restaurant_subscription_events').insert({restaurant_id:membership.restaurant_id,subscription_id:subscription.id,event_type:'subscription_resumed',details:{restart:true}});return json(request,await dashboard())}
+  if(action==='pause'){await stripe.subscriptions.update(subscription.stripe_subscription_id,{pause_collection:{behavior:'void'}});await admin.from('restaurant_subscriptions').update({status:'paused',paused_at:new Date().toISOString(),updated_at:new Date().toISOString()}).eq('id',subscription.id);await admin.from('restaurant_subscription_events').insert({restaurant_id:membership.restaurant_id,subscription_id:subscription.id,event_type:'subscription_paused',details:{collection_behavior:'void'}});return json(request,await dashboard())}
+  if(action==='resume'){await stripe.subscriptions.update(subscription.stripe_subscription_id,{pause_collection:'' as never});await admin.from('restaurant_subscriptions').update({status:'active',paused_at:null,resume_at:null,updated_at:new Date().toISOString()}).eq('id',subscription.id);await admin.from('restaurant_subscription_events').insert({restaurant_id:membership.restaurant_id,subscription_id:subscription.id,event_type:'subscription_resumed',details:{from_pause:true}});return json(request,await dashboard())}
+  return json(request,{error:'Unsupported subscription action.'},400)
+ }catch(error){console.error('Subscription billing failed',error);return json(request,{error:errorDetails(error)},500)}
 })
