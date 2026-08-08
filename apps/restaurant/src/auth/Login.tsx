@@ -10,26 +10,51 @@ export default function Login() {
   const navigate = useNavigate()
   const location = useLocation()
 
-  const destination = (location.state as { from?: string } | null)?.from ?? '/dashboard'
+  const requestedDestination = (location.state as { from?: string } | null)?.from
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     setError('')
     setLoading(true)
 
-    const { error: signInError } = await supabase.auth.signInWithPassword({
+    const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
       email: email.trim(),
       password,
     })
 
-    setLoading(false)
-
     if (signInError) {
+      setLoading(false)
       setError(signInError.message)
       return
     }
 
-    navigate(destination, { replace: true })
+    if (requestedDestination) {
+      setLoading(false)
+      navigate(requestedDestination, { replace: true })
+      return
+    }
+
+    const userId = signInData.user?.id
+    if (!userId) {
+      setLoading(false)
+      navigate('/dashboard', { replace: true })
+      return
+    }
+
+    const [{ data: membership }, { data: groupContext }] = await Promise.all([
+      supabase
+        .from('restaurant_members')
+        .select('id')
+        .eq('user_id', userId)
+        .eq('status', 'active')
+        .limit(1)
+        .maybeSingle(),
+      supabase.rpc('get_my_restaurant_group_context'),
+    ])
+
+    setLoading(false)
+    const hasGroupAccess = Array.isArray(groupContext) && groupContext.length > 0
+    navigate(membership ? '/dashboard' : hasGroupAccess ? '/enterprise' : '/dashboard', { replace: true })
   }
 
   return (
