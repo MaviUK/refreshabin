@@ -1,0 +1,4 @@
+begin;
+create index if not exists restaurant_subscription_events_restaurant_id_idx on public.restaurant_subscription_events(restaurant_id);
+create index if not exists restaurant_subscription_events_subscription_id_idx on public.restaurant_subscription_events(subscription_id);
+commit;
