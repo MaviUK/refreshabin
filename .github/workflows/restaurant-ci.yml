@@ -17,6 +17,7 @@ on:
       - 'package.json'
       - 'pnpm-workspace.yaml'
       - '.github/workflows/restaurant-ci.yml'
+      - '.github/workflows/stripe-subscription-e2e.yml'
 
 jobs:
   build:
@@ -72,6 +73,9 @@ jobs:
 
       - name: Audit Edge Function security settings
         run: node scripts/audit-edge-functions.mjs
+
+      - name: Validate Stripe E2E test-mode guard
+        run: node scripts/stripe-subscription-e2e.mjs --validate-only
 
       - name: Type-check restaurant app
         run: pnpm --filter @ordered/restaurant lint
