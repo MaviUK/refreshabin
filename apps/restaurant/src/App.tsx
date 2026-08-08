@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, type ReactNode } from 'react'
 import { Navigate, Route, Routes } from 'react-router-dom'
 import Login from './auth/Login'
 import Register from './auth/Register'
@@ -20,7 +20,7 @@ import DeliveryMap from './settings/DeliveryMap'
 import Payments from './payments/Payments'
 import Finance from './finance/Finance'
 import Subscription from './subscription/Subscription'
-import { SubscriptionAccessProvider, SubscriptionFeatureRoute } from './subscription/SubscriptionAccess'
+import { SubscriptionAccessProvider, SubscriptionFeatureRoute, type SubscriptionFeature } from './subscription/SubscriptionAccess'
 import Team from './team/Team'
 import Marketing from './marketing/Marketing'
 import MarketingWorkspaceNav from './marketing/MarketingWorkspaceNav'
@@ -83,7 +83,7 @@ import './checkout/CheckoutAddresses.css'
 
 export default function App(){return <PlatformConfigurationProvider><PlatformStatusBoundary><SubscriptionAccessProvider><ApplicationRoutes/></SubscriptionAccessProvider></PlatformStatusBoundary></PlatformConfigurationProvider>}
 function MarketingOverview(){return <><MarketingWorkspaceNav/><Marketing/></>}
-const Feature=({name,children}:{name:Parameters<typeof SubscriptionFeatureRoute>[0]['feature'];children:React.ReactNode})=><SubscriptionFeatureRoute feature={name}>{children}</SubscriptionFeatureRoute>
+const Feature=({name,children}:{name:SubscriptionFeature;children:ReactNode})=><SubscriptionFeatureRoute feature={name}>{children}</SubscriptionFeatureRoute>
 function ApplicationRoutes(){const{configuration}=usePlatformConfiguration();useEffect(()=>{void claimPendingReferralAttribution();const{data}=supabase.auth.onAuthStateChange((event)=>{if(event==='SIGNED_IN'||event==='USER_UPDATED')void claimPendingReferralAttribution()});return()=>data.subscription.unsubscribe()},[]);return <Routes>
 <Route path="/" element={<Home/>}/><Route path="/restaurants" element={<Restaurants/>}/><Route path="/ref/:code" element={<ReferralLanding/>}/><Route path="/marketing/unsubscribe" element={<MarketingUnsubscribe/>}/><Route path="/r/:slug" element={<><Storefront/><StorefrontGiftCardButton/></>}/><Route path="/r/:slug/checkout" element={<Checkout/>}/><Route path="/r/:slug/gift-card" element={<BuyGiftCard/>}/><Route path="/r/:slug/gift-card/success" element={<GiftCardSuccess/>}/><Route path="/order/success" element={<OrderStatus/>}/>
 <Route path="/account/login" element={<CustomerLogin/>}/><Route path="/account/register" element={<CustomerRegister/>}/><Route path="/account/forgot-password" element={<CustomerForgotPassword/>}/><Route path="/account/reset-password" element={<CustomerResetPassword/>}/><Route path="/account" element={<CustomerAccountHome/>}/><Route path="/account/profile" element={<CustomerProfile/>}/><Route path="/account/orders" element={<CustomerOrders/>}/><Route path="/account/addresses" element={<CustomerAddresses/>}/><Route path="/account/wallet" element={<CustomerWallet/>}/><Route path="/account/loyalty" element={<CustomerLoyalty/>}/><Route path="/account/referrals" element={<CustomerReferrals/>}/><Route path="/account/milestones" element={<CustomerMilestones/>}/><Route path="/account/vip" element={<CustomerVip/>}/><Route path="/account/challenges" element={<CustomerChallenges/>}/><Route path="/account/stamps" element={<CustomerStamps/>}/><Route path="/account/stamps/claim" element={<StampClaim/>}/><Route path="/account/notifications" element={<CustomerNotifications/>}/><Route path="/account/marketing-preferences" element={<CustomerMarketingPreferences/>}/><Route path="/account/rewards/:restaurantId" element={<CustomerRewards/>}/><Route path="/account/favourites" element={configuration.feature_flags.customer_favourites?<CustomerFavourites/>:<Navigate to="/account" replace/>}/>
