@@ -65,3 +65,12 @@ verify_jwt = true
 
 [functions.marketing-resend-webhook]
 verify_jwt = false
+
+[functions.process-group-notifications]
+verify_jwt = false
+
+[functions.restaurant-group-team-invite]
+verify_jwt = true
+
+[functions.enterprise-api]
+verify_jwt = false
