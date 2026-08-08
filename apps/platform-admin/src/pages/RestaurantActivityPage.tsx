@@ -4,6 +4,7 @@ import { useAdmin } from '../components/AdminLayout'
 import RestaurantActivity from '../components/RestaurantActivity'
 import { supabase } from '../lib/supabase'
 import { hasAdminPermission, statusLabels, type Restaurant } from '../types'
+import './RestaurantActivityPage.css'
 
 export default function RestaurantActivityPage() {
   const { admin } = useAdmin()
@@ -48,7 +49,7 @@ export default function RestaurantActivityPage() {
   }
 
   return (
-    <div className="admin-page restaurants-page">
+    <div className="admin-page restaurants-page restaurant-activity-page">
       <header className="page-heading">
         <div><span className="admin-kicker">Restaurant operations</span><h1>Restaurant activity</h1><p>Keep private operational notes and review every platform-admin action taken on a restaurant.</p></div>
       </header>
