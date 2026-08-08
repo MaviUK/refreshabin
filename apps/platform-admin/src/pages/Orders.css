@@ -1,0 +1,163 @@
+.order-detail-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.order-cancel-button,
+.order-cancel-confirm {
+  border: 1px solid #c7284e;
+  border-radius: 10px;
+  background: #c7284e;
+  color: #fff;
+  font: inherit;
+  font-weight: 800;
+  cursor: pointer;
+  transition: transform 120ms ease, box-shadow 120ms ease, opacity 120ms ease;
+}
+
+.order-cancel-button {
+  min-height: 40px;
+  padding: 0 16px;
+}
+
+.order-cancel-confirm {
+  min-height: 44px;
+  padding: 0 20px;
+}
+
+.order-cancel-button:hover:not(:disabled),
+.order-cancel-confirm:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 20px rgba(199, 40, 78, 0.2);
+}
+
+.order-cancel-button:disabled,
+.order-cancel-confirm:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.order-cancel-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(19, 18, 25, 0.52);
+  backdrop-filter: blur(3px);
+}
+
+.order-cancel-dialog {
+  width: min(620px, 100%);
+  max-height: min(760px, calc(100vh - 48px));
+  overflow: auto;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 18px 16px;
+  padding: 26px;
+  border: 1px solid #ead7dd;
+  border-radius: 18px;
+  background: #fff;
+  box-shadow: 0 24px 70px rgba(28, 24, 35, 0.24);
+}
+
+.order-cancel-dialog h2 {
+  margin: 4px 0 8px;
+  font-size: clamp(1.35rem, 3vw, 1.8rem);
+  line-height: 1.15;
+}
+
+.order-cancel-dialog p {
+  margin: 0;
+  color: #69636f;
+  line-height: 1.55;
+}
+
+.order-cancel-icon {
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  border-radius: 12px;
+  background: #ffe7ed;
+  color: #b71f45;
+  font-size: 1.25rem;
+  font-weight: 900;
+}
+
+.order-cancel-reason {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: 8px;
+  font-weight: 800;
+}
+
+.order-cancel-reason textarea {
+  width: 100%;
+  min-height: 112px;
+  resize: vertical;
+  box-sizing: border-box;
+  padding: 12px 14px;
+  border: 1px solid #d9d4dc;
+  border-radius: 12px;
+  background: #fff;
+  color: #191720;
+  font: inherit;
+  font-weight: 500;
+  line-height: 1.45;
+  outline: none;
+}
+
+.order-cancel-reason textarea:focus {
+  border-color: #c7284e;
+  box-shadow: 0 0 0 3px rgba(199, 40, 78, 0.1);
+}
+
+.order-cancel-reason small {
+  color: #857e8b;
+  font-weight: 500;
+}
+
+.order-cancel-actions {
+  grid-column: 1 / -1;
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding-top: 2px;
+}
+
+@media (max-width: 640px) {
+  .order-detail-actions {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .order-cancel-backdrop {
+    align-items: end;
+    padding: 12px;
+  }
+
+  .order-cancel-dialog {
+    grid-template-columns: 1fr;
+    gap: 14px;
+    padding: 20px;
+    border-radius: 18px 18px 12px 12px;
+  }
+
+  .order-cancel-reason,
+  .order-cancel-actions {
+    grid-column: 1;
+  }
+
+  .order-cancel-actions {
+    flex-direction: column-reverse;
+  }
+
+  .order-cancel-actions > button {
+    width: 100%;
+  }
+}
