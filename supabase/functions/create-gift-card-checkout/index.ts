@@ -64,8 +64,15 @@ Deno.serve(async (request) => {
   const { data: rate } = await db.rpc('consume_edge_function_rate_limit', { p_function_name: 'create-gift-card-checkout', p_subject_key: rateKey, p_window_seconds: 3600, p_max_requests: 10 })
   if (rate && !(rate as { allowed: boolean }).allowed) return reply(request, { error: 'Too many gift card checkout attempts. Please try again later.' }, 429, { 'Retry-After': String((rate as { retry_after_seconds?: number }).retry_after_seconds ?? 3600) })
 
-  const { data: restaurant, error: restaurantError } = await db.from('restaurants').select('id,name,slug,status').eq('slug', slug).eq('status', 'active').maybeSingle()
+  const { data: restaurant, error: restaurantError } = await db
+    .from('restaurants')
+    .select('id,name,slug,status,gift_cards_enabled')
+    .eq('slug', slug)
+    .eq('status', 'active')
+    .maybeSingle()
+
   if (restaurantError || !restaurant) return reply(request, { error: 'Restaurant is not available for gift cards.' }, 404)
+  if (!restaurant.gift_cards_enabled) return reply(request, { error: 'Gift card sales are currently unavailable for this restaurant.' }, 403)
 
   const { data: purchase, error: purchaseError } = await db.from('gift_card_purchases').insert({
     restaurant_id: restaurant.id,
