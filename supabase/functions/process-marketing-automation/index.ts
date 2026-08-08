@@ -22,8 +22,8 @@ Deno.serve(async(req)=>{
     const vars={...(row.metadata||{}),customer_id:row.customer_user_id}
     if(row.channel==='in_app'){
       const title=replaceVars(row.subject||'A message from your restaurant',vars),body=replaceVars(row.text_content||row.preview_text||'Open ordered.food to see your latest offer.',vars)
-      const{error}=await db.from('customer_notifications').upsert({customer_user_id:row.customer_user_id,restaurant_id:row.restaurant_id,notification_type:'marketing_campaign',title,body,action_url:row.cta_url||'/account',metadata:{marketing_delivery_id:row.id,campaign_id:row.campaign_id,automation_id:row.automation_id},dedupe_key:`marketing:${row.id}`},{onConflict:'dedupe_key'})
-      if(error)throw error
+      const{error}=await db.from('customer_notifications').insert({customer_user_id:row.customer_user_id,restaurant_id:row.restaurant_id,notification_type:'marketing_campaign',title,body,action_url:row.cta_url||'/account',metadata:{marketing_delivery_id:row.id,campaign_id:row.campaign_id,automation_id:row.automation_id},dedupe_key:`marketing:${row.id}`})
+      if(error&&error.code!=='23505')throw error
       await db.rpc('marketing_complete_delivery',{p_delivery_id:row.id,p_provider_message_id:`inapp:${row.id}`,p_token_hash:null})
       sent.push({id:row.id,status:'delivered'});continue
     }
