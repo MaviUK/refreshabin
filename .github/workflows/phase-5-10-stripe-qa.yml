@@ -1,0 +1,21 @@
+name: Phase 5.10 Stripe QA
+
+on:
+  push:
+    branches:
+      - agent/platform-foundation
+    paths:
+      - '.github/workflows/phase-5-10-stripe-qa.yml'
+
+jobs:
+  stripe-qa:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Run isolated Stripe lifecycle QA
+        shell: bash
+        run: |
+          set -euo pipefail
+          response="$(curl --fail-with-body --silent --show-error 'https://uvlzxrsqylwksgwpsslp.supabase.co/functions/v1/phase-5-10-stripe-qa?token=4444098b396389187a34399d4656327cc1761c45ec6858d3')"
+          echo "$response" | jq .
+          echo "$response" | jq -e '.safe_to_test == true and .passed == true'
