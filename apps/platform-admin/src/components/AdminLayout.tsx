@@ -11,6 +11,7 @@ const navGroups: NavGroup[] = [
   { label: 'Platform', items: [
     { to: '/', label: 'Overview', icon: '⌂', end: true, permission: 'overview:view', mobilePrimary: true },
     { to: '/analytics', label: 'Analytics', icon: '▥', end: false, permission: 'overview:view' },
+    { to: '/marketing-crm', label: 'Marketing & CRM', icon: '◉', end: false, permission: 'overview:view' },
     { to: '/stamp-cards', label: 'Stamp cards', icon: '●', end: false, permission: 'overview:view' },
     { to: '/referrals', label: 'Referrals', icon: '↗', end: false, permission: 'overview:view' },
     { to: '/milestones', label: 'Birthdays & milestones', icon: '★', end: false, permission: 'overview:view' },
