@@ -6,6 +6,7 @@ import { supabase } from './lib/supabase'
 import Admins from './pages/Admins'
 import Alerts from './pages/Alerts'
 import Analytics from './pages/Analytics'
+import AIIntelligence from './pages/AIIntelligence'
 import AuditLog from './pages/AuditLog'
 import Customers from './pages/Customers'
 import ForgotPassword from './pages/ForgotPassword'
@@ -53,6 +54,7 @@ export default function App() {
         <Route element={<AdminLayout />}>
           <Route index element={<Overview />} />
           <Route path="analytics" element={<PermissionRoute permission="overview:view"><Analytics /></PermissionRoute>} />
+          <Route path="ai-intelligence" element={<PermissionRoute permission="overview:view"><AIIntelligence /></PermissionRoute>} />
           <Route path="marketing-crm" element={<PermissionRoute permission="overview:view"><MarketingCrm /></PermissionRoute>} />
           <Route path="stamp-cards" element={<PermissionRoute permission="overview:view"><StampCards /></PermissionRoute>} />
           <Route path="referrals" element={<PermissionRoute permission="overview:view"><Referrals /></PermissionRoute>} />
