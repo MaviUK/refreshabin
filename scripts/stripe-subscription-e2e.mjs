@@ -60,9 +60,8 @@ try{
   check('Refund',refund.status==='succeeded'||refund.status==='pending',refund.status)
 
   const declineCustomer=await stripe('/customers',{method:'POST',data:{email:`ordered-food-decline-${Date.now()}@example.test`}});created.customers.push(declineCustomer.id)
-  const declinePmId='pm_card_chargeCustomerFail'
-  await stripe(`/payment_methods/${declinePmId}/attach`,{method:'POST',data:{customer:declineCustomer.id}})
-  await stripe(`/customers/${declineCustomer.id}`,{method:'POST',data:{'invoice_settings[default_payment_method]':declinePmId}})
+  const attachedDeclinePm=await stripe('/payment_methods/pm_card_chargeCustomerFail/attach',{method:'POST',data:{customer:declineCustomer.id}})
+  await stripe(`/customers/${declineCustomer.id}`,{method:'POST',data:{'invoice_settings[default_payment_method]':attachedDeclinePm.id}})
   let declineError=null
   try{await stripe('/subscriptions',{method:'POST',data:{customer:declineCustomer.id,'items[0][price]':priceA.id,payment_behavior:'error_if_incomplete'}})}catch(error){declineError=error}
   check('Failed-payment handling',declineError?.stripe?.code==='card_declined',declineError?.stripe?.code||declineError?.message||'payment unexpectedly succeeded')
