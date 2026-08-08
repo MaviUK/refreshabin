@@ -4,7 +4,7 @@ import path from 'node:path'
 const root = process.cwd()
 const functionsDir = path.join(root, 'supabase', 'functions')
 const configPath = path.join(root, 'supabase', 'config.toml')
-const publicWithoutJwt = new Set(['create-checkout-session', 'create-gift-card-checkout', 'finalize-gift-card-purchase', 'stripe-webhook'])
+const publicWithoutJwt = new Set(['create-checkout-session', 'create-gift-card-checkout', 'finalize-gift-card-purchase', 'stripe-webhook', 'marketing-resend-webhook'])
 const userContextFunctions = new Set(['admin-refund-payment', 'scan-menu-import'])
 const browserFacingFunctions = new Set(['create-checkout-session', 'create-gift-card-checkout', 'finalize-gift-card-purchase', 'scan-menu-import', 'admin-refund-payment'])
 
@@ -60,6 +60,13 @@ for (const name of functionNames) {
     if (!/MAX_EVENT_AGE_SECONDS/.test(source) || !/MAX_FUTURE_SKEW_SECONDS/.test(source)) failures.push(`${name}: event-age validation was not detected`)
     if (!/claim_stripe_webhook_event/.test(source) || !/complete_stripe_webhook_event/.test(source)) failures.push(`${name}: atomic webhook event lifecycle was not detected`)
     if (/console\.error\('Invalid Stripe signature',\s*error/.test(source)) failures.push(`${name}: signature failures must not log raw verification errors`)
+  }
+
+  if (name === 'marketing-resend-webhook') {
+    if (!/svix-signature/i.test(source) || !/new Webhook\(secret\)\.verify/.test(source)) failures.push(`${name}: signed Svix webhook verification was not detected`)
+    if (!/RESEND_WEBHOOK_SECRET/.test(source)) failures.push(`${name}: Resend webhook secret is not required`)
+    if (!/MAX_BODY_BYTES/.test(source) || !/413/.test(source)) failures.push(`${name}: webhook payload size must be capped`)
+    if (/return new Response\(error\.message/.test(source)) failures.push(`${name}: internal database errors must not be returned to the webhook caller`)
   }
 }
 
