@@ -5,6 +5,7 @@ const root = process.cwd()
 const functionsDir = path.join(root, 'supabase', 'functions')
 const configPath = path.join(root, 'supabase', 'config.toml')
 const publicWithoutJwt = new Set(['create-checkout-session', 'create-gift-card-checkout', 'finalize-gift-card-purchase', 'stripe-webhook', 'marketing-resend-webhook'])
+const customAuthWithoutJwt = new Set(['process-group-notifications', 'enterprise-api'])
 const userContextFunctions = new Set(['admin-refund-payment', 'scan-menu-import'])
 const browserFacingFunctions = new Set(['create-checkout-session', 'create-gift-card-checkout', 'finalize-gift-card-purchase', 'scan-menu-import', 'admin-refund-payment'])
 
@@ -26,12 +27,24 @@ const failures = []
 for (const name of functionNames) {
   if (!configured.has(name)) { failures.push(`${name}: missing explicit verify_jwt setting in supabase/config.toml`); continue }
   const verifyJwt = configured.get(name)
-  if (!verifyJwt && !publicWithoutJwt.has(name)) failures.push(`${name}: verify_jwt=false is not allowed for a privileged function`)
+  if (!verifyJwt && !publicWithoutJwt.has(name) && !customAuthWithoutJwt.has(name)) failures.push(`${name}: verify_jwt=false is not allowed for a privileged function`)
 
   const source = await readFile(path.join(functionsDir, name, 'index.ts'), 'utf8')
   if (!/request\.method|req\.method/.test(source)) failures.push(`${name}: request method is not validated`)
   if (name === 'stripe-webhook' && !/stripe-signature/i.test(source)) failures.push(`${name}: Stripe signature verification was not detected`)
   if (userContextFunctions.has(name) && !/Authorization|authorization/.test(source)) failures.push(`${name}: user-context function does not forward the Authorization header`)
+
+  if (name === 'process-group-notifications') {
+    if (!/x-ordered-cron-secret/i.test(source)) failures.push(`${name}: internal cron secret header verification was not detected`)
+    if (!/verify_restaurant_group_notification_cron_token/.test(source)) failures.push(`${name}: service-role database token verification was not detected`)
+    if (!/cronAllowed\s*!==\s*true/.test(source) || !/status:\s*401/.test(source)) failures.push(`${name}: failed custom authentication must return 401`)
+  }
+
+  if (name === 'enterprise-api') {
+    if (!/x-ordered-api-key/i.test(source)) failures.push(`${name}: corporate API key header verification was not detected`)
+    if (!/resolve_restaurant_group_api_key/.test(source)) failures.push(`${name}: service-role API key resolution was not detected`)
+    if (!/API key required/.test(source) || !/Invalid, expired, disabled, or insufficiently scoped API key/.test(source)) failures.push(`${name}: invalid corporate API keys must be rejected`)
+  }
 
   if (browserFacingFunctions.has(name)) {
     if (/Access-Control-Allow-Origin['"]?\s*:\s*['"]\*['"]/.test(source)) failures.push(`${name}: browser-facing function must not use wildcard CORS`)
