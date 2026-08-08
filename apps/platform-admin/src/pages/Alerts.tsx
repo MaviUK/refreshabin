@@ -2,6 +2,7 @@ import { FormEvent, useCallback, useEffect, useState } from 'react'
 import { useAdmin } from '../components/AdminLayout'
 import { supabase } from '../lib/supabase'
 import { formatDate, hasAdminPermission } from '../types'
+import './Alerts.css'
 
 type Rule={id:string;rule_key:string;name:string;description:string;is_enabled:boolean;severity:string;threshold:number;window_minutes:number;cooldown_minutes:number;email_recipients:string[];updated_at:string;updated_by_name:string}
 type AlertEvent={id:string;rule_key:string;rule_name:string;title:string;message:string;severity:string;metric_value:number|null;context:Record<string,unknown>;status:string;created_at:string;acknowledged_at:string|null;acknowledged_by_name:string|null;resolved_at:string|null;resolved_by_name:string|null}
