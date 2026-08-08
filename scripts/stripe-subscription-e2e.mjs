@@ -34,11 +34,11 @@ try{
   await stripe(`/payment_methods/${pm.id}/attach`,{method:'POST',data:{customer:customer.id}})
   await stripe(`/customers/${customer.id}`,{method:'POST',data:{'invoice_settings[default_payment_method]':pm.id}})
 
-  let subscription=await stripe('/subscriptions',{method:'POST',data:{customer:customer.id,'items[0][price]':priceA.id,'payment_behavior':'error_if_incomplete','metadata[test_suite]':'phase_5_10'}})
+  let subscription=await stripe('/subscriptions',{method:'POST',data:{customer:customer.id,'items[0][price]':priceA.id,payment_behavior:'error_if_incomplete','metadata[test_suite]':'phase_5_10'}})
   check('Subscription creation',['active','trialing'].includes(subscription.status),subscription.status)
 
   const item=subscription.items.data[0]
-  subscription=await stripe(`/subscriptions/${subscription.id}`,{method:'POST',data:{[`items[0][id]`]:item.id,[`items[0][price]`]:priceB.id,proration_behavior:'create_prorations'}})
+  subscription=await stripe(`/subscriptions/${subscription.id}`,{method:'POST',data:{'items[0][id]':item.id,'items[0][price]':priceB.id,proration_behavior:'create_prorations'}})
   check('Plan upgrade',subscription.items.data[0]?.price?.id===priceB.id)
 
   subscription=await stripe(`/subscriptions/${subscription.id}`,{method:'POST',data:{'pause_collection[behavior]':'void'}})
@@ -54,12 +54,10 @@ try{
   const credit=await stripe(`/customers/${customer.id}/balance_transactions`,{method:'POST',data:{amount:-500,currency:'gbp',description:'ordered.food E2E credit'}})
   check('Customer credit',credit.amount===-500)
 
-  const invoice=await stripe('/invoices',{method:'POST',data:{customer:customer.id,auto_advance:false,description:'ordered.food E2E invoice'}})
-  await stripe(`/invoiceitems`,{method:'POST',data:{customer:customer.id,invoice:invoice.id,currency:'gbp',amount:1200,description:'ordered.food E2E charge'}})
-  const finalInvoice=await stripe(`/invoices/${invoice.id}/finalize`,{method:'POST'})
-  const paid=finalInvoice.status==='paid'?finalInvoice:await stripe(`/invoices/${invoice.id}/pay`,{method:'POST'})
-  check('Successful invoice payment',paid.status==='paid')
-  if(paid.charge){const refund=await stripe('/refunds',{method:'POST',data:{charge:paid.charge}});check('Refund',refund.status==='succeeded'||refund.status==='pending',refund.status)}
+  const payment=await stripe('/payment_intents',{method:'POST',data:{amount:1200,currency:'gbp',customer:customer.id,payment_method:pm.id,confirm:true,off_session:true,description:'ordered.food E2E charge'}})
+  check('Successful card payment',payment.status==='succeeded',payment.status)
+  const refund=await stripe('/refunds',{method:'POST',data:{payment_intent:payment.id}})
+  check('Refund',refund.status==='succeeded'||refund.status==='pending',refund.status)
 
   const declineCustomer=await stripe('/customers',{method:'POST',data:{email:`ordered-food-decline-${Date.now()}@example.test`}});created.customers.push(declineCustomer.id)
   const declinePm=await stripe('/payment_methods',{method:'POST',data:{type:'card','card[token]':'tok_chargeDeclined'}})
