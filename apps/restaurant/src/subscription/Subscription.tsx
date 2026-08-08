@@ -3,183 +3,48 @@ import { Link, useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import './Subscription.css'
 
-type Plan = {
-  id: string
-  code: string
-  name: string
-  description: string
-  monthly_price_pence: number
-  annual_price_pence: number | null
-  trial_days: number
-  features: Record<string, boolean | number | string>
-}
+type FeatureValue = boolean | number | string
+type Plan = { id:string;code:string;name:string;description:string;monthly_price_pence:number;annual_price_pence:number|null;trial_days:number;setup_fee_pence:number;custom_pricing:boolean;supports_monthly:boolean;supports_annual:boolean;features:Record<string,FeatureValue> }
+type Usage = Record<string,{used:number;limit:number;unlimited:boolean}>
+type Invoice = { id:string;invoice_number:string|null;status:string;currency:string;total_pence:number;amount_paid_pence:number;amount_due_pence:number;refunded_pence:number;hosted_invoice_url:string|null;invoice_pdf_url:string|null;period_start:string|null;period_end:string|null;paid_at:string|null;created_at:string }
+type Credit = { id:string;amount_pence:number;reason:string;status:string;created_at:string }
+type SubscriptionRecord = { id:string;status:'incomplete'|'trialing'|'active'|'past_due'|'paused'|'cancelled'|'unpaid';billing_interval:'monthly'|'annual';trial_ends_at:string|null;current_period_start:string|null;current_period_end:string|null;cancel_at_period_end:boolean;grace_period_ends_at:string|null;paused_at:string|null;resume_at:string|null;comped_until:string|null;custom_price_pence:number|null;pending_plan_id:string|null;pending_billing_interval:'monthly'|'annual'|null;pending_plan:Plan|null;plan:Plan }
+type BillingDashboard = { restaurant_id:string;subscription:SubscriptionRecord|null;plans:Plan[];usage:Usage;invoices:Invoice[];credits:Credit[];enterprise:Record<string,unknown> }
 
-type SubscriptionRecord = {
-  id: string
-  status: 'incomplete' | 'trialing' | 'active' | 'past_due' | 'paused' | 'cancelled' | 'unpaid'
-  billing_interval: 'monthly' | 'annual'
-  trial_ends_at: string | null
-  current_period_start: string | null
-  current_period_end: string | null
-  cancel_at_period_end: boolean
-  grace_period_ends_at: string | null
-  last_payment_failed_at: string | null
-  plan: Plan
-}
+const money=new Intl.NumberFormat('en-GB',{style:'currency',currency:'GBP'})
+const formatMoney=(pence:number)=>money.format((pence||0)/100)
+const formatDate=(value:string|null)=>value?new Date(value).toLocaleDateString('en-GB',{day:'numeric',month:'long',year:'numeric'}):'Not available'
+const human=(key:string)=>key.replace(/^max_/,'').replace(/_/g,' ').replace(/\b\w/g,(m)=>m.toUpperCase())
+function daysRemaining(value:string|null){return value?Math.max(0,Math.ceil((new Date(value).getTime()-Date.now())/86_400_000)):0}
+function featureLabel(key:string,value:FeatureValue){if(typeof value==='boolean')return value?human(key):'';if(typeof value==='number')return value===-1?`Unlimited ${human(key)}`:`${value} ${human(key)}`;return `${human(key)}: ${value}`}
 
-type SubscriptionStatus = {
-  restaurant_id: string
-  subscription: SubscriptionRecord | null
-  plans: Plan[]
-  access: { allowed: boolean; reason: string }
-}
+export default function Subscription(){
+ const[searchParams]=useSearchParams(),[data,setData]=useState<BillingDashboard|null>(null),[interval,setInterval]=useState<'monthly'|'annual'>('monthly'),[loading,setLoading]=useState(true),[busy,setBusy]=useState(''),[error,setError]=useState(''),[notice,setNotice]=useState(''),[cancelReason,setCancelReason]=useState('')
+ const load=useCallback(async()=>{setLoading(true);setError('');const{data:result,error:invokeError}=await supabase.functions.invoke('restaurant-subscription-billing',{body:{action:'status'}});if(invokeError||result?.error)setError(invokeError?.message||result?.error||'Unable to load billing.');else{const dashboard=result as BillingDashboard;setData(dashboard);if(dashboard.subscription?.billing_interval)setInterval(dashboard.subscription.billing_interval)}setLoading(false)},[])
+ useEffect(()=>{void load()},[load])
+ useEffect(()=>{if(searchParams.get('subscription')==='success'){const timer=window.setTimeout(()=>void load(),1000);return()=>window.clearTimeout(timer)}},[load,searchParams])
+ async function invoke(action:string,body:Record<string,unknown>={}){setBusy(action);setError('');setNotice('');const{data:result,error:invokeError}=await supabase.functions.invoke('restaurant-subscription-billing',{body:{action,...body}});if(invokeError||result?.error){setError(invokeError?.message||result?.error||'Billing action failed.');setBusy('');return null}if(result?.url){window.location.assign(result.url);return null}setData((result?.dashboard??result) as BillingDashboard);setBusy('');return result}
+ async function choosePlan(plan:Plan){const current=data?.subscription;if(current?.plan.id===plan.id&&current.billing_interval===interval)return;if(plan.custom_pricing){setError('Enterprise uses custom commercial pricing. Contact platform support to have this plan assigned.');return}if(current?.plan.code==='free'||!current){await invoke('checkout',{plan_id:plan.id,billing_interval:interval});return}await invoke('change_plan',{plan_id:plan.id,billing_interval:interval});setNotice(plan.code==='free'?'Your downgrade to Free is scheduled for the end of the current billing period.':'Your plan change has been applied.')}
+ async function cancel(){if(!cancelReason.trim()){setError('Please enter a cancellation reason.');return}if(await invoke('cancel',{reason:cancelReason.trim()})){setNotice('Cancellation scheduled. Your access continues through the current billing period.');setCancelReason('')}}
+ const current=data?.subscription,trialDays=useMemo(()=>daysRemaining(current?.trial_ends_at??null),[current?.trial_ends_at]),graceDays=useMemo(()=>daysRemaining(current?.grace_period_ends_at??null),[current?.grace_period_ends_at])
+ if(loading&&!data)return <main className="subscription-page"><section className="subscription-panel">Loading subscription…</section></main>
+ return <main className="subscription-page">
+  <header className="subscription-header"><div><Link to="/dashboard" className="subscription-back">← Back to dashboard</Link><span className="subscription-kicker">Restaurant subscription</span><h1>Plans, billing and usage</h1><p>Control your ordered.food subscription, invoices, payment method and SaaS limits.</p></div><div style={{display:'flex',gap:8,flexWrap:'wrap'}}><Link className="secondary-button" to="/team">Manage team</Link>{current?.plan.code!=='free'&&<button className="secondary-button" type="button" onClick={()=>void invoke('portal')} disabled={Boolean(busy)}>Payment method</button>}</div></header>
+  {searchParams.get('subscription')==='success'&&<div className="subscription-alert subscription-alert--success">Stripe checkout completed. The webhook will keep your plan and invoices in sync.</div>}{searchParams.get('subscription')==='cancelled'&&<div className="subscription-alert">Checkout was cancelled. No billing change was made.</div>}{notice&&<div className="subscription-alert subscription-alert--success">{notice}</div>}{error&&<div className="subscription-alert subscription-alert--error" role="alert">{error}</div>}
+  {current&&<section className={`subscription-current subscription-current--${current.status}`}><div><span className="subscription-status">{current.status.replaceAll('_',' ')}</span><h2>{current.plan.name}</h2><p>{current.plan.description}</p></div><div className="subscription-current-details"><div><small>Billing</small><strong>{current.billing_interval==='annual'?'Annual':'Monthly'}</strong></div><div><small>{current.status==='trialing'?'Trial ends':'Renewal date'}</small><strong>{formatDate(current.status==='trialing'?current.trial_ends_at:current.current_period_end)}</strong></div><div><small>Price</small><strong>{current.custom_price_pence!=null?formatMoney(current.custom_price_pence):formatMoney(current.billing_interval==='annual'?(current.plan.annual_price_pence||0):current.plan.monthly_price_pence)}<span>/{current.billing_interval==='annual'?'year':'month'}</span></strong></div></div>
+   {current.status==='trialing'&&<div className="subscription-notice"><strong>{trialDays} day{trialDays===1?'':'s'} left in your trial.</strong> Billing converts automatically at the end of the trial.</div>}{current.status==='past_due'&&<div className="subscription-notice subscription-notice--danger"><strong>Payment failed.</strong> Update your payment method within {graceDays} day{graceDays===1?'':'s'} to keep feature access.</div>}{current.status==='paused'&&<div className="subscription-notice"><strong>Billing is paused.</strong> Resume when you are ready to restart collection.</div>}{current.pending_plan&&<div className="subscription-notice"><strong>Downgrade scheduled to {current.pending_plan.name}.</strong> It takes effect after {formatDate(current.current_period_end)}.</div>}{current.cancel_at_period_end&&!current.pending_plan&&<div className="subscription-notice"><strong>Cancellation scheduled.</strong> Access continues until {formatDate(current.current_period_end)}.</div>}
+   {current.plan.code!=='free'&&<div style={{display:'flex',gap:8,flexWrap:'wrap',marginTop:16}}>{current.status==='paused'?<button className="primary-button" type="button" onClick={()=>void invoke('resume')} disabled={Boolean(busy)}>Resume subscription</button>:<button className="secondary-button" type="button" onClick={()=>void invoke('pause')} disabled={Boolean(busy)}>Pause billing</button>}{current.cancel_at_period_end?<button className="primary-button" type="button" onClick={()=>void invoke('restart')} disabled={Boolean(busy)}>Restart subscription</button>:null}<button className="secondary-button" type="button" onClick={()=>void invoke('portal')} disabled={Boolean(busy)}>Billing portal</button></div>}
+  </section>}
 
-const money = new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'GBP' })
-const formatMoney = (pence: number) => money.format((pence || 0) / 100)
-const formatDate = (value: string | null) => value ? new Date(value).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }) : 'Not available'
+  <section className="subscription-plans-heading"><div><span className="subscription-kicker">Available plans</span><h2>Compare or change plan</h2></div><div className="billing-toggle" role="group" aria-label="Billing interval"><button type="button" className={interval==='monthly'?'active':''} onClick={()=>setInterval('monthly')}>Monthly</button><button type="button" className={interval==='annual'?'active':''} onClick={()=>setInterval('annual')}>Annual</button></div></section>
+  <section className="subscription-plans">{(data?.plans??[]).map(plan=>{const selected=current?.plan.id===plan.id&&current.billing_interval===interval,price=interval==='annual'?(plan.annual_price_pence||0):plan.monthly_price_pence,supported=interval==='annual'?plan.supports_annual:plan.supports_monthly;return <article className={`subscription-plan ${selected?'subscription-plan--current':''}`} key={plan.id}>{selected&&<span className="current-plan-label">Current plan</span>}<h3>{plan.name}</h3><p>{plan.description}</p><div className="subscription-price"><strong>{plan.custom_pricing?'Custom':formatMoney(price)}</strong>{!plan.custom_pricing&&<span>/{interval==='annual'?'year':'month'}</span>}</div>{plan.setup_fee_pence>0&&<small className="trial-label">+ {formatMoney(plan.setup_fee_pence)} setup fee</small>}{plan.trial_days>0&&current?.plan.code==='free'&&<small className="trial-label">Up to {plan.trial_days} days trial for eligible restaurants</small>}<ul>{Object.entries(plan.features).filter(([key])=>!['locations','staff_users','advanced_reporting','marketing','priority_support','ai_menu_import','multi_location'].includes(key)).slice(0,12).map(([key,value])=>{const label=featureLabel(key,value);return label?<li key={key}>✓ {label}</li>:null})}</ul><button type="button" className={selected?'secondary-button':'primary-button'} disabled={Boolean(busy)||selected||!supported||plan.custom_pricing} onClick={()=>void choosePlan(plan)}>{selected?'Current plan':plan.custom_pricing?'Contact platform team':!supported?'Not available':busy?'Working…':`Choose ${plan.name}`}</button></article>})}</section>
 
-function daysRemaining(value: string | null) {
-  if (!value) return 0
-  return Math.max(0, Math.ceil((new Date(value).getTime() - Date.now()) / 86_400_000))
-}
+  <section className="subscription-panel"><span className="subscription-kicker">Usage</span><h2>Plan limits</h2>{Object.keys(data?.usage??{}).length===0?<p>No metered limits are currently reported.</p>:<div className="subscription-current-details">{Object.entries(data?.usage??{}).map(([key,item])=><div key={key}><small>{human(key)}</small><strong>{item.used} / {item.unlimited?'Unlimited':item.limit}</strong></div>)}</div>}</section>
 
-function featureLabel(key: string, value: boolean | number | string) {
-  const labels: Record<string, string> = {
-    locations: 'locations',
-    staff_users: 'staff users',
-    advanced_reporting: 'Advanced reporting',
-    marketing: 'Marketing tools',
-    priority_support: 'Priority support',
-  }
-  if (typeof value === 'boolean') return value ? labels[key] || key.replaceAll('_', ' ') : ''
-  return `${value} ${labels[key] || key.replaceAll('_', ' ')}`
-}
+  <section className="subscription-panel"><div style={{display:'flex',justifyContent:'space-between',gap:12,alignItems:'center',flexWrap:'wrap'}}><div><span className="subscription-kicker">Invoices</span><h2>Billing history</h2></div><button className="secondary-button" type="button" disabled={Boolean(busy)||current?.plan.code==='free'} onClick={()=>void invoke('sync_invoices')}>Refresh invoices</button></div>{(data?.invoices??[]).length===0?<p>No subscription invoices yet.</p>:<div style={{overflowX:'auto'}}><table style={{width:'100%',borderCollapse:'collapse'}}><thead><tr><th align="left">Invoice</th><th align="left">Period</th><th align="left">Status</th><th align="right">Total</th><th align="right">Refunded</th><th /></tr></thead><tbody>{data!.invoices.map(invoice=><tr key={invoice.id}><td>{invoice.invoice_number||'Stripe invoice'}</td><td>{formatDate(invoice.period_start)} – {formatDate(invoice.period_end)}</td><td>{invoice.status}</td><td align="right">{formatMoney(invoice.total_pence)}</td><td align="right">{formatMoney(invoice.refunded_pence||0)}</td><td align="right">{invoice.hosted_invoice_url&&<a href={invoice.hosted_invoice_url} target="_blank" rel="noreferrer">View</a>}{invoice.invoice_pdf_url&&<> · <a href={invoice.invoice_pdf_url} target="_blank" rel="noreferrer">PDF</a></>}</td></tr>)}</tbody></table></div>}</section>
 
-export default function Subscription() {
-  const [searchParams] = useSearchParams()
-  const [data, setData] = useState<SubscriptionStatus | null>(null)
-  const [interval, setInterval] = useState<'monthly' | 'annual'>('monthly')
-  const [loading, setLoading] = useState(true)
-  const [busy, setBusy] = useState('')
-  const [error, setError] = useState('')
+  {(data?.credits??[]).length>0&&<section className="subscription-panel"><span className="subscription-kicker">Credits</span><h2>Account credits</h2><ul>{data!.credits.map(credit=><li key={credit.id}>{formatMoney(credit.amount_pence)} · {credit.reason} · {credit.status}</li>)}</ul></section>}
 
-  const load = useCallback(async () => {
-    setLoading(true)
-    setError('')
-    const { data: result, error: invokeError } = await supabase.functions.invoke('restaurant-subscription-billing', { body: { action: 'status' } })
-    if (invokeError) setError(invokeError.message)
-    else {
-      const status = result as SubscriptionStatus
-      setData(status)
-      if (status.subscription?.billing_interval) setInterval(status.subscription.billing_interval)
-    }
-    setLoading(false)
-  }, [])
-
-  useEffect(() => { void load() }, [load])
-
-  useEffect(() => {
-    if (searchParams.get('subscription') === 'success') {
-      const timer = window.setTimeout(() => void load(), 1200)
-      return () => window.clearTimeout(timer)
-    }
-  }, [load, searchParams])
-
-  async function startCheckout(plan: Plan) {
-    setBusy(plan.id)
-    setError('')
-    const { data: result, error: invokeError } = await supabase.functions.invoke('restaurant-subscription-billing', {
-      body: { action: 'checkout', plan_id: plan.id, billing_interval: interval },
-    })
-    if (invokeError || !result?.url) {
-      setError(invokeError?.message || result?.error || 'Unable to start subscription checkout.')
-      setBusy('')
-      return
-    }
-    window.location.assign(result.url)
-  }
-
-  async function openPortal() {
-    setBusy('portal')
-    setError('')
-    const { data: result, error: invokeError } = await supabase.functions.invoke('restaurant-subscription-billing', { body: { action: 'portal' } })
-    if (invokeError || !result?.url) {
-      setError(invokeError?.message || result?.error || 'Unable to open billing management.')
-      setBusy('')
-      return
-    }
-    window.location.assign(result.url)
-  }
-
-  const current = data?.subscription
-  const trialDays = useMemo(() => daysRemaining(current?.trial_ends_at ?? null), [current?.trial_ends_at])
-  const graceDays = useMemo(() => daysRemaining(current?.grace_period_ends_at ?? null), [current?.grace_period_ends_at])
-
-  if (loading && !data) return <main className="subscription-page"><section className="subscription-panel">Loading subscription…</section></main>
-
-  return (
-    <main className="subscription-page">
-      <header className="subscription-header">
-        <div>
-          <Link to="/dashboard" className="subscription-back">← Back to dashboard</Link>
-          <span className="subscription-kicker">Restaurant subscription</span>
-          <h1>Plan and billing</h1>
-          <p>Manage your ordered.food plan, free trial, payment method and billing schedule.</p>
-        </div>
-        {current?.status !== 'incomplete' && current && <button className="secondary-button" type="button" onClick={() => void openPortal()} disabled={busy === 'portal'}>{busy === 'portal' ? 'Opening…' : 'Manage billing'}</button>}
-      </header>
-
-      {searchParams.get('subscription') === 'success' && <div className="subscription-alert subscription-alert--success">Your Stripe checkout completed. Subscription status will update automatically.</div>}
-      {searchParams.get('subscription') === 'cancelled' && <div className="subscription-alert">Checkout was cancelled. No subscription changes were made.</div>}
-      {error && <div className="subscription-alert subscription-alert--error" role="alert">{error}</div>}
-
-      {current && <section className={`subscription-current subscription-current--${current.status}`}>
-        <div>
-          <span className="subscription-status">{current.status.replaceAll('_', ' ')}</span>
-          <h2>{current.plan.name}</h2>
-          <p>{current.plan.description}</p>
-        </div>
-        <div className="subscription-current-details">
-          <div><small>Billing</small><strong>{current.billing_interval === 'annual' ? 'Annual' : 'Monthly'}</strong></div>
-          <div><small>{current.status === 'trialing' ? 'Trial ends' : 'Next billing date'}</small><strong>{formatDate(current.status === 'trialing' ? current.trial_ends_at : current.current_period_end)}</strong></div>
-          <div><small>Price</small><strong>{formatMoney(current.billing_interval === 'annual' ? (current.plan.annual_price_pence || 0) : current.plan.monthly_price_pence)}<span>/{current.billing_interval === 'annual' ? 'year' : 'month'}</span></strong></div>
-        </div>
-        {current.status === 'trialing' && <div className="subscription-notice"><strong>{trialDays} day{trialDays === 1 ? '' : 's'} left in your trial.</strong> Billing begins automatically when the trial finishes.</div>}
-        {current.status === 'past_due' && <div className="subscription-notice subscription-notice--danger"><strong>Payment failed.</strong> Update your payment method within {graceDays} day{graceDays === 1 ? '' : 's'} to avoid feature restrictions.</div>}
-        {current.cancel_at_period_end && <div className="subscription-notice"><strong>Cancellation scheduled.</strong> Your access continues until {formatDate(current.current_period_end)}. You can reactivate from Manage billing.</div>}
-      </section>}
-
-      <section className="subscription-plans-heading">
-        <div><span className="subscription-kicker">Available plans</span><h2>{current ? 'Compare or change plan' : 'Choose your plan'}</h2></div>
-        <div className="billing-toggle" role="group" aria-label="Billing interval">
-          <button type="button" className={interval === 'monthly' ? 'active' : ''} onClick={() => setInterval('monthly')}>Monthly</button>
-          <button type="button" className={interval === 'annual' ? 'active' : ''} onClick={() => setInterval('annual')}>Annual <span>Save 2 months</span></button>
-        </div>
-      </section>
-
-      <section className="subscription-plans">
-        {(data?.plans ?? []).map((plan) => {
-          const selected = current?.plan.id === plan.id
-          const price = interval === 'annual' ? (plan.annual_price_pence || 0) : plan.monthly_price_pence
-          return <article className={`subscription-plan ${selected ? 'subscription-plan--current' : ''}`} key={plan.id}>
-            {selected && <span className="current-plan-label">Current plan</span>}
-            <h3>{plan.name}</h3>
-            <p>{plan.description}</p>
-            <div className="subscription-price"><strong>{formatMoney(price)}</strong><span>/{interval === 'annual' ? 'year' : 'month'}</span></div>
-            {!current && plan.trial_days > 0 && <small className="trial-label">Includes {plan.trial_days}-day free trial</small>}
-            <ul>{Object.entries(plan.features).map(([key, value]) => {
-              const label = featureLabel(key, value)
-              return label ? <li key={key}>✓ {label}</li> : null
-            })}</ul>
-            {selected ? <button type="button" className="secondary-button" onClick={() => void openPortal()} disabled={busy === 'portal'}>Manage current plan</button> : current?.status === 'active' || current?.status === 'trialing' ? <button type="button" className="primary-button" onClick={() => void openPortal()} disabled={busy === 'portal'}>Change in billing portal</button> : <button type="button" className="primary-button" onClick={() => void startCheckout(plan)} disabled={Boolean(busy)}>{busy === plan.id ? 'Opening Stripe…' : `Choose ${plan.name}`}</button>}
-          </article>
-        })}
-      </section>
-
-      <section className="subscription-panel subscription-help">
-        <div><h2>Billing and invoices</h2><p>Stripe securely manages cards, subscription invoices, plan changes and cancellations. No card details are stored by ordered.food.</p></div>
-        {current && <button className="secondary-button" type="button" onClick={() => void openPortal()} disabled={busy === 'portal'}>Payment methods and invoices</button>}
-      </section>
-    </main>
-  )
+  {current?.plan.code!=='free'&&!current?.cancel_at_period_end&&<section className="subscription-panel"><span className="subscription-kicker">Cancellation</span><h2>Cancel subscription</h2><p>Your plan stays active until the current paid period ends.</p><textarea value={cancelReason} onChange={event=>setCancelReason(event.target.value)} placeholder="Tell us why you are cancelling" rows={3} style={{width:'100%',marginBottom:12}}/><button className="secondary-button" type="button" onClick={()=>void cancel()} disabled={Boolean(busy)}>Schedule cancellation</button></section>}
+ </main>
 }
