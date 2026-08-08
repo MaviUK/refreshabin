@@ -33,6 +33,15 @@ verify_jwt = true
 [functions.restaurant-subscription-billing]
 verify_jwt = true
 
+[functions.process-subscription-notifications]
+verify_jwt = true
+
+[functions.restaurant-team-invite]
+verify_jwt = true
+
+[functions.platform-subscription-admin]
+verify_jwt = true
+
 [functions.process-gift-card-deliveries]
 verify_jwt = true
 
