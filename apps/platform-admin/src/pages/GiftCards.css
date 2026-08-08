@@ -13,10 +13,33 @@
 .gift-card-health strong { overflow: hidden; color: #27252c; font-size: .95rem; text-overflow: ellipsis; white-space: nowrap; }
 .gift-card-health article > span { flex: 0 0 auto; padding: 6px 9px; border-radius: 999px; color: #8f2e58; background: #ffe7f0; font-size: .7rem; font-weight: 850; }
 
-.gift-card-panel { min-width: 0; }
+.gift-card-panel,
+.gift-card-controls-panel { min-width: 0; margin-bottom: 18px; }
 .gift-card-panel-heading { min-height: 84px; }
 .gift-card-panel-heading > div { min-width: 0; }
 .gift-card-search { width: min(100%, 360px); }
+
+.gift-card-restaurant-list { display: grid; }
+.gift-card-restaurant-row { min-width: 0; padding: 16px 18px; display: grid; grid-template-columns: minmax(220px, 1fr) minmax(300px, 1.15fr) minmax(210px, .7fr); align-items: center; gap: 20px; border-bottom: 1px solid #efedf1; }
+.gift-card-restaurant-row:last-child { border-bottom: 0; }
+.gift-card-restaurant-row.disabled { background: #fffafb; }
+.gift-card-restaurant-identity { min-width: 0; display: flex; align-items: center; gap: 12px; }
+.gift-card-restaurant-mark { width: 40px; height: 40px; flex: 0 0 auto; display: grid; place-items: center; border-radius: 11px; color: #a52f5d; background: #ffe3ee; font-weight: 900; }
+.gift-card-restaurant-identity > div { min-width: 0; display: grid; gap: 4px; }
+.gift-card-restaurant-identity strong,
+.gift-card-restaurant-identity small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.gift-card-restaurant-identity strong { color: #27252c; font-size: .88rem; }
+.gift-card-restaurant-identity small { color: #918f98; font-size: .7rem; text-transform: capitalize; }
+.gift-card-restaurant-stats { min-width: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.gift-card-restaurant-stats > span { min-width: 0; padding: 10px 12px; display: grid; gap: 4px; border: 1px solid #ebe9ee; border-radius: 11px; background: #faf9fb; }
+.gift-card-restaurant-stats small { color: #92909a; font-size: .62rem; font-weight: 850; text-transform: uppercase; letter-spacing: .045em; }
+.gift-card-restaurant-stats strong { overflow: hidden; color: #2f2c34; font-size: .8rem; text-overflow: ellipsis; white-space: nowrap; }
+.gift-card-restaurant-control { min-width: 0; display: flex; align-items: flex-end; flex-direction: column; gap: 7px; }
+.gift-card-restaurant-control > small { max-width: 260px; overflow: hidden; color: #8f606a; font-size: .68rem; text-overflow: ellipsis; white-space: nowrap; }
+.gift-card-sale-state { width: max-content; padding: 5px 9px; border-radius: 999px; font-size: .65rem; font-weight: 900; }
+.gift-card-sale-state.enabled { color: #15613a; background: #def5e7; }
+.gift-card-sale-state.disabled { color: #9d2a3d; background: #ffe1e6; }
+.gift-card-restaurant-control button { min-height: 38px; padding-inline: 13px; font-size: .72rem; }
 
 .gift-card-table-wrap { overflow-x: auto; }
 .gift-card-table { width: 100%; border-collapse: collapse; }
@@ -36,18 +59,30 @@
 .gift-card-status.neutral { color: #555c70; background: #eceef4; }
 .gift-card-error { color: #a62d40 !important; white-space: normal !important; }
 
+@media (max-width: 1150px) {
+  .gift-card-restaurant-row { grid-template-columns: minmax(220px, 1fr) minmax(240px, 1fr); }
+  .gift-card-restaurant-control { grid-column: 1 / -1; align-items: center; flex-direction: row; justify-content: flex-end; }
+  .gift-card-restaurant-control > small { margin-right: auto; }
+}
+
 @media (max-width: 1050px) {
   .gift-card-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .gift-card-health { grid-template-columns: 1fr; }
 }
 
-@media (max-width: 720px) {
+@media (max-width: 760px) {
   .gift-card-panel-heading { align-items: stretch; flex-direction: column; }
   .gift-card-search { width: 100%; }
   .gift-card-table { min-width: 900px; }
+  .gift-card-restaurant-row { grid-template-columns: 1fr; }
+  .gift-card-restaurant-stats { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .gift-card-restaurant-control { grid-column: auto; align-items: stretch; flex-direction: column; }
+  .gift-card-restaurant-control > small { margin-right: 0; max-width: none; white-space: normal; }
+  .gift-card-restaurant-control button { width: 100%; }
 }
 
 @media (max-width: 560px) {
   .gift-card-metrics { grid-template-columns: 1fr; }
   .gift-card-health article { align-items: flex-start; flex-direction: column; }
+  .gift-card-restaurant-stats { grid-template-columns: 1fr; }
 }
