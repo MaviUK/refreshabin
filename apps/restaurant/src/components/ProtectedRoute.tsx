@@ -7,10 +7,11 @@ type ProtectedRouteProps = {
   children: ReactNode
   allowApplication?: boolean
   allowPaymentSetup?: boolean
+  allowGroup?: boolean
   requiredPermission?: string
 }
 
-export default function ProtectedRoute({ children, allowApplication = false, requiredPermission }: ProtectedRouteProps) {
+export default function ProtectedRoute({ children, allowApplication = false, allowGroup = false, requiredPermission }: ProtectedRouteProps) {
   const [session, setSession] = useState<Session | null>(null)
   const [loading, setLoading] = useState(true)
   const [applicationRequired, setApplicationRequired] = useState(false)
@@ -40,6 +41,14 @@ export default function ProtectedRoute({ children, allowApplication = false, req
 
         if (!active) return
         if (!membership || membership.status !== 'active') {
+          if (allowGroup) {
+            const { data: groups, error: groupError } = await supabase.rpc('get_my_restaurant_group_context')
+            if (!active) return
+            const hasGroupAccess = !groupError && Array.isArray(groups) && groups.length > 0
+            setMembershipDenied(!hasGroupAccess)
+            setLoading(false)
+            return
+          }
           setMembershipDenied(true)
           setLoading(false)
           return
@@ -73,12 +82,12 @@ export default function ProtectedRoute({ children, allowApplication = false, req
       active = false
       listener.subscription.unsubscribe()
     }
-  }, [requiredPermission])
+  }, [allowGroup, requiredPermission])
 
   if (loading) return <div className="screen-message">Loading your restaurant portal…</div>
   if (!session) return <Navigate to="/login" replace state={{ from: location.pathname }} />
-  if (membershipDenied) return <div className="screen-message">Your restaurant access is suspended or no longer active. Contact the restaurant owner if you need access restored.</div>
+  if (membershipDenied) return <div className="screen-message">Your restaurant or organisation access is suspended or no longer active. Contact an administrator if you need access restored.</div>
   if (permissionDenied) return <Navigate to="/dashboard" replace />
-  if (applicationRequired && !allowApplication) return <Navigate to="/onboarding" replace />
+  if (applicationRequired && !allowApplication && !allowGroup) return <Navigate to="/onboarding" replace />
   return children
 }
