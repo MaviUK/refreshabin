@@ -8,7 +8,7 @@ type RecoverySnapshot = {
     id: string
     order_number: number
     restaurant_name: string
-    customer_name: string
+    customer_name: string | null
     order_status: string
     payment_status: string
     total_pence: number
@@ -69,22 +69,47 @@ export default function OrderRecovery() {
 
   async function recover(action: 'cancel' | 'requeue_print') {
     if (!snapshot || !canManage || saving) return
-    if (reason.trim().length < 3) {
-      setError('Add a clear reason of at least 3 characters.')
+    const cleanReason = reason.trim()
+    if (cleanReason.length < 3 || cleanReason.length > 500) {
+      setError('Add a clear reason between 3 and 500 characters.')
       return
     }
+
     setSaving(true)
     setError('')
     setMessage('')
+
+    if (action === 'cancel') {
+      const { data, error: actionError } = await supabase.functions.invoke('admin-cancel-order', {
+        body: { order_id: snapshot.order.id, reason: cleanReason },
+      })
+
+      if (actionError) {
+        setError(actionError.message || 'The order could not be cancelled.')
+        setSaving(false)
+        return
+      }
+      if (data && typeof data === 'object' && 'error' in data && typeof data.error === 'string') {
+        setError(data.error)
+        setSaving(false)
+        return
+      }
+
+      setMessage('Order cancelled. Any captured card payment and eligible stored-value balances have been reversed, and the action is recorded in the audit trail.')
+      await search()
+      setSaving(false)
+      return
+    }
+
     const { error: actionError } = await supabase.rpc('recover_platform_order', {
       p_order_id: snapshot.order.id,
-      p_action: action,
-      p_reason: reason.trim(),
+      p_action: 'requeue_print',
+      p_reason: cleanReason,
     })
     if (actionError) {
       setError(actionError.message)
     } else {
-      setMessage(action === 'cancel' ? 'Order cancelled and recorded in its status history.' : 'Print jobs requeued successfully.')
+      setMessage('Print jobs requeued successfully.')
       await search()
     }
     setSaving(false)
@@ -93,7 +118,7 @@ export default function OrderRecovery() {
   const terminal = snapshot ? ['completed', 'cancelled', 'rejected'].includes(snapshot.order.order_status) : false
 
   return <div className="admin-page">
-    <header className="page-heading"><div><span className="admin-kicker">Operational recovery</span><h1>Order recovery</h1><p>Find an order, cancel it when operationally necessary, or resend its kitchen print jobs.</p></div></header>
+    <header className="page-heading"><div><span className="admin-kicker">Operational recovery</span><h1>Order recovery</h1><p>Find an order, cancel it safely when operationally necessary, or resend its kitchen print jobs.</p></div></header>
 
     <form className="restaurant-toolbar" onSubmit={(event) => void search(event)}>
       <label className="admin-search"><span aria-hidden="true">#</span><input type="number" min="1" value={orderNumber} onChange={(event) => setOrderNumber(event.target.value)} placeholder="Enter order number…" /></label>
@@ -110,7 +135,7 @@ export default function OrderRecovery() {
 
       <div className="order-detail-summary">
         <article><small>Total</small><strong>{formatMoney(snapshot.order.total_pence)}</strong><span>{snapshot.order.fulfilment_method}</span></article>
-        <article><small>Customer</small><strong>{snapshot.order.customer_name || 'Guest customer'}</strong><span>Placed {formatDate(snapshot.order.created_at)}</span></article>
+        <article><small>Customer</small><strong>{snapshot.order.customer_name || 'Customer details restricted'}</strong><span>Placed {formatDate(snapshot.order.created_at)}</span></article>
         <article><small>Print jobs</small><strong>{snapshot.print_jobs.length}</strong><span>{snapshot.print_jobs.filter((job) => job.status === 'failed').length} failed</span></article>
       </div>
 
@@ -118,11 +143,12 @@ export default function OrderRecovery() {
         <h3>Recovery controls</h3>
         {!canManage && <div className="read-only-notice"><strong>Read-only access</strong><span>Your role can inspect recovery history but cannot perform actions.</span></div>}
         {canManage && <>
-          <label>Reason for action<textarea rows={3} value={reason} onChange={(event) => setReason(event.target.value)} placeholder="Required for the audit trail…" /></label>
+          <label>Reason for action<textarea rows={3} maxLength={500} value={reason} onChange={(event) => setReason(event.target.value)} placeholder="Required for the audit trail…" /></label>
           <div className="restaurant-actions">
-            <button type="button" className="danger-button ghost" disabled={saving || terminal} onClick={() => void recover('cancel')}>{terminal ? 'Order cannot be cancelled' : 'Cancel order'}</button>
+            <button type="button" className="danger-button ghost" disabled={saving || terminal} onClick={() => void recover('cancel')}>{terminal ? 'Order cannot be cancelled' : saving ? 'Working…' : 'Cancel order'}</button>
             <button type="button" className="admin-primary-button" disabled={saving} onClick={() => void recover('requeue_print')}>{saving ? 'Working…' : 'Requeue all print jobs'}</button>
           </div>
+          <small>Cancellation uses the same payment-safe workflow as the main Orders screen, including Stripe refunds or authorisation cancellation where applicable.</small>
         </>}
       </section>
 
