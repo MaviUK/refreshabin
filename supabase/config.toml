@@ -47,3 +47,9 @@ verify_jwt = true
 
 [functions.process-challenges]
 verify_jwt = true
+
+[functions.process-marketing-automation]
+verify_jwt = true
+
+[functions.marketing-resend-webhook]
+verify_jwt = false
