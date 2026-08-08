@@ -1,10 +1,10 @@
 import { createClient } from 'npm:@supabase/supabase-js@2'
 
 function isServiceRoleRequest(req:Request){const auth=req.headers.get('Authorization')||'';const token=auth.replace(/^Bearer\s+/i,'');const parts=token.split('.');if(parts.length!==3)return false;try{let payload=parts[1].replace(/-/g,'+').replace(/_/g,'/');payload=payload.padEnd(Math.ceil(payload.length/4)*4,'=');const claims=JSON.parse(atob(payload));return claims?.role==='service_role'}catch{return false}}
-const esc=(v:string)=>v.replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]||c))
+const esc=(v:string)=>v.replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot',"'":'&#039;'}[c]||c))
 const replaceVars=(value:string|null|undefined,vars:Record<string,unknown>)=>(value||'').replace(/\{\{\s*([a-zA-Z0-9_]+)\s*\}\}/g,(_,key)=>String(vars[key]??''))
 async function sha256(value:string){const bytes=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(value));return Array.from(new Uint8Array(bytes)).map(v=>v.toString(16).padStart(2,'0')).join('')}
-async function sendEmail(apiKey:string,from:string,to:string,subject:string,html:string){const response=await fetch('https://api.resend.com/emails',{method:'POST',headers:{Authorization:`Bearer ${apiKey}`,'Content-Type':'application/json'},body:JSON.stringify({from,to:[to],subject,html})});const body=await response.json().catch(()=>({}));if(!response.ok)throw new Error(`Resend returned ${response.status}: ${String(body?.message||'send failed')}`);return String(body?.id||'')}
+async function sendEmail(apiKey:string,from:string,to:string,subject:string,html:string,idempotencyKey:string){const response=await fetch('https://api.resend.com/emails',{method:'POST',headers:{Authorization:`Bearer ${apiKey}`,'Content-Type':'application/json','Idempotency-Key':idempotencyKey},body:JSON.stringify({from,to:[to],subject,html})});const body=await response.json().catch(()=>({}));if(!response.ok)throw new Error(`Resend returned ${response.status}: ${String(body?.message||'send failed')}`);return String(body?.id||'')}
 
 Deno.serve(async(req)=>{
   if(req.method!=='POST')return new Response(JSON.stringify({error:'Method not allowed'}),{status:405,headers:{'Content-Type':'application/json'}})
@@ -29,11 +29,12 @@ Deno.serve(async(req)=>{
     }
     if(row.channel!=='email')throw new Error('Push delivery is reserved for future push provider support')
     if(!row.recipient_email)throw new Error('Recipient email unavailable')
-    const rawToken=crypto.randomUUID()+crypto.randomUUID().replace(/-/g,'');const tokenHash=await sha256(rawToken);const unsubscribe=`${site}/marketing/unsubscribe?token=${encodeURIComponent(rawToken)}`
+    const rawToken=String(row.id);const tokenHash=await sha256(rawToken);const unsubscribe=`${site}/marketing/unsubscribe?token=${encodeURIComponent(rawToken)}`
+    const registration=await db.rpc('marketing_register_unsubscribe_token',{p_delivery_id:row.id,p_token_hash:tokenHash});if(registration.error)throw registration.error
     const subject=replaceVars(row.subject||'A message from your restaurant',vars),content=replaceVars(row.html_content||`<p>${esc(row.text_content||row.preview_text||'')}</p>`,vars),cta=row.cta_url?`<p><a href="${esc(row.cta_url)}" style="display:inline-block;background:#171615;color:white;text-decoration:none;padding:12px 18px;border-radius:999px">${esc(row.cta_label||'View offer')}</a></p>`:''
     const html=`<div style="font-family:Arial,sans-serif;background:#f5f1e8;padding:32px"><div style="max-width:620px;margin:auto;background:#fff;border-radius:20px;padding:32px">${row.image_url?`<img src="${esc(row.image_url)}" alt="" style="max-width:100%;border-radius:14px">`:''}${content}${cta}<hr style="border:0;border-top:1px solid #e7e1d8;margin:28px 0"><p style="font-size:12px;color:#756d63">You received this because your marketing preferences allow messages from this restaurant. <a href="${esc(unsubscribe)}">Unsubscribe</a>.</p></div></div>`
-    const providerId=await sendEmail(resend,from,row.recipient_email,subject,html)
-    await db.rpc('marketing_complete_delivery',{p_delivery_id:row.id,p_provider_message_id:providerId,p_token_hash:tokenHash})
+    const providerId=await sendEmail(resend,from,row.recipient_email,subject,html,`marketing/${row.id}`)
+    await db.rpc('marketing_complete_delivery',{p_delivery_id:row.id,p_provider_message_id:providerId,p_token_hash:null})
     sent.push({id:row.id,status:'sent',providerId})
   }catch(caught){const message=caught instanceof Error?caught.message:'Delivery failed';await db.rpc('marketing_fail_delivery',{p_delivery_id:row.id,p_error:message});sent.push({id:row.id,status:'failed',error:message})}}
   return new Response(JSON.stringify({claimed:(deliveries||[]).length,sent,results}),{headers:{'Content-Type':'application/json','Cache-Control':'no-store'}})
