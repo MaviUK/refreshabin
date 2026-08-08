@@ -17,6 +17,7 @@ import Referrals from './pages/Referrals'
 import Milestones from './pages/Milestones'
 import Vip from './pages/Vip'
 import Challenges from './pages/Challenges'
+import MarketingCrm from './pages/MarketingCrm'
 import Login from './pages/Login'
 import Moderation from './pages/Moderation'
 import OrderRecovery from './pages/OrderRecovery'
@@ -52,6 +53,7 @@ export default function App() {
         <Route element={<AdminLayout />}>
           <Route index element={<Overview />} />
           <Route path="analytics" element={<PermissionRoute permission="overview:view"><Analytics /></PermissionRoute>} />
+          <Route path="marketing-crm" element={<PermissionRoute permission="overview:view"><MarketingCrm /></PermissionRoute>} />
           <Route path="stamp-cards" element={<PermissionRoute permission="overview:view"><StampCards /></PermissionRoute>} />
           <Route path="referrals" element={<PermissionRoute permission="overview:view"><Referrals /></PermissionRoute>} />
           <Route path="milestones" element={<PermissionRoute permission="overview:view"><Milestones /></PermissionRoute>} />
