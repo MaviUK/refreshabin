@@ -3,9 +3,11 @@ import { createClient } from 'npm:@supabase/supabase-js@2'
 
 const MAX_BODY_BYTES = 4 * 1024
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+const DEFAULT_ALLOWED_ORIGINS = ['https://ordered.food', 'https://www.ordered.food']
 
 function allowedOrigins() {
   return new Set([
+    ...DEFAULT_ALLOWED_ORIGINS,
     Deno.env.get('PLATFORM_ADMIN_URL'),
     ...(Deno.env.get('CORS_ALLOWED_ORIGINS') ?? '').split(','),
   ].map((value) => value?.trim().replace(/\/$/, '')).filter(Boolean) as string[])
