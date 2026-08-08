@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
+import { useAdmin } from '../components/AdminLayout'
 import { supabase } from '../lib/supabase'
-import { formatDate, formatMoney } from '../types'
+import { formatDate, formatMoney, hasAdminPermission } from '../types'
+import './Orders.css'
 
 type OrderStatus =
   | 'pending_payment'
@@ -14,7 +16,7 @@ type OrderStatus =
   | 'cancelled'
   | 'rejected'
 
-type PaymentStatus = 'pending' | 'requires_action' | 'paid' | 'failed' | 'refunded' | 'partially_refunded'
+type PaymentStatus = 'pending' | 'requires_action' | 'authorized' | 'paid' | 'failed' | 'cancelled' | 'refunded' | 'partially_refunded'
 type FulfilmentMethod = 'delivery' | 'collection'
 type ScheduleFilter = 'asap' | 'scheduled'
 
@@ -131,8 +133,10 @@ const orderStatuses: Array<{ value: OrderStatus; label: string }> = [
 const paymentStatuses: Array<{ value: PaymentStatus; label: string }> = [
   { value: 'pending', label: 'Pending' },
   { value: 'requires_action', label: 'Requires action' },
+  { value: 'authorized', label: 'Authorised' },
   { value: 'paid', label: 'Paid' },
   { value: 'failed', label: 'Failed' },
+  { value: 'cancelled', label: 'Cancelled' },
   { value: 'refunded', label: 'Refunded' },
   { value: 'partially_refunded', label: 'Partially refunded' },
 ]
@@ -144,6 +148,8 @@ const emptySnapshot: OrderSnapshot = {
 }
 
 export default function Orders() {
+  const { admin } = useAdmin()
+  const canManageOrders = hasAdminPermission(admin, 'orders:manage')
   const [params, setParams] = useSearchParams()
   const [search, setSearch] = useState(params.get('search') ?? '')
   const [status, setStatus] = useState<OrderStatus | ''>(validOrderStatus(params.get('status')))
@@ -158,7 +164,11 @@ export default function Orders() {
   const [loading, setLoading] = useState(true)
   const [detailLoading, setDetailLoading] = useState(false)
   const [error, setError] = useState('')
+  const [message, setMessage] = useState('')
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
+  const [cancelOpen, setCancelOpen] = useState(false)
+  const [cancelReason, setCancelReason] = useState('')
+  const [cancelling, setCancelling] = useState(false)
 
   const updateUrl = useCallback((updates: Record<string, string | null>) => {
     const next = new URLSearchParams(params)
@@ -195,6 +205,18 @@ export default function Orders() {
     setLoading(false)
   }, [attentionOnly, fulfilment, page, paymentStatus, schedule, search, status])
 
+  const loadDetail = useCallback(async (id: string) => {
+    setDetailLoading(true)
+    const { data, error: detailError } = await supabase.rpc('get_platform_order', { p_order_id: id })
+    if (detailError) {
+      setError(detailError.message)
+      setDetail(null)
+    } else {
+      setDetail(data as OrderDetail)
+    }
+    setDetailLoading(false)
+  }, [])
+
   useEffect(() => {
     const timer = window.setTimeout(() => void load(), search ? 300 : 0)
     return () => window.clearTimeout(timer)
@@ -210,22 +232,8 @@ export default function Orders() {
       setDetail(null)
       return
     }
-
-    let active = true
-    setDetailLoading(true)
-    void supabase.rpc('get_platform_order', { p_order_id: selectedId }).then(({ data, error: detailError }) => {
-      if (!active) return
-      if (detailError) {
-        setError(detailError.message)
-        setDetail(null)
-      } else {
-        setDetail(data as OrderDetail)
-      }
-      setDetailLoading(false)
-    })
-
-    return () => { active = false }
-  }, [selectedId])
+    void loadDetail(selectedId)
+  }, [loadDetail, selectedId])
 
   const selected = useMemo(() => snapshot.orders.find((order) => order.id === selectedId) ?? null, [selectedId, snapshot.orders])
 
@@ -238,6 +246,9 @@ export default function Orders() {
   function selectOrder(id: string) {
     setSelectedId(id)
     setError('')
+    setMessage('')
+    setCancelOpen(false)
+    setCancelReason('')
     updateUrl({ order: id })
   }
 
@@ -259,6 +270,43 @@ export default function Orders() {
     updateUrl({ page: nextPage === 1 ? null : String(nextPage), order: null })
   }
 
+  async function cancelOrder() {
+    if (!detail || !canManageOrders || cancelling) return
+    const reason = cancelReason.trim()
+    if (reason.length < 3 || reason.length > 500) {
+      setError('Enter a cancellation reason between 3 and 500 characters.')
+      return
+    }
+
+    setCancelling(true)
+    setError('')
+    setMessage('')
+    const orderId = detail.order.id
+    const orderNumber = detail.order.order_number
+    const { data, error: cancelError } = await supabase.functions.invoke('admin-cancel-order', {
+      body: { order_id: orderId, reason },
+    })
+
+    if (cancelError) {
+      setError(cancelError.message || 'The order could not be cancelled.')
+      setCancelling(false)
+      return
+    }
+
+    if (data && typeof data === 'object' && 'error' in data && typeof data.error === 'string') {
+      setError(data.error)
+      setCancelling(false)
+      return
+    }
+
+    setCancelOpen(false)
+    setCancelReason('')
+    setMessage(`Order #${orderNumber} was cancelled. Any eligible payment and stored-value balance has been reversed.`)
+    await loadDetail(orderId)
+    await load(true)
+    setCancelling(false)
+  }
+
   return (
     <div className="admin-page orders-page">
       <header className="page-heading">
@@ -267,6 +315,7 @@ export default function Orders() {
       </header>
 
       {error && <div className="admin-alert error" role="alert">{error}</div>}
+      {message && <div className="admin-alert success" role="status">{message}</div>}
 
       <section className="order-metric-grid" aria-label="Order operations summary">
         <OrderMetric label="Awaiting acceptance" value={snapshot.summary.awaiting_acceptance} detail="Paid orders" tone="amber" />
@@ -302,19 +351,42 @@ export default function Orders() {
         <section className="order-detail">
           {!selected && !detailLoading && <div className="panel-empty"><strong>Select an order</strong><span>Customer, payment, items and status history will appear here.</span></div>}
           {detailLoading && <div className="panel-empty"><div className="gate-spinner" /><span>Loading order details…</span></div>}
-          {!detailLoading && detail && <OrderDetailView detail={detail} />}
+          {!detailLoading && detail && <OrderDetailView detail={detail} canManageOrders={canManageOrders} onCancel={() => { setCancelReason(''); setCancelOpen(true) }} />}
         </section>
       </div>
+
+      {cancelOpen && detail && (
+        <div className="order-cancel-backdrop" role="presentation" onMouseDown={(event) => { if (event.currentTarget === event.target && !cancelling) setCancelOpen(false) }}>
+          <section className="order-cancel-dialog" role="dialog" aria-modal="true" aria-labelledby="cancel-order-title">
+            <div className="order-cancel-icon" aria-hidden="true">!</div>
+            <div>
+              <span className="admin-kicker">Platform order control</span>
+              <h2 id="cancel-order-title">Cancel order #{detail.order.order_number}?</h2>
+              <p>This will stop the order. Captured card payments are refunded, uncaptured authorisations are cancelled, and eligible gift card, store credit and reward balances are restored.</p>
+            </div>
+            <label className="order-cancel-reason">
+              Cancellation reason
+              <textarea autoFocus rows={4} maxLength={500} value={cancelReason} onChange={(event) => setCancelReason(event.target.value)} placeholder="Explain why the platform is cancelling this order…" disabled={cancelling} />
+              <small>{cancelReason.trim().length}/500 · this reason is stored in the order history and audit log</small>
+            </label>
+            <div className="order-cancel-actions">
+              <button type="button" className="secondary-button" onClick={() => setCancelOpen(false)} disabled={cancelling}>Keep order</button>
+              <button type="button" className="order-cancel-confirm" onClick={() => void cancelOrder()} disabled={cancelling || cancelReason.trim().length < 3}>{cancelling ? 'Cancelling…' : 'Cancel order'}</button>
+            </div>
+          </section>
+        </div>
+      )}
     </div>
   )
 }
 
-function OrderDetailView({ detail }: { detail: OrderDetail }) {
+function OrderDetailView({ detail, canManageOrders, onCancel }: { detail: OrderDetail; canManageOrders: boolean; onCancel: () => void }) {
   const { order, customer, delivery, items, history } = detail
+  const canCancel = canManageOrders && !['completed', 'cancelled', 'rejected'].includes(order.order_status)
   return <>
     <div className="order-detail-header">
       <div><span className="admin-kicker">Order #{order.order_number}</span><h2>{order.restaurant_name}</h2><div className="order-detail-badges"><span className={`order-status-badge ${order.order_status}`}>{orderStatusLabel(order.order_status)}</span><span className={`payment-badge ${order.payment_status}`}>{paymentStatusLabel(order.payment_status)}</span><span className="fulfilment-badge">{capitalise(order.fulfilment_method)}</span>{order.requested_fulfilment_at && <span className="scheduled-badge">Scheduled</span>}</div></div>
-      <a className="secondary-button" href={`/r/${order.restaurant_slug}`} target="_blank" rel="noreferrer">Storefront ↗</a>
+      <div className="order-detail-actions"><a className="secondary-button" href={`/r/${order.restaurant_slug}`} target="_blank" rel="noreferrer">Storefront ↗</a>{canCancel && <button type="button" className="order-cancel-button" onClick={onCancel}>Cancel order</button>}</div>
     </div>
 
     {order.needs_attention && <div className="order-attention-banner"><span>!</span><div><strong>Restaurant response overdue</strong><p>This paid order has waited {formatWait(order.response_wait_minutes)} without being accepted or rejected.</p></div></div>}
