@@ -94,7 +94,8 @@ export const foodCategoryGroups: FoodCategoryGroup[] = [
 
 export const foodCategories = foodCategoryGroups.flatMap((group) => group.categories)
 
+// Keep the homepage focused on the food types customers are most likely to browse first.
+// The full catalogue remains available behind the "View all" control.
 export const featuredFoodCategories = [
-  'Pizza', 'Burgers', 'Chicken', 'Chinese', 'Indian', 'Fish & Chips', 'Kebab',
-  'Italian', 'Thai', 'Japanese', 'Mexican', 'Breakfast', 'Desserts', 'Healthy',
+  'Pizza', 'Burgers', 'Chicken', 'Chinese', 'Indian', 'Fish & Chips', 'Kebab', 'Desserts',
 ]
