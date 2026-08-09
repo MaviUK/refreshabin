@@ -1,0 +1,165 @@
+:root {
+  --ordered-pink: #FF78AC;
+  --ordered-pink-deep: #d94f86;
+  --ordered-pink-soft: #ffe3ee;
+  --ordered-teal: #A8D5E3;
+  --ordered-teal-deep: #4f8fa3;
+  --ordered-teal-soft: #e3f3f7;
+  --ordered-cream: #F2F0EA;
+  --ordered-cream-light: #faf9f5;
+  --ordered-ink: #2f2930;
+  --ordered-muted: #6f666b;
+  --ordered-border: #ddd8d1;
+  --ordered-surface: #fffdfa;
+  color: var(--ordered-ink);
+  background: var(--ordered-cream);
+}
+
+html,
+body,
+#root {
+  background: var(--ordered-cream);
+  color: var(--ordered-ink);
+}
+
+body,
+.admin-shell,
+.admin-page,
+.admin-layout-shell {
+  background:
+    radial-gradient(circle at 5% 0%, rgba(255, 120, 172, 0.15), transparent 28rem),
+    radial-gradient(circle at 98% 100%, rgba(168, 213, 227, 0.22), transparent 30rem),
+    var(--ordered-cream);
+}
+
+.admin-list,
+.admin-detail,
+.admin-card,
+.panel,
+.card,
+.metric-card,
+.stat-card,
+.table-card,
+.filters-card,
+.auth-card,
+.settings-card,
+.modal-card {
+  border-color: var(--ordered-border);
+  background: rgba(255, 253, 250, 0.97);
+  box-shadow: 0 18px 48px rgba(73, 65, 68, 0.08);
+}
+
+.admin-list-item {
+  border-color: #e3ddd5;
+  background: var(--ordered-surface);
+  color: var(--ordered-ink);
+}
+
+.admin-list-item.active,
+.admin-tabs button.active,
+.nav-link.active,
+.sidebar-link.active,
+.tab.active,
+.tabs button.active {
+  border-color: rgba(255, 120, 172, 0.48);
+  background: var(--ordered-pink-soft);
+  color: #8f3158;
+}
+
+.admin-list-logo,
+.eyebrow,
+.badge,
+.chip,
+.pill,
+.tag {
+  background: var(--ordered-pink-soft);
+  color: #8f3158;
+}
+
+.primary-button,
+button.primary-button,
+.button-primary,
+.btn-primary,
+.save-button,
+.submit-button {
+  border-color: var(--ordered-pink-deep);
+  background: var(--ordered-pink);
+  color: #2f2027;
+  box-shadow: 0 10px 24px rgba(255, 120, 172, 0.24);
+}
+
+.primary-button:hover:not(:disabled),
+.button-primary:hover:not(:disabled),
+.btn-primary:hover:not(:disabled),
+.save-button:hover:not(:disabled),
+.submit-button:hover:not(:disabled) {
+  background: #ff6aa3;
+}
+
+.secondary-button,
+button.secondary-button,
+.button-secondary,
+.btn-secondary,
+.text-button {
+  border-color: #8ebfce;
+  background: var(--ordered-teal-soft);
+  color: #355f6d;
+}
+
+.secondary-button:hover:not(:disabled),
+.button-secondary:hover:not(:disabled),
+.btn-secondary:hover:not(:disabled),
+.text-button:hover:not(:disabled) {
+  background: var(--ordered-teal);
+  color: #294d58;
+}
+
+input,
+textarea,
+select {
+  border-color: var(--ordered-border);
+  background: var(--ordered-cream-light);
+  color: var(--ordered-ink);
+}
+
+input:focus,
+textarea:focus,
+select:focus {
+  border-color: var(--ordered-pink);
+  background: #fffdfa;
+  box-shadow: 0 0 0 4px rgba(255, 120, 172, 0.18);
+}
+
+input[type='checkbox'],
+input[type='radio'] {
+  accent-color: var(--ordered-pink);
+}
+
+.admin-summary-grid article,
+.info-card,
+.notice,
+.callout,
+.empty-state {
+  border-color: rgba(79, 143, 163, 0.25);
+  background: var(--ordered-teal-soft);
+}
+
+p,
+.muted,
+.helper-text,
+small {
+  color: var(--ordered-muted);
+}
+
+a {
+  color: #397b90;
+}
+
+a:hover {
+  color: #a83d68;
+}
+
+::selection {
+  background: var(--ordered-pink);
+  color: #2f2027;
+}
