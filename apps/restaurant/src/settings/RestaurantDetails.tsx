@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
+import FoodCategoryPicker from '../components/FoodCategoryPicker'
 import { supabase } from '../lib/supabase'
 
 type Restaurant = {
@@ -17,12 +18,6 @@ type Location = {
   city: string
   postcode: string
 }
-
-const cuisineOptions = [
-  'American', 'Bakery', 'Breakfast', 'British', 'Burgers', 'Chinese', 'Desserts',
-  'European', 'Indian', 'Italian', 'Japanese', 'Kebab', 'Mexican', 'Pizza',
-  'Seafood', 'Thai', 'Vegan', 'Vegetarian',
-]
 
 export default function RestaurantDetails() {
   const navigate = useNavigate()
@@ -97,7 +92,7 @@ export default function RestaurantDetails() {
     setSaved(false)
     setError('')
     if (!name.trim() || !cuisines.length || !email.trim() || !phone.trim()) {
-      setError('Enter the restaurant name, cuisine, email address and phone number.')
+      setError('Enter the restaurant name, at least one food category, email address and phone number.')
       return
     }
     if (!line1.trim() || !city.trim() || !postcode.trim()) {
@@ -137,6 +132,7 @@ export default function RestaurantDetails() {
       if (locationError) throw locationError
       setLocation(savedLocation as Location)
       setPostcode(postcode.trim().toUpperCase())
+      setRestaurant({ ...restaurant, name: name.trim(), cuisines, email: email.trim(), phone: phone.trim() })
       setSaved(true)
     } catch (caughtError) {
       setError(caughtError instanceof Error ? caughtError.message : 'Unable to save restaurant details.')
@@ -165,13 +161,11 @@ export default function RestaurantDetails() {
       <section className="settings-layout">
         <div className="settings-main">
           <article className="settings-card">
-            <div className="settings-card-heading"><div><h2>Trading details</h2><p>The name and cuisine shown on your storefront.</p></div></div>
+            <div className="settings-card-heading"><div><h2>Trading details</h2><p>The name and food categories customers use to discover your restaurant.</p></div></div>
             <div className="form-grid">
               <label className="large-field full-width">Restaurant name<input value={name} onChange={(event) => { setName(event.target.value); setSaved(false) }} /></label>
             </div>
-            <div className="cuisine-grid">
-              {cuisineOptions.map((cuisine) => <button className={cuisines.includes(cuisine) ? 'cuisine-chip selected' : 'cuisine-chip'} type="button" key={cuisine} onClick={() => { setCuisines((current) => current.includes(cuisine) ? current.filter((item) => item !== cuisine) : [...current, cuisine]); setSaved(false) }}>{cuisines.includes(cuisine) ? '✓ ' : ''}{cuisine}</button>)}
-            </div>
+            <FoodCategoryPicker value={cuisines} onChange={(next) => { setCuisines(next); setSaved(false) }} />
           </article>
 
           <article className="settings-card">
