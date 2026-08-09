@@ -1,5 +1,6 @@
 import { FormEvent, useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
+import logoUrl from '../assets/ordered-food-logo.jpg'
 import { featuredFoodCategories, foodCategories } from '../lib/foodCategories'
 import { supabase } from '../lib/supabase'
 import './Home.css'
@@ -39,7 +40,7 @@ async function reverseGeocodePostcode(latitude: number, longitude: number) {
 }
 
 function OrderedLogo() {
-  return <img className="ordered-logo" src={import.meta.env.ORDERED_FOOD_LOGO} alt="ordered.food" />
+  return <img className="ordered-logo" src={logoUrl} alt="ordered.food" />
 }
 
 export default function Home() {
