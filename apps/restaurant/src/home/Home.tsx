@@ -25,6 +25,15 @@ async function reverseGeocodePostcode(latitude: number, longitude: number) {
   return postcode
 }
 
+function OrderedLogo() {
+  return (
+    <span className="ordered-logo" aria-label="ordered.food">
+      <span className="ordered-logo-top">ordered</span>
+      <span className="ordered-logo-bottom"><span>.</span>food</span>
+    </span>
+  )
+}
+
 export default function Home() {
   const navigate = useNavigate()
   const [postcode, setPostcode] = useState('')
@@ -76,13 +85,17 @@ export default function Home() {
 
   return (
     <main className="home-page">
-      <header className="home-header">
-        <Link className="home-logo" to="/">ordered.food</Link>
-        <nav className="home-nav" aria-label="Main navigation">
-          <Link className="home-customer-link" to="/account">My account</Link>
-          <Link className="home-restaurant-login" to="/login">Restaurant login</Link>
-          <Link className="home-business-button" to="/register">List your business</Link>
-        </nav>
+      <header className="home-header-shell">
+        <div className="home-header">
+          <Link className="home-logo" to="/" aria-label="ordered.food home">
+            <OrderedLogo />
+          </Link>
+          <nav className="home-nav" aria-label="Main navigation">
+            <Link className="home-customer-link" to="/account">My account</Link>
+            <Link className="home-restaurant-login" to="/login">Restaurant login</Link>
+            <Link className="home-business-button" to="/register">List your business</Link>
+          </nav>
+        </div>
       </header>
 
       <section className="home-hero">
@@ -183,7 +196,7 @@ export default function Home() {
       </section>
 
       <footer className="home-footer">
-        <Link className="home-logo" to="/">ordered.food</Link>
+        <Link className="home-logo home-footer-logo" to="/" aria-label="ordered.food home"><OrderedLogo /></Link>
         <p>Online ordering for local restaurants.</p>
         <div><Link to="/account">My account</Link><Link to="/login">Restaurant login</Link><Link to="/register">Business sign up</Link></div>
       </footer>
