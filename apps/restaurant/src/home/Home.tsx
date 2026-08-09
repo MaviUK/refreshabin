@@ -39,7 +39,7 @@ async function reverseGeocodePostcode(latitude: number, longitude: number) {
 }
 
 function OrderedLogo() {
-  return <span className="ordered-logo" aria-label="ordered.food"><span className="ordered-logo-top">ordered</span><span className="ordered-logo-bottom"><span>.</span>food</span></span>
+  return <img className="ordered-logo" src="/ordered-food-logo.jpg" alt="ordered.food" />
 }
 
 export default function Home() {
