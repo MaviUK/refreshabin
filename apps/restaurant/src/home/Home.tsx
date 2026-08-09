@@ -178,10 +178,9 @@ export default function Home() {
       <header className="home-header-shell">
         <div className="home-header">
           <Link className="home-logo" to="/" aria-label="ordered.food home"><OrderedLogo /></Link>
-          <nav className="home-nav" aria-label="Main navigation">
+          <nav className="home-nav" aria-label="Customer navigation">
+            <Link to="/restaurants">Browse food</Link>
             <Link className="home-customer-link" to="/account">My account</Link>
-            <Link className="home-restaurant-login" to="/login">Restaurant login</Link>
-            <Link className="home-business-button" to="/register">List your business</Link>
           </nav>
         </div>
       </header>
@@ -252,15 +251,22 @@ export default function Home() {
         </div>
       </section>
 
-      <section className="business-banner">
-        <div><span className="home-eyebrow">For restaurants</span><h2>Your food. Your customers. Your brand.</h2><p>Take online orders without losing your identity. Build your menu, manage orders and grow direct relationships with local customers.</p></div>
-        <Link to="/register">Start taking orders</Link>
+      <section className="business-banner restaurant-access">
+        <div>
+          <span className="home-eyebrow">Restaurant partners</span>
+          <h2>Own or manage a restaurant?</h2>
+          <p>Join ordered.food to take direct orders, or sign in to manage your existing restaurant.</p>
+        </div>
+        <div className="restaurant-access-actions">
+          <Link className="restaurant-signup-button" to="/register">Restaurant sign up</Link>
+          <Link className="restaurant-login-button" to="/login">Restaurant login</Link>
+        </div>
       </section>
 
       <footer className="home-footer">
         <Link className="home-logo home-footer-logo" to="/" aria-label="ordered.food home"><OrderedLogo /></Link>
-        <p>Online ordering for local restaurants.</p>
-        <div><Link to="/account">My account</Link><Link to="/login">Restaurant login</Link><Link to="/register">Business sign up</Link></div>
+        <p>Find and order from local restaurants.</p>
+        <div><Link to="/restaurants">Browse food</Link><Link to="/account">My account</Link><Link to="/account/orders">My orders</Link></div>
       </footer>
     </main>
   )
