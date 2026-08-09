@@ -1,6 +1,7 @@
 import { FormEvent, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import './Home.css'
+import './HomeHeader.css'
 
 const cuisines = ['Pizza', 'Burgers', 'Chinese', 'Indian', 'Chicken', 'Desserts']
 
