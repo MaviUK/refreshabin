@@ -4,14 +4,74 @@ import './Home.css'
 
 const cuisines = ['Pizza', 'Burgers', 'Chinese', 'Indian', 'Chicken', 'Desserts']
 
+type GeolocationErrorCode = 1 | 2 | 3
+
+function locationErrorMessage(code?: GeolocationErrorCode) {
+  if (code === 1) return 'Location access was denied. Enter your postcode instead.'
+  if (code === 2) return 'We could not determine your location. Enter your postcode instead.'
+  if (code === 3) return 'Finding your location took too long. Enter your postcode instead.'
+  return 'We could not use your current location. Enter your postcode instead.'
+}
+
+async function reverseGeocodePostcode(latitude: number, longitude: number) {
+  const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${encodeURIComponent(latitude)}&lon=${encodeURIComponent(longitude)}&addressdetails=1`, {
+    headers: { Accept: 'application/json' },
+  })
+  if (!response.ok) throw new Error('Reverse geocoding failed')
+
+  const result = await response.json() as { address?: { postcode?: string } }
+  const postcode = result.address?.postcode?.trim()
+  if (!postcode) throw new Error('No postcode returned for current location')
+  return postcode
+}
+
 export default function Home() {
   const navigate = useNavigate()
   const [postcode, setPostcode] = useState('')
+  const [locating, setLocating] = useState(false)
+  const [locationError, setLocationError] = useState('')
+
+  function goToRestaurants(value: string) {
+    navigate(value ? `/restaurants?postcode=${encodeURIComponent(value)}` : '/restaurants')
+  }
 
   function submitPostcode(event: FormEvent) {
     event.preventDefault()
-    const value = postcode.trim()
-    navigate(value ? `/restaurants?postcode=${encodeURIComponent(value)}` : '/restaurants')
+    goToRestaurants(postcode.trim())
+  }
+
+  function useCurrentLocation() {
+    if (locating) return
+    setLocationError('')
+
+    if (!('geolocation' in navigator)) {
+      setLocationError('Your browser does not support location lookup. Enter your postcode instead.')
+      return
+    }
+
+    setLocating(true)
+    navigator.geolocation.getCurrentPosition(
+      async ({ coords }) => {
+        try {
+          const resolvedPostcode = await reverseGeocodePostcode(coords.latitude, coords.longitude)
+          setPostcode(resolvedPostcode)
+          goToRestaurants(resolvedPostcode)
+        } catch (error) {
+          console.error('Unable to reverse geocode current location', error)
+          setLocationError('We found your location but could not resolve a postcode. Enter it manually instead.')
+          setLocating(false)
+        }
+      },
+      (error) => {
+        setLocationError(locationErrorMessage(error.code as GeolocationErrorCode))
+        setLocating(false)
+      },
+      {
+        enableHighAccuracy: false,
+        timeout: 10000,
+        maximumAge: 5 * 60 * 1000,
+      },
+    )
   }
 
   return (
@@ -44,6 +104,17 @@ export default function Home() {
               />
               <button type="submit">Find food</button>
             </div>
+            <button
+              className="current-location-button"
+              type="button"
+              onClick={useCurrentLocation}
+              disabled={locating}
+              aria-busy={locating}
+            >
+              <span aria-hidden="true">⌖</span>
+              {locating ? 'Finding your location…' : 'Use my current location'}
+            </button>
+            {locationError && <p className="location-error" role="alert">{locationError}</p>}
           </form>
 
           <div className="home-trust-row">
