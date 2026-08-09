@@ -1,6 +1,6 @@
 import { FormEvent, useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { featuredFoodCategories } from '../lib/foodCategories'
+import { featuredFoodCategories, foodCategories } from '../lib/foodCategories'
 import { supabase } from '../lib/supabase'
 import './Home.css'
 import './HomeHeader.css'
@@ -17,16 +17,34 @@ const cuisineIcons: Record<string, string> = {
   Italian: '🍝',
   Thai: '🍜',
   Japanese: '🍣',
+  Sushi: '🍣',
   Mexican: '🌮',
   Breakfast: '🍳',
+  Brunch: '🥞',
   Desserts: '🍰',
+  'Ice Cream': '🍦',
   Healthy: '🥗',
+  Vegan: '🌱',
+  Vegetarian: '🥬',
+  Bakery: '🥐',
+  Coffee: '☕',
+  'Bubble Tea': '🧋',
+  Seafood: '🦐',
+  BBQ: '🍖',
+  Steak: '🥩',
+  Wings: '🍗',
+  'Fried Chicken': '🍗',
+  Pasta: '🍝',
+  Sandwiches: '🥪',
+  Wraps: '🌯',
 }
 
-const cuisines = featuredFoodCategories.map((name) => ({
-  name,
-  icon: cuisineIcons[name] ?? '🍽️',
-}))
+function categoryCards(categories: string[]) {
+  return categories.map((name) => ({
+    name,
+    icon: cuisineIcons[name] ?? '🍽️',
+  }))
+}
 
 type GeolocationErrorCode = 1 | 2 | 3
 type SearchMode = 'postcode' | 'restaurant'
@@ -66,6 +84,9 @@ export default function Home() {
   const [locating, setLocating] = useState(false)
   const [locationError, setLocationError] = useState('')
   const [defaultPostcode, setDefaultPostcode] = useState('')
+  const [showAllCategories, setShowAllCategories] = useState(false)
+
+  const visibleCuisines = categoryCards(showAllCategories ? foodCategories : featuredFoodCategories)
 
   useEffect(() => {
     let active = true
@@ -189,11 +210,16 @@ export default function Home() {
           {locationError && <p className="location-error" role="alert">{locationError}</p>}
 
           <div className="home-cuisine-strip-heading">
-            <strong>Browse food</strong>
-            {defaultPostcode && <span>Near {defaultPostcode}</span>}
+            <div>
+              <strong>Browse food</strong>
+              {defaultPostcode && <span>Near {defaultPostcode}</span>}
+            </div>
+            <button className="home-view-all-cuisines" type="button" onClick={() => setShowAllCategories((current) => !current)} aria-expanded={showAllCategories}>
+              {showAllCategories ? 'Show popular' : 'View all'}
+            </button>
           </div>
-          <div className="home-cuisine-carousel" aria-label="Browse by food type">
-            {cuisines.map((cuisine) => (
+          <div className={showAllCategories ? 'home-cuisine-carousel expanded' : 'home-cuisine-carousel'} aria-label={showAllCategories ? 'All food types' : 'Popular food types'}>
+            {visibleCuisines.map((cuisine) => (
               <Link key={cuisine.name} to={cuisineHref(cuisine.name)} className="home-cuisine-card">
                 <span className="home-cuisine-icon" aria-hidden="true">{cuisine.icon}</span>
                 <strong>{cuisine.name}</strong>
