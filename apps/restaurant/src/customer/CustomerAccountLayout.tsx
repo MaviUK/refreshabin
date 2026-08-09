@@ -3,12 +3,7 @@ import CustomerNotificationBell from './CustomerNotificationBell'
 import './CustomerAccountLayout.css'
 
 function OrderedLogo() {
-  return (
-    <span className="customer-site-logo-mark" aria-label="ordered.food">
-      <span className="customer-site-logo-top">ordered</span>
-      <span className="customer-site-logo-bottom"><span>.</span>food</span>
-    </span>
-  )
+  return <img className="customer-site-logo-mark" src="/ordered-food-logo.jpg" alt="ordered.food" />
 }
 
 export default function CustomerAccountLayout() {
