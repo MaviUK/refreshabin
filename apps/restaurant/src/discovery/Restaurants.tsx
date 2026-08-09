@@ -30,11 +30,16 @@ export default function Restaurants() {
   const [signedIn, setSignedIn] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  const [search, setSearch] = useState('')
+  const [search, setSearch] = useState(searchParams.get('search') ?? '')
   const [savingFavourite, setSavingFavourite] = useState<string | null>(null)
 
   const selectedCuisine = searchParams.get('cuisine') ?? ''
   const postcode = searchParams.get('postcode') ?? ''
+  const searchFromUrl = searchParams.get('search') ?? ''
+
+  useEffect(() => {
+    setSearch(searchFromUrl)
+  }, [searchFromUrl])
 
   useEffect(() => {
     async function loadRestaurants() {
@@ -134,7 +139,7 @@ export default function Restaurants() {
 
       <section className="restaurants-intro">
         <span>Food near you</span>
-        <h1>{postcode ? `Restaurants near ${postcode}` : 'Find your next favourite'}</h1>
+        <h1>{postcode ? `Restaurants near ${postcode}` : search ? `Results for “${search}”` : 'Find your next favourite'}</h1>
         <p>Browse local restaurants available for delivery and collection.</p>
 
         <div className="restaurant-search-row">
