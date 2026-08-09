@@ -9,86 +9,16 @@
   text-decoration: none;
 }
 
-.dashboard-ordered-logo {
-  position: relative;
-  display: inline-flex;
-  width: 146px;
-  height: 66px;
-  align-items: flex-start;
-  font-weight: 950;
-  line-height: 1;
-  letter-spacing: -0.055em;
-}
-
-.dashboard-ordered-logo-top,
-.dashboard-ordered-logo-bottom {
-  position: absolute;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #fff;
-  box-shadow: 0 6px 18px rgba(47, 41, 48, 0.08);
-}
-
-.dashboard-ordered-logo-top {
-  top: 1px;
-  left: 0;
-  width: 116px;
-  height: 39px;
-  border-radius: 12px 12px 12px 5px;
-  background: #ff78ac;
-  font-size: 1.19rem;
-}
-
-.dashboard-ordered-logo-top::after {
-  content: '';
-  position: absolute;
-  left: 14px;
-  bottom: -9px;
-  border-top: 12px solid #ff78ac;
-  border-right: 11px solid transparent;
-}
-
-.dashboard-ordered-logo-bottom {
-  right: 0;
-  bottom: 0;
-  width: 84px;
-  height: 31px;
-  border: 2px solid #f2f0ea;
-  border-radius: 11px;
-  background: #7bb9c8;
-  font-size: 1rem;
-}
-
-.dashboard-ordered-logo-bottom > span {
-  margin-right: 2px;
-  color: #ff78ac;
+.dashboard-official-logo {
+  display: block;
+  width: 150px;
+  height: auto;
+  object-fit: contain;
+  border-radius: 8px;
 }
 
 @media (max-width: 620px) {
-  .dashboard-ordered-logo {
-    width: 108px;
-    height: 52px;
-  }
-
-  .dashboard-ordered-logo-top {
-    width: 86px;
-    height: 31px;
-    border-radius: 10px 10px 10px 4px;
-    font-size: 0.9rem;
-  }
-
-  .dashboard-ordered-logo-top::after {
-    left: 11px;
-    bottom: -7px;
-    border-top-width: 9px;
-    border-right-width: 9px;
-  }
-
-  .dashboard-ordered-logo-bottom {
-    width: 64px;
-    height: 25px;
-    border-radius: 9px;
-    font-size: 0.77rem;
+  .dashboard-official-logo {
+    width: 112px;
   }
 }
