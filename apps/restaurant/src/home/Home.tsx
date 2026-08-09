@@ -2,10 +2,12 @@ import { FormEvent, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import './Home.css'
 import './HomeHeader.css'
+import './HomeSearch.css'
 
 const cuisines = ['Pizza', 'Burgers', 'Chinese', 'Indian', 'Chicken', 'Desserts']
 
 type GeolocationErrorCode = 1 | 2 | 3
+type SearchMode = 'postcode' | 'restaurant'
 
 function locationErrorMessage(code?: GeolocationErrorCode) {
   if (code === 1) return 'Location access was denied. Enter your postcode instead.'
@@ -37,17 +39,25 @@ function OrderedLogo() {
 
 export default function Home() {
   const navigate = useNavigate()
-  const [postcode, setPostcode] = useState('')
+  const [searchMode, setSearchMode] = useState<SearchMode>('postcode')
+  const [searchValue, setSearchValue] = useState('')
   const [locating, setLocating] = useState(false)
   const [locationError, setLocationError] = useState('')
 
-  function goToRestaurants(value: string) {
+  function submitSearch(event: FormEvent) {
+    event.preventDefault()
+    const value = searchValue.trim()
+    if (searchMode === 'restaurant') {
+      navigate(value ? `/restaurants?search=${encodeURIComponent(value)}` : '/restaurants')
+      return
+    }
     navigate(value ? `/restaurants?postcode=${encodeURIComponent(value)}` : '/restaurants')
   }
 
-  function submitPostcode(event: FormEvent) {
-    event.preventDefault()
-    goToRestaurants(postcode.trim())
+  function chooseSearchMode(mode: SearchMode) {
+    setSearchMode(mode)
+    setSearchValue('')
+    setLocationError('')
   }
 
   function useCurrentLocation() {
@@ -64,8 +74,8 @@ export default function Home() {
       async ({ coords }) => {
         try {
           const resolvedPostcode = await reverseGeocodePostcode(coords.latitude, coords.longitude)
-          setPostcode(resolvedPostcode)
-          goToRestaurants(resolvedPostcode)
+          setSearchValue(resolvedPostcode)
+          navigate(`/restaurants?postcode=${encodeURIComponent(resolvedPostcode)}`)
         } catch (error) {
           console.error('Unable to reverse geocode current location', error)
           setLocationError('We found your location but could not resolve a postcode. Enter it manually instead.')
@@ -99,37 +109,46 @@ export default function Home() {
         </div>
       </header>
 
+      <section className="home-search-section" aria-label="Find food">
+        <div className="home-search-inner">
+          <div className="home-search-heading">
+            <span className="home-eyebrow">Find food near you</span>
+            <h2>What are you looking for?</h2>
+          </div>
+
+          <div className="home-search-tabs" role="tablist" aria-label="Search type">
+            <button type="button" role="tab" aria-selected={searchMode === 'postcode'} className={searchMode === 'postcode' ? 'active' : ''} onClick={() => chooseSearchMode('postcode')}>Postcode</button>
+            <button type="button" role="tab" aria-selected={searchMode === 'restaurant'} className={searchMode === 'restaurant' ? 'active' : ''} onClick={() => chooseSearchMode('restaurant')}>Restaurant</button>
+          </div>
+
+          <form className="home-discovery-search" onSubmit={submitSearch}>
+            <input
+              id="home-search"
+              name="search"
+              value={searchValue}
+              onChange={(event) => setSearchValue(event.target.value)}
+              placeholder={searchMode === 'postcode' ? 'Enter your postcode, e.g. BT20 5ED' : 'Search restaurant name'}
+              aria-label={searchMode === 'postcode' ? 'Enter your postcode' : 'Search restaurant name'}
+              autoComplete={searchMode === 'postcode' ? 'postal-code' : 'off'}
+            />
+            <button type="submit">{searchMode === 'postcode' ? 'Find food' : 'Search'}</button>
+          </form>
+
+          {searchMode === 'postcode' && (
+            <button className="current-location-button home-location-button" type="button" onClick={useCurrentLocation} disabled={locating} aria-busy={locating}>
+              <span aria-hidden="true">⌖</span>
+              {locating ? 'Finding your location…' : 'Use my current location'}
+            </button>
+          )}
+          {locationError && <p className="location-error" role="alert">{locationError}</p>}
+        </div>
+      </section>
+
       <section className="home-hero">
         <div className="home-hero-copy">
           <span className="home-eyebrow">Your local favourites, delivered</span>
           <h1>Good food.<br />Ordered simply.</h1>
           <p>Discover independent restaurants near you, order in a few taps and support the places that make your area taste better.</p>
-
-          <form className="postcode-search" onSubmit={submitPostcode}>
-            <label htmlFor="postcode">Enter your postcode</label>
-            <div>
-              <input
-                id="postcode"
-                name="postcode"
-                value={postcode}
-                onChange={(event) => setPostcode(event.target.value)}
-                placeholder="e.g. BT20 5ED"
-                autoComplete="postal-code"
-              />
-              <button type="submit">Find food</button>
-            </div>
-            <button
-              className="current-location-button"
-              type="button"
-              onClick={useCurrentLocation}
-              disabled={locating}
-              aria-busy={locating}
-            >
-              <span aria-hidden="true">⌖</span>
-              {locating ? 'Finding your location…' : 'Use my current location'}
-            </button>
-            {locationError && <p className="location-error" role="alert">{locationError}</p>}
-          </form>
 
           <div className="home-trust-row">
             <span>Local restaurants</span>
