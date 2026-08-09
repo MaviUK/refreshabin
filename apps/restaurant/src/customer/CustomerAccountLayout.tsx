@@ -1,9 +1,10 @@
 import { Link, Outlet } from 'react-router-dom'
+import logoUrl from '../assets/ordered-food-logo.jpg'
 import CustomerNotificationBell from './CustomerNotificationBell'
 import './CustomerAccountLayout.css'
 
 function OrderedLogo() {
-  return <img className="customer-site-logo-mark" src={import.meta.env.ORDERED_FOOD_LOGO} alt="ordered.food" />
+  return <img className="customer-site-logo-mark" src={logoUrl} alt="ordered.food" />
 }
 
 export default function CustomerAccountLayout() {
