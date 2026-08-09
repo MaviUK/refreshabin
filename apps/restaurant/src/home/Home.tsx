@@ -1,18 +1,32 @@
 import { FormEvent, useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
+import { featuredFoodCategories } from '../lib/foodCategories'
 import { supabase } from '../lib/supabase'
 import './Home.css'
 import './HomeHeader.css'
 import './HomeSearch.css'
 
-const cuisines = [
-  { name: 'Pizza', icon: '🍕' },
-  { name: 'Burgers', icon: '🍔' },
-  { name: 'Chinese', icon: '🥡' },
-  { name: 'Indian', icon: '🍛' },
-  { name: 'Chicken', icon: '🍗' },
-  { name: 'Desserts', icon: '🍰' },
-]
+const cuisineIcons: Record<string, string> = {
+  Pizza: '🍕',
+  Burgers: '🍔',
+  Chicken: '🍗',
+  Chinese: '🥡',
+  Indian: '🍛',
+  'Fish & Chips': '🐟',
+  Kebab: '🥙',
+  Italian: '🍝',
+  Thai: '🍜',
+  Japanese: '🍣',
+  Mexican: '🌮',
+  Breakfast: '🍳',
+  Desserts: '🍰',
+  Healthy: '🥗',
+}
+
+const cuisines = featuredFoodCategories.map((name) => ({
+  name,
+  icon: cuisineIcons[name] ?? '🍽️',
+}))
 
 type GeolocationErrorCode = 1 | 2 | 3
 type SearchMode = 'postcode' | 'restaurant'
