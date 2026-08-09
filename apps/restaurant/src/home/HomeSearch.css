@@ -129,6 +129,13 @@
   gap: 12px;
 }
 
+.home-cuisine-strip-heading > div {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+}
+
 .home-cuisine-strip-heading strong {
   font-size: 0.92rem;
 }
@@ -139,6 +146,25 @@
   font-weight: 800;
 }
 
+.home-view-all-cuisines {
+  flex: 0 0 auto;
+  min-height: 34px;
+  padding: 0 12px;
+  border: 1px solid rgba(79, 143, 163, 0.25);
+  border-radius: 999px;
+  background: #eef7f9;
+  color: #356b7b;
+  font-size: 0.78rem;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.home-view-all-cuisines:hover {
+  border-color: #FF78AC;
+  background: #fff3f8;
+  color: #2f2930;
+}
+
 .home-cuisine-carousel {
   display: flex;
   gap: 10px;
@@ -147,6 +173,13 @@
   scroll-snap-type: x proximity;
   scrollbar-width: none;
   -webkit-overflow-scrolling: touch;
+}
+
+.home-cuisine-carousel.expanded {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(108px, 1fr));
+  overflow: visible;
+  scroll-snap-type: none;
 }
 
 .home-cuisine-carousel::-webkit-scrollbar {
@@ -171,6 +204,10 @@
   transition: transform 160ms ease, border-color 160ms ease, background 160ms ease;
 }
 
+.home-cuisine-carousel.expanded .home-cuisine-card {
+  min-width: 0;
+}
+
 .home-cuisine-card:hover {
   transform: translateY(-2px);
   border-color: #FF78AC;
@@ -184,6 +221,7 @@
 
 .home-cuisine-card strong {
   font-size: 0.82rem;
+  text-align: center;
 }
 
 .home-hero {
@@ -254,9 +292,19 @@
     margin-top: 15px;
   }
 
-  .home-cuisine-carousel {
+  .home-cuisine-strip-heading > div {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 1px;
+  }
+
+  .home-cuisine-carousel:not(.expanded) {
     margin-right: -16px;
     padding-right: 16px;
+  }
+
+  .home-cuisine-carousel.expanded {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
   .home-cuisine-card {
@@ -295,5 +343,9 @@
 
   .home-discovery-search input {
     font-size: 0.88rem;
+  }
+
+  .home-cuisine-carousel.expanded {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
