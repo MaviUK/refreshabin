@@ -1,7 +1,7 @@
 .home-page {
   min-height: 100vh;
-  background: #f7f4ec;
-  color: #17211b;
+  background: #F2F0EA;
+  color: #2f2930;
 }
 
 .home-header {
@@ -16,7 +16,7 @@
 }
 
 .home-logo {
-  color: #17211b;
+  color: #2f2930;
   font-size: 1.35rem;
   font-weight: 900;
   letter-spacing: -0.04em;
@@ -30,23 +30,23 @@
 }
 
 .home-nav a {
-  color: #344039;
+  color: #4f6971;
   font-weight: 800;
   text-decoration: none;
 }
 
 .home-customer-link {
-  border: 1px solid #d8d1c4;
+  border: 1px solid #A8D5E3;
   border-radius: 999px;
   padding: 10px 15px;
-  background: rgba(255,255,255,.6);
+  background: rgba(255, 255, 255, .62);
 }
 
 .home-business-button,
 .business-banner > a {
   border-radius: 999px;
-  background: #17211b;
-  color: #fff !important;
+  background: #A8D5E3;
+  color: #2f2930 !important;
   padding: 12px 18px;
 }
 
@@ -62,7 +62,7 @@
 }
 
 .home-eyebrow {
-  color: #de5b2d;
+  color: #d94f86;
   font-size: 0.75rem;
   font-weight: 900;
   letter-spacing: 0.14em;
@@ -72,6 +72,7 @@
 .home-hero h1 {
   max-width: 700px;
   margin: 16px 0 22px;
+  color: #2f2930;
   font-size: clamp(4rem, 8vw, 7.8rem);
   line-height: 0.88;
   letter-spacing: -0.075em;
@@ -80,7 +81,7 @@
 .home-hero-copy > p {
   max-width: 620px;
   margin: 0;
-  color: #536058;
+  color: #6f666b;
   font-size: 1.15rem;
   line-height: 1.65;
 }
@@ -101,10 +102,10 @@
   display: flex;
   gap: 10px;
   padding: 8px;
-  border: 1px solid #ded7c9;
+  border: 1px solid #ddd8d1;
   border-radius: 18px;
-  background: #fff;
-  box-shadow: 0 18px 45px rgba(55, 44, 27, 0.08);
+  background: #fffdfa;
+  box-shadow: 0 18px 45px rgba(47, 41, 48, 0.08);
 }
 
 .postcode-search input {
@@ -113,7 +114,7 @@
   border: 0;
   outline: 0;
   background: transparent;
-  color: #17211b;
+  color: #2f2930;
   font: inherit;
   padding: 0 14px;
 }
@@ -122,12 +123,17 @@
   min-height: 52px;
   border: 0;
   border-radius: 12px;
-  background: #de5b2d;
-  color: #fff;
+  background: #FF78AC;
+  color: #2f2027;
   cursor: pointer;
   font: inherit;
   font-weight: 900;
   padding: 0 24px;
+  box-shadow: 0 10px 24px rgba(255, 120, 172, .24);
+}
+
+.postcode-search button:hover:not(:disabled) {
+  background: #ff6aa3;
 }
 
 .current-location-button {
@@ -139,7 +145,7 @@
   border: 0 !important;
   border-radius: 0 !important;
   background: transparent !important;
-  color: #344039 !important;
+  color: #4f8fa3 !important;
   padding: 4px 0 !important;
   font-size: 0.9rem !important;
   font-weight: 800 !important;
@@ -147,7 +153,7 @@
 }
 
 .current-location-button:hover:not(:disabled) {
-  color: #17211b !important;
+  color: #397b90 !important;
   text-decoration: underline;
   text-underline-offset: 3px;
 }
@@ -169,7 +175,7 @@
   display: flex;
   flex-wrap: wrap;
   gap: 10px 22px;
-  color: #6b756e;
+  color: #6f666b;
   font-size: 0.85rem;
   font-weight: 700;
 }
@@ -177,7 +183,7 @@
 .home-trust-row span::before {
   content: '✓';
   margin-right: 7px;
-  color: #278553;
+  color: #4f8fa3;
 }
 
 .home-hero-art {
@@ -186,7 +192,7 @@
   display: grid;
   place-items: center;
   border-radius: 44px;
-  background: #e9c85c;
+  background: #A8D5E3;
   overflow: hidden;
 }
 
@@ -208,9 +214,9 @@
   place-items: center;
   border: 22px solid rgba(255,255,255,0.92);
   border-radius: 50%;
-  background: #fff7df;
+  background: #fffdfa;
   font-size: 8.5rem;
-  box-shadow: 0 30px 70px rgba(67, 47, 0, 0.22);
+  box-shadow: 0 30px 70px rgba(47, 41, 48, 0.18);
   transform: rotate(-7deg);
 }
 
@@ -222,14 +228,14 @@
   gap: 5px;
   border: 1px solid rgba(255,255,255,0.65);
   border-radius: 18px;
-  background: rgba(255,255,255,0.92);
-  box-shadow: 0 18px 45px rgba(60, 43, 6, 0.16);
+  background: rgba(255,253,250,0.94);
+  box-shadow: 0 18px 45px rgba(47, 41, 48, 0.12);
   padding: 17px;
   backdrop-filter: blur(12px);
 }
 
 .hero-food-card span,
-.hero-food-card small { color: #6b756e; font-size: 0.75rem; }
+.hero-food-card small { color: #6f666b; font-size: 0.75rem; }
 .hero-card-one { top: 48px; left: 28px; }
 .hero-card-two { right: 24px; bottom: 42px; }
 
@@ -263,7 +269,7 @@
 }
 
 .section-heading > a {
-  color: #17211b;
+  color: #4f8fa3;
   font-weight: 900;
 }
 
@@ -277,25 +283,26 @@
   min-height: 150px;
   display: grid;
   align-content: space-between;
-  border: 1px solid #e0dbcf;
+  border: 1px solid #ddd8d1;
   border-radius: 22px;
-  background: #fff;
-  color: #17211b;
+  background: #fffdfa;
+  color: #2f2930;
   text-decoration: none;
   padding: 20px;
-  transition: transform 160ms ease, box-shadow 160ms ease;
+  transition: transform 160ms ease, box-shadow 160ms ease, border-color 160ms ease;
 }
 
 .cuisine-grid a:hover {
   transform: translateY(-4px);
-  box-shadow: 0 20px 40px rgba(48, 42, 28, 0.08);
+  border-color: #FF78AC;
+  box-shadow: 0 20px 40px rgba(255, 120, 172, 0.14);
 }
 
 .cuisine-grid span { font-size: 2.4rem; }
 .cuisine-grid strong { font-size: 1rem; }
 
 .how-it-works {
-  border-top: 1px solid #ded8cb;
+  border-top: 1px solid #ddd8d1;
 }
 
 .steps-grid {
@@ -306,20 +313,20 @@
 
 .steps-grid article {
   border-radius: 26px;
-  background: #1d2b22;
-  color: #fff;
+  background: #A8D5E3;
+  color: #2f2930;
   padding: 30px;
 }
 
 .steps-grid article > span {
-  color: #e9c85c;
+  color: #d94f86;
   font-size: 0.75rem;
   font-weight: 900;
   letter-spacing: 0.15em;
 }
 
 .steps-grid h3 { margin: 52px 0 10px; font-size: 1.35rem; }
-.steps-grid p { margin: 0; color: #cbd3cd; line-height: 1.6; }
+.steps-grid p { margin: 0; color: #445b62; line-height: 1.6; }
 
 .business-banner {
   margin-top: 40px;
@@ -331,11 +338,11 @@
   justify-content: space-between;
   gap: 50px;
   border-radius: 32px;
-  background: #f0d76f;
+  background: #ffe3ee;
 }
 
 .business-banner > div { max-width: 760px; }
-.business-banner p { max-width: 700px; margin: 18px 0 0; color: #4f513b; line-height: 1.6; }
+.business-banner p { max-width: 700px; margin: 18px 0 0; color: #6f5661; line-height: 1.6; }
 .business-banner > a { flex: none; font-weight: 900; text-decoration: none; }
 
 .home-footer {
@@ -344,12 +351,12 @@
   align-items: center;
   justify-content: space-between;
   gap: 24px;
-  border-top: 1px solid #ded8cb;
+  border-top: 1px solid #ddd8d1;
 }
 
-.home-footer p { color: #69736c; }
+.home-footer p { color: #6f666b; }
 .home-footer div { display: flex; gap: 18px; }
-.home-footer div a { color: #344039; font-weight: 800; }
+.home-footer div a { color: #4f8fa3; font-weight: 800; }
 
 @media (max-width: 920px) {
   .home-hero { grid-template-columns: 1fr; padding-top: 48px; }
