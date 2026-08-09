@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import './Dashboard.css'
 
 type Restaurant = {
   id: string
@@ -37,6 +38,10 @@ type SetupStep = {
 
 const money = new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'GBP' })
 const activeStatuses = ['placed', 'accepted', 'preparing', 'ready', 'out_for_delivery']
+
+function OrderedLogo() {
+  return <span className="dashboard-ordered-logo" aria-label="ordered.food"><span className="dashboard-ordered-logo-top">ordered</span><span className="dashboard-ordered-logo-bottom"><span>.</span>food</span></span>
+}
 
 function startOfTodayIso() {
   const now = new Date()
@@ -246,8 +251,8 @@ export default function Dashboard() {
   return (
     <main className="dashboard-shell">
       <header className="dashboard-header">
-        <div>
-          <Link className="brand" to="/dashboard">ordered.food</Link>
+        <div className="dashboard-brand-block">
+          <Link className="dashboard-logo-link" to="/dashboard" aria-label="ordered.food restaurant dashboard"><OrderedLogo /></Link>
           <p className="dashboard-kicker">{restaurant?.name ?? 'Restaurant portal'}</p>
         </div>
         <button className="secondary-button" type="button" onClick={() => void signOut()}>Sign out</button>
