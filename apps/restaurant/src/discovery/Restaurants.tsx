@@ -21,6 +21,37 @@ type Restaurant = {
 
 const money = new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'GBP' })
 
+const fallbackFoodImages = [
+  'https://images.unsplash.com/photo-1504674900247-0877df9cc836?auto=format&fit=crop&w=1200&q=82',
+  'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?auto=format&fit=crop&w=1200&q=82',
+  'https://images.unsplash.com/photo-1574071318508-1cdbab80d002?auto=format&fit=crop&w=1200&q=82',
+  'https://images.unsplash.com/photo-1515003197210-e0cd71810b5f?auto=format&fit=crop&w=1200&q=82',
+  'https://images.unsplash.com/photo-1585937421612-70a008356fbe?auto=format&fit=crop&w=1200&q=82',
+  'https://images.unsplash.com/photo-1525755662778-989d0524087e?auto=format&fit=crop&w=1200&q=82',
+  'https://images.unsplash.com/photo-1563379926898-05f4575a45d8?auto=format&fit=crop&w=1200&q=82',
+  'https://images.unsplash.com/photo-1540189549336-e6e99c3679fe?auto=format&fit=crop&w=1200&q=82',
+]
+
+const cuisineFallbackImages: Record<string, string> = {
+  pizza: 'https://images.unsplash.com/photo-1574071318508-1cdbab80d002?auto=format&fit=crop&w=1200&q=82',
+  burgers: 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?auto=format&fit=crop&w=1200&q=82',
+  burger: 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?auto=format&fit=crop&w=1200&q=82',
+  indian: 'https://images.unsplash.com/photo-1585937421612-70a008356fbe?auto=format&fit=crop&w=1200&q=82',
+  chinese: 'https://images.unsplash.com/photo-1525755662778-989d0524087e?auto=format&fit=crop&w=1200&q=82',
+  italian: 'https://images.unsplash.com/photo-1563379926898-05f4575a45d8?auto=format&fit=crop&w=1200&q=82',
+  pasta: 'https://images.unsplash.com/photo-1563379926898-05f4575a45d8?auto=format&fit=crop&w=1200&q=82',
+  healthy: 'https://images.unsplash.com/photo-1540189549336-e6e99c3679fe?auto=format&fit=crop&w=1200&q=82',
+  vegan: 'https://images.unsplash.com/photo-1540189549336-e6e99c3679fe?auto=format&fit=crop&w=1200&q=82',
+}
+
+function fallbackImageFor(restaurant: Restaurant) {
+  const cuisine = restaurant.cuisines?.[0]?.toLowerCase().trim() ?? ''
+  if (cuisineFallbackImages[cuisine]) return cuisineFallbackImages[cuisine]
+  let hash = 0
+  for (const char of restaurant.id || restaurant.name) hash = ((hash << 5) - hash + char.charCodeAt(0)) | 0
+  return fallbackFoodImages[Math.abs(hash) % fallbackFoodImages.length]
+}
+
 function OrderedLogo() {
   return <span className="discovery-logo" aria-label="ordered.food"><span>ordered</span><small><b>.</b>food</small></span>
 }
@@ -135,11 +166,11 @@ export default function Restaurants() {
           {visibleRestaurants.map((restaurant) => {
             const isFavourite = favourites.has(restaurant.id)
             const primaryCuisine = restaurant.cuisines?.[0]
+            const coverImage = restaurant.cover_url || fallbackImageFor(restaurant)
             return (
               <article className="restaurant-card" key={restaurant.id}>
                 <Link className="restaurant-card-link" to={`/r/${restaurant.slug}`}>
-                  <div className="restaurant-cover" style={restaurant.cover_url ? { backgroundImage: `url(${restaurant.cover_url})` } : undefined}>
-                    {!restaurant.cover_url && <span>{restaurant.name.charAt(0)}</span>}
+                  <div className="restaurant-cover" role="img" aria-label={`${restaurant.name} food`} style={{ backgroundImage: `url(${coverImage})` }}>
                     {restaurant.logo_url && <img src={restaurant.logo_url} alt="" />}
                   </div>
                   <div className="restaurant-card-body">
