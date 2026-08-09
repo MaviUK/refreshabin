@@ -130,6 +130,40 @@
   padding: 0 24px;
 }
 
+.current-location-button {
+  margin-top: 12px;
+  min-height: auto !important;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  color: #344039 !important;
+  padding: 4px 0 !important;
+  font-size: 0.9rem !important;
+  font-weight: 800 !important;
+  box-shadow: none !important;
+}
+
+.current-location-button:hover:not(:disabled) {
+  color: #17211b !important;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.current-location-button:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+
+.location-error {
+  margin: 8px 0 0 !important;
+  color: #9f2f1e !important;
+  font-size: 0.84rem !important;
+  line-height: 1.45 !important;
+}
+
 .home-trust-row {
   margin-top: 22px;
   display: flex;
@@ -335,6 +369,7 @@
   .postcode-search > div { display: grid; }
   .postcode-search input { min-height: 48px; }
   .postcode-search button { width: 100%; }
+  .current-location-button { width: auto !important; }
   .home-hero-art { min-height: 390px; border-radius: 28px; }
   .hero-dish { width: 210px; height: 210px; border-width: 16px; font-size: 6.2rem; }
   .hero-food-card { min-width: 180px; padding: 13px; }
