@@ -122,24 +122,34 @@ export default function Home() {
           </div>
 
           <form className="home-discovery-search" onSubmit={submitSearch}>
-            <input
-              id="home-search"
-              name="search"
-              value={searchValue}
-              onChange={(event) => setSearchValue(event.target.value)}
-              placeholder={searchMode === 'postcode' ? 'Enter your postcode, e.g. BT20 5ED' : 'Search restaurant name'}
-              aria-label={searchMode === 'postcode' ? 'Enter your postcode' : 'Search restaurant name'}
-              autoComplete={searchMode === 'postcode' ? 'postal-code' : 'off'}
-            />
-            <button type="submit">{searchMode === 'postcode' ? 'Find food' : 'Search'}</button>
+            <div className="home-search-input-wrap">
+              {searchMode === 'postcode' && (
+                <button
+                  className="home-inline-location-button"
+                  type="button"
+                  onClick={useCurrentLocation}
+                  disabled={locating}
+                  aria-busy={locating}
+                  aria-label={locating ? 'Finding your current location' : 'Use my current location'}
+                  title={locating ? 'Finding your current location' : 'Use my current location'}
+                >
+                  <span aria-hidden="true">⌖</span>
+                </button>
+              )}
+              <input
+                id="home-search"
+                name="search"
+                value={searchValue}
+                onChange={(event) => setSearchValue(event.target.value)}
+                placeholder={searchMode === 'postcode' ? 'Enter postcode, e.g. BT20 5ED' : 'Search restaurant name'}
+                aria-label={searchMode === 'postcode' ? 'Enter your postcode' : 'Search restaurant name'}
+                autoComplete={searchMode === 'postcode' ? 'postal-code' : 'off'}
+                className={searchMode === 'postcode' ? 'has-location-button' : ''}
+              />
+            </div>
+            <button className="home-search-submit" type="submit">{searchMode === 'postcode' ? 'Find food' : 'Search'}</button>
           </form>
 
-          {searchMode === 'postcode' && (
-            <button className="current-location-button home-location-button" type="button" onClick={useCurrentLocation} disabled={locating} aria-busy={locating}>
-              <span aria-hidden="true">⌖</span>
-              {locating ? 'Finding your location…' : 'Use my current location'}
-            </button>
-          )}
           {locationError && <p className="location-error" role="alert">{locationError}</p>}
         </div>
       </section>
