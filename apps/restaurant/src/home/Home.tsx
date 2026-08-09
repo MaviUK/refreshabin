@@ -1,10 +1,18 @@
-import { FormEvent, useState } from 'react'
+import { FormEvent, useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
+import { supabase } from '../lib/supabase'
 import './Home.css'
 import './HomeHeader.css'
 import './HomeSearch.css'
 
-const cuisines = ['Pizza', 'Burgers', 'Chinese', 'Indian', 'Chicken', 'Desserts']
+const cuisines = [
+  { name: 'Pizza', icon: '🍕' },
+  { name: 'Burgers', icon: '🍔' },
+  { name: 'Chinese', icon: '🥡' },
+  { name: 'Indian', icon: '🍛' },
+  { name: 'Chicken', icon: '🍗' },
+  { name: 'Desserts', icon: '🍰' },
+]
 
 type GeolocationErrorCode = 1 | 2 | 3
 type SearchMode = 'postcode' | 'restaurant'
@@ -43,6 +51,36 @@ export default function Home() {
   const [searchValue, setSearchValue] = useState('')
   const [locating, setLocating] = useState(false)
   const [locationError, setLocationError] = useState('')
+  const [defaultPostcode, setDefaultPostcode] = useState('')
+
+  useEffect(() => {
+    let active = true
+
+    async function loadDefaultPostcode() {
+      const { data: sessionData } = await supabase.auth.getSession()
+      const user = sessionData.session?.user
+      if (!user) {
+        if (active) setDefaultPostcode('')
+        return
+      }
+
+      const { data } = await supabase
+        .from('customer_addresses')
+        .select('postcode')
+        .eq('user_id', user.id)
+        .eq('is_default', true)
+        .maybeSingle()
+
+      if (active) setDefaultPostcode((data?.postcode as string | undefined)?.trim() ?? '')
+    }
+
+    void loadDefaultPostcode()
+    const { data: authListener } = supabase.auth.onAuthStateChange(() => void loadDefaultPostcode())
+    return () => {
+      active = false
+      authListener.subscription.unsubscribe()
+    }
+  }, [])
 
   function submitSearch(event: FormEvent) {
     event.preventDefault()
@@ -56,8 +94,14 @@ export default function Home() {
 
   function chooseSearchMode(mode: SearchMode) {
     setSearchMode(mode)
-    setSearchValue('')
+    setSearchValue(mode === 'postcode' && defaultPostcode ? defaultPostcode : '')
     setLocationError('')
+  }
+
+  function cuisineHref(cuisine: string) {
+    const params = new URLSearchParams({ cuisine })
+    if (defaultPostcode) params.set('postcode', defaultPostcode)
+    return `/restaurants?${params.toString()}`
   }
 
   function useCurrentLocation() {
@@ -98,9 +142,7 @@ export default function Home() {
     <main className="home-page">
       <header className="home-header-shell">
         <div className="home-header">
-          <Link className="home-logo" to="/" aria-label="ordered.food home">
-            <OrderedLogo />
-          </Link>
+          <Link className="home-logo" to="/" aria-label="ordered.food home"><OrderedLogo /></Link>
           <nav className="home-nav" aria-label="Main navigation">
             <Link className="home-customer-link" to="/account">My account</Link>
             <Link className="home-restaurant-login" to="/login">Restaurant login</Link>
@@ -111,10 +153,7 @@ export default function Home() {
 
       <section className="home-search-section" aria-label="Find food">
         <div className="home-search-inner">
-          <div className="home-search-heading">
-            <span className="home-eyebrow">Find food near you</span>
-            <h2>What are you looking for?</h2>
-          </div>
+          <div className="home-search-heading"><span className="home-eyebrow">Find food near you</span></div>
 
           <div className="home-search-tabs" role="tablist" aria-label="Search type">
             <button type="button" role="tab" aria-selected={searchMode === 'postcode'} className={searchMode === 'postcode' ? 'active' : ''} onClick={() => chooseSearchMode('postcode')}>Postcode</button>
@@ -124,33 +163,29 @@ export default function Home() {
           <form className="home-discovery-search" onSubmit={submitSearch}>
             <div className="home-search-input-wrap">
               {searchMode === 'postcode' && (
-                <button
-                  className="home-inline-location-button"
-                  type="button"
-                  onClick={useCurrentLocation}
-                  disabled={locating}
-                  aria-busy={locating}
-                  aria-label={locating ? 'Finding your current location' : 'Use my current location'}
-                  title={locating ? 'Finding your current location' : 'Use my current location'}
-                >
+                <button className="home-inline-location-button" type="button" onClick={useCurrentLocation} disabled={locating} aria-busy={locating} aria-label={locating ? 'Finding your current location' : 'Use my current location'} title={locating ? 'Finding your current location' : 'Use my current location'}>
                   <span aria-hidden="true">⌖</span>
                 </button>
               )}
-              <input
-                id="home-search"
-                name="search"
-                value={searchValue}
-                onChange={(event) => setSearchValue(event.target.value)}
-                placeholder={searchMode === 'postcode' ? 'Enter postcode, e.g. BT20 5ED' : 'Search restaurant name'}
-                aria-label={searchMode === 'postcode' ? 'Enter your postcode' : 'Search restaurant name'}
-                autoComplete={searchMode === 'postcode' ? 'postal-code' : 'off'}
-                className={searchMode === 'postcode' ? 'has-location-button' : ''}
-              />
+              <input id="home-search" name="search" value={searchValue} onChange={(event) => setSearchValue(event.target.value)} placeholder={searchMode === 'postcode' ? 'Enter postcode, e.g. BT20 5ED' : 'Search restaurant name'} aria-label={searchMode === 'postcode' ? 'Enter your postcode' : 'Search restaurant name'} autoComplete={searchMode === 'postcode' ? 'postal-code' : 'off'} className={searchMode === 'postcode' ? 'has-location-button' : ''} />
             </div>
             <button className="home-search-submit" type="submit">{searchMode === 'postcode' ? 'Find food' : 'Search'}</button>
           </form>
 
           {locationError && <p className="location-error" role="alert">{locationError}</p>}
+
+          <div className="home-cuisine-strip-heading">
+            <strong>Browse food</strong>
+            {defaultPostcode && <span>Near {defaultPostcode}</span>}
+          </div>
+          <div className="home-cuisine-carousel" aria-label="Browse by food type">
+            {cuisines.map((cuisine) => (
+              <Link key={cuisine.name} to={cuisineHref(cuisine.name)} className="home-cuisine-card">
+                <span className="home-cuisine-icon" aria-hidden="true">{cuisine.icon}</span>
+                <strong>{cuisine.name}</strong>
+              </Link>
+            ))}
+          </div>
         </div>
       </section>
 
@@ -159,56 +194,17 @@ export default function Home() {
           <span className="home-eyebrow">Your local favourites, delivered</span>
           <h1>Good food.<br />Ordered simply.</h1>
           <p>Discover independent restaurants near you, order in a few taps and support the places that make your area taste better.</p>
-
-          <div className="home-trust-row">
-            <span>Local restaurants</span>
-            <span>Secure checkout</span>
-            <span>Delivery or collection</span>
-          </div>
+          <div className="home-trust-row"><span>Local restaurants</span><span>Secure checkout</span><span>Delivery or collection</span></div>
         </div>
-
         <div className="home-hero-art" aria-hidden="true">
-          <div className="hero-food-card hero-card-one">
-            <span>Popular nearby</span>
-            <strong>Smash & Stack</strong>
-            <small>20–30 min · £2.49 delivery</small>
-          </div>
+          <div className="hero-food-card hero-card-one"><span>Popular nearby</span><strong>Smash & Stack</strong><small>20–30 min · £2.49 delivery</small></div>
           <div className="hero-dish">🍔</div>
-          <div className="hero-food-card hero-card-two">
-            <span>Your order</span>
-            <strong>2 items · £18.40</strong>
-            <small>Ready to checkout</small>
-          </div>
-        </div>
-      </section>
-
-      <section className="cuisine-section">
-        <div className="section-heading">
-          <div>
-            <span className="home-eyebrow">What are you craving?</span>
-            <h2>Browse by cuisine</h2>
-          </div>
-          <Link to="/restaurants">View all restaurants</Link>
-        </div>
-
-        <div className="cuisine-grid">
-          {cuisines.map((cuisine, index) => (
-            <Link key={cuisine} to={`/restaurants?cuisine=${encodeURIComponent(cuisine)}`}>
-              <span>{['🍕', '🍔', '🥡', '🍛', '🍗', '🍰'][index]}</span>
-              <strong>{cuisine}</strong>
-            </Link>
-          ))}
+          <div className="hero-food-card hero-card-two"><span>Your order</span><strong>2 items · £18.40</strong><small>Ready to checkout</small></div>
         </div>
       </section>
 
       <section className="how-it-works">
-        <div className="section-heading">
-          <div>
-            <span className="home-eyebrow">No fuss, just food</span>
-            <h2>From hungry to happy</h2>
-          </div>
-        </div>
-
+        <div className="section-heading"><div><span className="home-eyebrow">No fuss, just food</span><h2>From hungry to happy</h2></div></div>
         <div className="steps-grid">
           <article><span>01</span><h3>Find somewhere great</h3><p>Search your area and discover local restaurants available for delivery or collection.</p></article>
           <article><span>02</span><h3>Make it yours</h3><p>Choose your meal, add extras, remove ingredients and leave a note for the kitchen.</p></article>
@@ -217,11 +213,7 @@ export default function Home() {
       </section>
 
       <section className="business-banner">
-        <div>
-          <span className="home-eyebrow">For restaurants</span>
-          <h2>Your food. Your customers. Your brand.</h2>
-          <p>Take online orders without losing your identity. Build your menu, manage orders and grow direct relationships with local customers.</p>
-        </div>
+        <div><span className="home-eyebrow">For restaurants</span><h2>Your food. Your customers. Your brand.</h2><p>Take online orders without losing your identity. Build your menu, manage orders and grow direct relationships with local customers.</p></div>
         <Link to="/register">Start taking orders</Link>
       </section>
 
