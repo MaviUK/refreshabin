@@ -54,18 +54,29 @@
 .home-discovery-search {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
-  gap: 10px;
+  gap: 8px;
+  align-items: stretch;
+}
+
+.home-search-input-wrap {
+  position: relative;
+  min-width: 0;
 }
 
 .home-discovery-search input {
+  width: 100%;
   min-width: 0;
-  min-height: 56px;
-  padding: 0 18px;
+  min-height: 52px;
+  padding: 0 16px;
   border: 1px solid #ddd8d1;
   border-radius: 16px;
   background: #F2F0EA;
   font-size: 1rem;
   outline: 0;
+}
+
+.home-discovery-search input.has-location-button {
+  padding-left: 52px;
 }
 
 .home-discovery-search input:focus {
@@ -74,20 +85,49 @@
   box-shadow: 0 0 0 4px rgba(255, 120, 172, 0.15);
 }
 
-.home-discovery-search button {
-  min-width: 132px;
-  min-height: 56px;
-  padding: 0 22px;
+.home-inline-location-button {
+  position: absolute;
+  left: 8px;
+  top: 50%;
+  z-index: 2;
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  transform: translateY(-50%);
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: #4f8fa3;
+  font-size: 1.2rem;
+  font-weight: 900;
+  box-shadow: none;
+}
+
+.home-inline-location-button:hover:not(:disabled) {
+  background: rgba(168, 213, 227, 0.35);
+}
+
+.home-inline-location-button:disabled {
+  opacity: 0.55;
+}
+
+.home-search-submit {
+  min-width: 96px;
+  min-height: 52px;
+  padding: 0 16px;
   border: 0;
   border-radius: 16px;
   background: #FF78AC;
   color: #2f2027;
   font-weight: 900;
   box-shadow: 0 10px 24px rgba(255, 120, 172, 0.22);
+  white-space: nowrap;
 }
 
-.home-location-button {
-  margin-top: 10px;
+.location-error {
+  margin-top: 8px !important;
 }
 
 .home-hero {
@@ -139,11 +179,29 @@
   }
 
   .home-discovery-search {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 7px;
   }
 
-  .home-discovery-search button {
-    width: 100%;
+  .home-search-submit {
+    min-width: 82px;
+    padding: 0 12px;
+    font-size: 0.9rem;
+  }
+
+  .home-discovery-search input {
+    min-height: 50px;
+    font-size: 0.94rem;
+  }
+
+  .home-inline-location-button {
+    width: 34px;
+    height: 34px;
+    left: 7px;
+  }
+
+  .home-discovery-search input.has-location-button {
+    padding-left: 48px;
   }
 
   .home-hero {
@@ -159,5 +217,17 @@
   .home-hero-copy > p {
     font-size: 0.96rem;
     line-height: 1.55;
+  }
+}
+
+@media (max-width: 390px) {
+  .home-search-submit {
+    min-width: 72px;
+    padding: 0 10px;
+    font-size: 0.82rem;
+  }
+
+  .home-discovery-search input {
+    font-size: 0.88rem;
   }
 }
