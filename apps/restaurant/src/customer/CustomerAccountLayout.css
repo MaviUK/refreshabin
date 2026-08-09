@@ -113,6 +113,7 @@
 
 .customer-site-account-content {
   min-height: calc(100vh - 94px);
+  background: #dceff4;
 }
 
 .customer-site-account-layout .customer-home-header {
