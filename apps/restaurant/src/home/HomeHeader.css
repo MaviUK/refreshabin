@@ -1,8 +1,5 @@
 .home-page {
-  background:
-    radial-gradient(circle at 88% 8%, rgba(168, 213, 227, 0.22), transparent 24rem),
-    radial-gradient(circle at 8% 26%, rgba(255, 120, 172, 0.12), transparent 22rem),
-    linear-gradient(180deg, #fff9fb 0%, #f8fcfd 48%, #fffdfa 100%);
+  background: #dceff4;
 }
 
 .home-header-shell {
@@ -10,11 +7,9 @@
   top: 0;
   z-index: 100;
   width: 100%;
-  border-bottom: 1px solid rgba(47, 41, 48, 0.1);
-  background: rgba(242, 240, 234, 0.97);
-  box-shadow: 0 8px 30px rgba(47, 41, 48, 0.08);
-  backdrop-filter: blur(18px);
-  -webkit-backdrop-filter: blur(18px);
+  border-bottom: 1px solid rgba(47, 41, 48, 0.12);
+  background: #F2F0EA;
+  box-shadow: 0 8px 30px rgba(47, 41, 48, 0.09);
 }
 
 .home-header {
@@ -102,7 +97,43 @@
 }
 
 .home-hero {
+  width: min(calc(100% - 40px), 1240px);
+  margin: 22px auto 34px;
   padding-top: 54px;
+  border: 1px solid rgba(255, 120, 172, 0.24);
+  border-radius: 36px;
+  background:
+    radial-gradient(circle at 100% 0%, rgba(168, 213, 227, 0.38), transparent 23rem),
+    radial-gradient(circle at 0% 100%, rgba(255, 120, 172, 0.16), transparent 25rem),
+    #fff6f9;
+  box-shadow: 0 24px 60px rgba(65, 99, 108, 0.12);
+}
+
+.cuisine-section {
+  max-width: none;
+  padding-right: max(24px, calc((100vw - 1240px) / 2 + 24px));
+  padding-left: max(24px, calc((100vw - 1240px) / 2 + 24px));
+  background: #F2F0EA;
+}
+
+.how-it-works {
+  max-width: none;
+  padding-right: max(24px, calc((100vw - 1240px) / 2 + 24px));
+  padding-left: max(24px, calc((100vw - 1240px) / 2 + 24px));
+  border-top: 0;
+  background: #dceff4;
+}
+
+.business-banner {
+  border: 1px solid rgba(255, 120, 172, 0.28);
+  box-shadow: 0 18px 45px rgba(47, 41, 48, 0.08);
+}
+
+.home-footer {
+  max-width: none;
+  padding-right: max(24px, calc((100vw - 1240px) / 2 + 24px));
+  padding-left: max(24px, calc((100vw - 1240px) / 2 + 24px));
+  background: #F2F0EA;
 }
 
 @media (max-width: 760px) {
@@ -158,8 +189,11 @@
   }
 
   .home-hero {
+    width: calc(100% - 20px);
     min-height: auto;
+    margin: 10px auto 24px;
     padding-top: 32px;
+    border-radius: 26px;
   }
 
   .home-hero h1 {
@@ -174,6 +208,12 @@
 
   .postcode-search {
     margin-top: 26px;
+  }
+
+  .cuisine-section,
+  .how-it-works {
+    padding-right: 16px;
+    padding-left: 16px;
   }
 }
 
@@ -221,7 +261,10 @@
   }
 
   .home-hero {
+    width: calc(100% - 16px);
+    margin-top: 8px;
     padding-top: 28px;
+    border-radius: 22px;
   }
 
   .home-eyebrow {
