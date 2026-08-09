@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
+import { foodCategories } from '../lib/foodCategories'
 import { supabase } from '../lib/supabase'
 import { usePlatformConfiguration } from '../lib/platformConfiguration'
 import './Restaurants.css'
@@ -76,8 +77,8 @@ export default function Restaurants() {
   }, [favouritesEnabled])
 
   const cuisineOptions = useMemo(() => {
-    const values = restaurants.flatMap((restaurant) => restaurant.cuisines ?? [])
-    return Array.from(new Set(values)).sort()
+    const assignedCategories = restaurants.flatMap((restaurant) => restaurant.cuisines ?? [])
+    return Array.from(new Set([...foodCategories, ...assignedCategories])).sort((a, b) => a.localeCompare(b))
   }, [restaurants])
 
   const visibleRestaurants = useMemo(() => restaurants.filter((restaurant) => {
@@ -145,7 +146,7 @@ export default function Restaurants() {
         <div className="restaurant-search-row">
           <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search restaurants" aria-label="Search restaurants" />
           <select value={selectedCuisine} onChange={(event) => chooseCuisine(event.target.value)} aria-label="Filter by cuisine">
-            <option value="">All cuisines</option>
+            <option value="">All food categories</option>
             {cuisineOptions.map((cuisine) => <option key={cuisine} value={cuisine}>{cuisine}</option>)}
           </select>
         </div>
@@ -194,7 +195,7 @@ export default function Restaurants() {
       ) : (
         <section className="restaurants-empty">
           <span>🍽️</span><h2>No restaurants found</h2>
-          <p>Try another search or cuisine. More local restaurants will appear here as they join ordered.food.</p>
+          <p>Try another search or food category. More local restaurants will appear here as they join ordered.food.</p>
           <button onClick={() => { setSearch(''); chooseCuisine('') }}>Clear filters</button>
         </section>
       )}
