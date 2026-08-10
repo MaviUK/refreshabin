@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
+import CustomerSiteHeader from '../components/CustomerSiteHeader'
 import { foodCategories } from '../lib/foodCategories'
 import { supabase } from '../lib/supabase'
 import { usePlatformConfiguration } from '../lib/platformConfiguration'
@@ -50,10 +51,6 @@ function fallbackImageFor(restaurant: Restaurant) {
   let hash = 0
   for (const char of restaurant.id || restaurant.name) hash = ((hash << 5) - hash + char.charCodeAt(0)) | 0
   return fallbackFoodImages[Math.abs(hash) % fallbackFoodImages.length]
-}
-
-function OrderedLogo() {
-  return <span className="discovery-logo" aria-label="ordered.food"><span>ordered</span><small><b>.</b>food</small></span>
 }
 
 export default function Restaurants() {
@@ -135,15 +132,7 @@ export default function Restaurants() {
 
   return (
     <main className="restaurants-page">
-      <header className="restaurants-header-shell">
-        <div className="restaurants-header">
-          <Link className="restaurants-logo-link" to="/" aria-label="ordered.food home"><OrderedLogo /></Link>
-          <nav aria-label="Customer navigation">
-            <Link to="/restaurants" className="active">Browse food</Link>
-            {signedIn ? <Link className="account-pill" to="/account">My account</Link> : <Link className="account-pill" to="/account/login" state={{ from: `${window.location.pathname}${window.location.search}` }}>Log in</Link>}
-          </nav>
-        </div>
-      </header>
+      <CustomerSiteHeader />
 
       <section className="restaurants-intro">
         <span>Food near you</span>
