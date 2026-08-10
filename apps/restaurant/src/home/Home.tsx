@@ -1,6 +1,7 @@
 import { FormEvent, useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import logoUrl from '../assets/ordered-food-logo.jpg'
+import CustomerSiteHeader from '../components/CustomerSiteHeader'
 import { featuredFoodCategories, foodCategories } from '../lib/foodCategories'
 import { supabase } from '../lib/supabase'
 import './Home.css'
@@ -106,7 +107,7 @@ export default function Home() {
 
   return (
     <main className="home-page">
-      <header className="home-header-shell"><div className="home-header"><Link className="home-logo" to="/" aria-label="ordered.food home"><OrderedLogo /></Link><nav className="home-nav" aria-label="Customer navigation"><Link to="/restaurants">Browse food</Link><Link className="home-customer-link" to="/account">My account</Link></nav></div></header>
+      <CustomerSiteHeader />
 
       <section className="home-search-section" aria-label="Find food"><div className="home-search-inner">
         <div className="home-search-heading"><span className="home-eyebrow">Find food near you</span></div>
