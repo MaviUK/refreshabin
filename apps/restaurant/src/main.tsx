@@ -5,6 +5,7 @@ import App from './App'
 import './styles.css'
 import './storefront/Customisation.css'
 import './theme.css'
+import './theme-overrides.css'
 
 const rootElement = document.getElementById('root')
 
