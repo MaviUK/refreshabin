@@ -1,0 +1,90 @@
+name: Platform CI
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - agent/platform-foundation
+  pull_request:
+    paths:
+      - 'apps/restaurant/**'
+      - 'apps/platform-admin/**'
+      - 'packages/**'
+      - 'scripts/**'
+      - 'supabase/config.toml'
+      - 'supabase/migrations/**'
+      - 'supabase/functions/**'
+      - 'package.json'
+      - 'pnpm-workspace.yaml'
+      - '.github/workflows/restaurant-ci.yml'
+      - '.github/workflows/stripe-subscription-e2e.yml'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Use Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Enable Corepack
+        run: corepack enable
+
+      - name: Install dependencies
+        run: pnpm install --no-frozen-lockfile
+
+      - name: Validate Supabase migration versions
+        shell: bash
+        run: |
+          set -euo pipefail
+          duplicates="$(find supabase/migrations -maxdepth 1 -type f -name '*.sql' -printf '%f\n' \
+            | sed -E 's/^([0-9]{14}).*/\1/' \
+            | sort \
+            | uniq -d)"
+          if [ -n "$duplicates" ]; then
+            echo "Duplicate Supabase migration versions found:"
+            echo "$duplicates"
+            exit 1
+          fi
+
+      - name: Audit platform-admin RPC permissions
+        run: node scripts/audit-admin-rpc-permissions.mjs
+
+      - name: Audit platform-admin table security
+        run: node scripts/audit-admin-table-security.mjs
+
+      - name: Audit operational RLS policies
+        run: node scripts/audit-operational-rls.mjs
+
+      - name: Audit critical performance indexes
+        run: node scripts/audit-platform-performance-indexes.mjs
+
+      - name: Audit bounded analytics queries
+        run: node scripts/audit-admin-query-bounds.mjs
+
+      - name: Audit bounded admin list queries
+        run: node scripts/audit-admin-list-query-bounds.mjs
+
+      - name: Audit Edge Function security settings
+        run: node scripts/audit-edge-functions.mjs
+
+      - name: Validate Stripe E2E test-mode guard
+        run: node scripts/stripe-subscription-e2e.mjs --validate-only
+
+      - name: Type-check restaurant app
+        run: pnpm --filter @ordered/restaurant lint
+
+      - name: Build restaurant app
+        run: pnpm --filter @ordered/restaurant build
+
+      - name: Type-check platform admin
+        run: pnpm --filter @ordered/platform-admin lint
+
+      - name: Build platform admin
+        run: pnpm --filter @ordered/platform-admin build

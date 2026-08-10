@@ -1,0 +1,205 @@
+:root {
+  --ordered-pink: #FF78AC;
+  --ordered-pink-deep: #d94f86;
+  --ordered-pink-soft: #ffe3ee;
+  --ordered-teal: #A8D5E3;
+  --ordered-teal-deep: #4f8fa3;
+  --ordered-teal-soft: #e3f3f7;
+  --ordered-cream: #F2F0EA;
+  --ordered-cream-light: #faf9f5;
+  --ordered-ink: #2f2930;
+  --ordered-muted: #6f666b;
+  --ordered-border: #ddd8d1;
+  --ordered-surface: #fffdfa;
+  color: var(--ordered-ink);
+  background: var(--ordered-cream);
+}
+
+html,
+body,
+#root {
+  background: var(--ordered-cream);
+  color: var(--ordered-ink);
+}
+
+body {
+  background:
+    radial-gradient(circle at top left, rgba(255, 120, 172, 0.13), transparent 28rem),
+    radial-gradient(circle at bottom right, rgba(168, 213, 227, 0.2), transparent 30rem),
+    var(--ordered-cream);
+}
+
+/* Platform shells */
+.app-shell,
+.onboarding-shell,
+.auth-shell,
+.dashboard-shell,
+.restaurant-shell,
+.menu-shell,
+.settings-shell,
+.orders-shell,
+.finance-shell,
+.marketing-shell,
+.account-shell,
+.customer-account-shell,
+.checkout-shell,
+.discovery-shell,
+.subscription-shell,
+.enterprise-shell {
+  background:
+    radial-gradient(circle at 8% 0%, rgba(255, 120, 172, 0.16), transparent 26rem),
+    radial-gradient(circle at 96% 100%, rgba(168, 213, 227, 0.22), transparent 30rem),
+    var(--ordered-cream);
+}
+
+/* Default surfaces */
+.hero-card,
+.onboarding-card,
+.auth-card,
+.dashboard-card,
+.panel,
+.card,
+.settings-card,
+.menu-editor-panel,
+.menu-preview-panel,
+.menu-state-card,
+.order-card,
+.finance-card,
+.marketing-card,
+.account-card,
+.checkout-card,
+.summary-card,
+.subscription-card,
+.enterprise-card,
+.restaurant-live-card {
+  border-color: var(--ordered-border);
+  background: rgba(255, 253, 250, 0.96);
+  box-shadow: 0 20px 55px rgba(73, 65, 68, 0.08);
+}
+
+/* Primary actions */
+.primary-button,
+button.primary-button,
+.button-primary,
+.btn-primary,
+.checkout-button,
+.save-button,
+.submit-button {
+  border-color: var(--ordered-pink-deep);
+  background: var(--ordered-pink);
+  color: #2f2027;
+  box-shadow: 0 10px 24px rgba(255, 120, 172, 0.24);
+}
+
+.primary-button:hover:not(:disabled),
+.button-primary:hover:not(:disabled),
+.btn-primary:hover:not(:disabled),
+.checkout-button:hover:not(:disabled),
+.save-button:hover:not(:disabled),
+.submit-button:hover:not(:disabled) {
+  background: #ff6aa3;
+  box-shadow: 0 14px 28px rgba(255, 120, 172, 0.3);
+}
+
+/* Secondary controls */
+.secondary-button,
+button.secondary-button,
+.button-secondary,
+.btn-secondary,
+.text-button {
+  border-color: #8ebfce;
+  background: var(--ordered-teal-soft);
+  color: #355f6d;
+}
+
+.secondary-button:hover:not(:disabled),
+.button-secondary:hover:not(:disabled),
+.btn-secondary:hover:not(:disabled),
+.text-button:hover:not(:disabled) {
+  background: var(--ordered-teal);
+  color: #294d58;
+}
+
+/* Labels, chips and active navigation */
+.eyebrow,
+.badge,
+.chip,
+.pill,
+.tag,
+.status-badge,
+.cuisine-chip.selected,
+.category-row.active,
+.category-chip.active,
+.nav-link.active,
+.tab.active,
+.tabs button.active {
+  border-color: rgba(255, 120, 172, 0.48);
+  background: var(--ordered-pink-soft);
+  color: #8f3158;
+}
+
+.onboarding-progress span,
+.progress-bar span,
+.progress-fill {
+  background: linear-gradient(90deg, var(--ordered-pink), var(--ordered-teal));
+}
+
+/* Form controls */
+input,
+textarea,
+select {
+  border-color: var(--ordered-border);
+  background: var(--ordered-cream-light);
+  color: var(--ordered-ink);
+}
+
+input:focus,
+textarea:focus,
+select:focus,
+.large-field input:focus,
+.onboarding-card textarea:focus {
+  border-color: var(--ordered-pink);
+  background: #fffdfa;
+  box-shadow: 0 0 0 4px rgba(255, 120, 172, 0.18);
+}
+
+input[type='checkbox'],
+input[type='radio'] {
+  accent-color: var(--ordered-pink);
+}
+
+/* Text and links */
+p,
+.muted,
+.helper-text,
+small {
+  color: var(--ordered-muted);
+}
+
+a {
+  color: #397b90;
+}
+
+a:hover {
+  color: #a83d68;
+}
+
+/* Teal informational areas */
+.info-card,
+.notice,
+.callout,
+.empty-state,
+.preview-banner {
+  border-color: rgba(79, 143, 163, 0.28);
+  background: var(--ordered-teal-soft);
+}
+
+/* Keep semantic statuses recognizable while harmonising neutral UI. */
+.status-dot {
+  box-shadow: 0 0 0 6px rgba(168, 213, 227, 0.35);
+}
+
+::selection {
+  background: var(--ordered-pink);
+  color: #2f2027;
+}

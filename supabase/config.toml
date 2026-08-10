@@ -1,0 +1,76 @@
+project_id = "uvlzxrsqylwksgwpsslp"
+
+[functions.create-checkout-session]
+verify_jwt = false
+
+[functions.create-gift-card-checkout]
+verify_jwt = false
+
+[functions.finalize-gift-card-purchase]
+verify_jwt = false
+
+[functions.stripe-webhook]
+verify_jwt = false
+
+[functions.admin-refund-payment]
+verify_jwt = true
+
+[functions.scan-menu-import]
+verify_jwt = true
+
+[functions.process-admin-report]
+verify_jwt = true
+
+[functions.restaurant-stripe-connect]
+verify_jwt = true
+
+[functions.restaurant-order-payment]
+verify_jwt = true
+
+[functions.process-weekly-restaurant-invoices]
+verify_jwt = true
+
+[functions.restaurant-subscription-billing]
+verify_jwt = true
+
+[functions.process-subscription-notifications]
+verify_jwt = true
+
+[functions.restaurant-team-invite]
+verify_jwt = true
+
+[functions.platform-subscription-admin]
+verify_jwt = true
+
+[functions.process-gift-card-deliveries]
+verify_jwt = true
+
+[functions.process-referral-notifications]
+verify_jwt = true
+
+[functions.process-birthday-milestones]
+verify_jwt = true
+
+[functions.process-vip-memberships]
+verify_jwt = true
+
+[functions.process-challenges]
+verify_jwt = true
+
+[functions.process-marketing-automation]
+verify_jwt = true
+
+[functions.process-ai-intelligence]
+verify_jwt = true
+
+[functions.marketing-resend-webhook]
+verify_jwt = false
+
+[functions.process-group-notifications]
+verify_jwt = false
+
+[functions.restaurant-group-team-invite]
+verify_jwt = true
+
+[functions.enterprise-api]
+verify_jwt = false

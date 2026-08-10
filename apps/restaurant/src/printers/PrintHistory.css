@@ -1,0 +1,185 @@
+.print-history-page {
+  display: grid;
+  gap: 1.5rem;
+}
+
+.print-history-header-actions,
+.print-job-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.print-history-summary {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.print-history-summary article {
+  display: grid;
+  gap: 0.35rem;
+  padding: 1.1rem;
+  border: 1px solid var(--border, #e6e6e6);
+  border-radius: 1rem;
+  background: var(--surface, #fff);
+}
+
+.print-history-summary span,
+.print-job-time span,
+.print-job-meta {
+  color: var(--muted, #6b7280);
+  font-size: 0.85rem;
+}
+
+.print-history-summary strong {
+  font-size: 1.65rem;
+}
+
+.print-history-filters {
+  display: flex;
+  gap: 0.6rem;
+  overflow-x: auto;
+  padding-bottom: 0.15rem;
+}
+
+.print-history-filters button {
+  flex: 0 0 auto;
+  border: 1px solid var(--border, #dedede);
+  border-radius: 999px;
+  background: var(--surface, #fff);
+  padding: 0.65rem 0.9rem;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.print-history-filters button.active {
+  background: #111;
+  border-color: #111;
+  color: #fff;
+}
+
+.print-history-filters button span {
+  margin-left: 0.3rem;
+  opacity: 0.7;
+}
+
+.print-history-list {
+  display: grid;
+  gap: 1rem;
+}
+
+.print-job-card {
+  display: grid;
+  gap: 1rem;
+}
+
+.print-job-main {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  align-items: flex-start;
+}
+
+.print-job-main h2 {
+  margin: 0.5rem 0 0.25rem;
+}
+
+.print-job-main p,
+.print-job-error p,
+.print-history-empty p {
+  margin: 0;
+}
+
+.print-job-status {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 0.35rem 0.65rem;
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.print-job-status.queued {
+  background: #fff4cc;
+  color: #795d00;
+}
+
+.print-job-status.processing {
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+
+.print-job-status.printed {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.print-job-status.failed,
+.print-job-status.cancelled {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.print-job-time {
+  display: grid;
+  gap: 0.25rem;
+  text-align: right;
+}
+
+.print-job-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.print-job-error {
+  border-left: 4px solid #dc2626;
+  border-radius: 0.65rem;
+  background: #fff1f2;
+  padding: 0.9rem 1rem;
+  color: #881337;
+}
+
+.print-job-error strong {
+  display: block;
+  margin-bottom: 0.3rem;
+}
+
+.print-job-actions {
+  justify-content: flex-end;
+}
+
+.print-history-empty {
+  text-align: center;
+  padding: 2rem;
+}
+
+@media (max-width: 720px) {
+  .print-history-summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .print-history-header-actions {
+    width: 100%;
+  }
+
+  .print-history-header-actions > * {
+    flex: 1;
+    text-align: center;
+  }
+
+  .print-job-main {
+    display: grid;
+  }
+
+  .print-job-time {
+    text-align: left;
+  }
+
+  .print-job-actions > * {
+    flex: 1;
+    text-align: center;
+  }
+}

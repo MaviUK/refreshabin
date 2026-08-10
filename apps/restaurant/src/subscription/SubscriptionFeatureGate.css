@@ -1,0 +1,7 @@
+.subscription-gate{margin:24px 0;padding:30px;border:1px solid #dedbd3;border-radius:22px;background:linear-gradient(145deg,#fff,#f7f4ed);box-shadow:0 18px 45px rgba(31,27,20,.08)}
+.subscription-gate--compact{padding:20px;border-radius:16px}
+.subscription-gate--loading{color:#6d675d;font-weight:700}
+.subscription-gate__badge{display:inline-flex;padding:6px 10px;border-radius:999px;background:#1d1b18;color:#fff;font-size:.72rem;font-weight:800;text-transform:uppercase;letter-spacing:.08em}
+.subscription-gate h2{margin:14px 0 8px;font-size:clamp(1.35rem,3vw,2rem)}
+.subscription-gate p{margin:0 0 16px;max-width:680px;color:#625d54;line-height:1.6}
+.subscription-gate__current{font-size:.92rem}

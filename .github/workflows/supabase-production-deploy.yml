@@ -1,0 +1,63 @@
+name: Supabase Production Deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm_production:
+        description: 'Type DEPLOY to apply migrations and deploy Edge Functions to production'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: supabase-production-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    if: ${{ inputs.confirm_production == 'DEPLOY' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: production
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+      SUPABASE_PROJECT_ID: uvlzxrsqylwksgwpsslp
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Install Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Validate deployment secrets
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "${SUPABASE_ACCESS_TOKEN:-}" || { echo 'SUPABASE_ACCESS_TOKEN is not configured'; exit 1; }
+          test -n "${SUPABASE_DB_PASSWORD:-}" || { echo 'SUPABASE_DB_PASSWORD is not configured'; exit 1; }
+
+      - name: Link production project
+        run: supabase link --project-ref "$SUPABASE_PROJECT_ID" --password "$SUPABASE_DB_PASSWORD"
+
+      - name: Preview production migrations
+        run: supabase db push --dry-run --linked --password "$SUPABASE_DB_PASSWORD"
+
+      - name: Apply production migrations
+        run: supabase db push --linked --password "$SUPABASE_DB_PASSWORD"
+
+      - name: Deploy Edge Functions
+        run: supabase functions deploy --project-ref "$SUPABASE_PROJECT_ID" --use-api
+
+      - name: Verify migration history
+        run: supabase migration list --linked --password "$SUPABASE_DB_PASSWORD"
+
+      - name: Verify Edge Functions
+        run: supabase functions list --project-ref "$SUPABASE_PROJECT_ID"

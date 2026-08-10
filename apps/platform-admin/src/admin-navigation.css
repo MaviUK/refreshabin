@@ -1,0 +1,35 @@
+.admin-sidebar { max-height: 100vh; }
+.admin-nav-grouped { margin-top: 28px; padding-right: 4px; overflow-y: auto; align-content: start; }
+.admin-nav-group { display: grid; gap: 5px; }
+.admin-nav-group + .admin-nav-group { margin-top: 18px; padding-top: 17px; border-top: 1px solid #292830; }
+.admin-nav-group-label { padding: 0 13px 5px; color: #777681; font-size: 0.64rem; font-weight: 900; text-transform: uppercase; letter-spacing: 0.11em; }
+.admin-nav-group a { min-height: 42px; }
+.mobile-menu-button { display: none; }
+.mobile-admin-nav button { border: 0; color: #77757f; background: transparent; font: inherit; }
+.mobile-admin-nav button span, .mobile-admin-nav button small { display: block; }
+.mobile-admin-drawer-backdrop { display: none; }
+
+@media (max-width: 900px) {
+  .mobile-admin-header { display: flex; }
+  .mobile-admin-header .admin-brand > span:last-child { display: grid; }
+  .mobile-admin-header .admin-brand small { font-size: 0.62rem; }
+  .mobile-menu-button { width: 42px; height: 42px; display: grid; place-items: center; border: 1px solid #dedde3; border-radius: 11px; color: #35333b; background: #fff; font-size: 1.15rem; }
+  .mobile-admin-nav > a, .mobile-admin-nav > button { min-width: 0; display: grid; place-items: center; align-content: center; gap: 3px; text-decoration: none; }
+  .mobile-admin-nav > button { width: 100%; }
+  .mobile-admin-drawer-backdrop { position: fixed; inset: 0; z-index: 120; display: flex; justify-content: flex-end; background: rgba(18, 17, 22, 0.58); backdrop-filter: blur(3px); }
+  .mobile-admin-drawer { width: min(88vw, 390px); height: 100%; padding: 20px; display: flex; flex-direction: column; color: #eeeef2; background: #17161d; box-shadow: -18px 0 50px rgba(0, 0, 0, 0.28); overflow-y: auto; }
+  .mobile-admin-drawer > header { padding-bottom: 18px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #302f37; }
+  .mobile-admin-drawer > header > button { width: 38px; height: 38px; border: 0; border-radius: 10px; color: #eeeef2; background: #2a2931; font-size: 1.45rem; }
+  .mobile-admin-drawer > nav { padding: 18px 0; display: grid; gap: 20px; }
+  .mobile-admin-drawer-group { display: grid; gap: 5px; }
+  .mobile-admin-drawer-group > span { padding: 0 10px 5px; color: #777681; font-size: 0.64rem; font-weight: 900; text-transform: uppercase; letter-spacing: 0.11em; }
+  .mobile-admin-drawer-group a { min-height: 44px; padding: 0 11px; display: flex; align-items: center; gap: 11px; border-radius: 11px; color: #aaa9b3; font-size: 0.88rem; font-weight: 750; text-decoration: none; }
+  .mobile-admin-drawer-group a i { width: 24px; color: #85848e; font-size: 1.08rem; font-style: normal; text-align: center; }
+  .mobile-admin-drawer-group a.active { color: #fff; background: #2c2932; box-shadow: inset 3px 0 #ff86b5; }
+  .mobile-admin-drawer-group a.active i { color: #ff86b5; }
+  .mobile-admin-drawer > footer { margin-top: auto; padding-top: 16px; display: flex; align-items: center; justify-content: space-between; gap: 12px; border-top: 1px solid #302f37; }
+  .mobile-admin-drawer > footer > span { min-width: 0; display: grid; gap: 2px; }
+  .mobile-admin-drawer > footer strong, .mobile-admin-drawer > footer small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .mobile-admin-drawer > footer small { color: #9998a3; font-size: 0.7rem; text-transform: capitalize; }
+  .mobile-admin-drawer > footer button { min-height: 38px; padding: 0 13px; border: 1px solid #44424d; border-radius: 10px; color: #eeeef2; background: #2a2931; font-weight: 800; }
+}

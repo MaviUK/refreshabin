@@ -1,0 +1,41 @@
+name: Stripe Subscription E2E
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '17 5 * * 1'
+  push:
+    branches:
+      - agent/platform-foundation
+    paths:
+      - 'scripts/stripe-subscription-e2e.mjs'
+      - 'supabase/functions/restaurant-subscription-billing/**'
+      - 'supabase/functions/stripe-webhook/**'
+      - 'supabase/functions/platform-subscription-admin/**'
+      - '.github/workflows/stripe-subscription-e2e.yml'
+
+jobs:
+  stripe-test-mode:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    env:
+      STRIPE_TEST_SECRET_KEY: ${{ secrets.STRIPE_TEST_SECRET_KEY }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Use Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Validate test-mode guard
+        run: node scripts/stripe-subscription-e2e.mjs --validate-only
+
+      - name: Run Stripe subscription lifecycle E2E
+        if: env.STRIPE_TEST_SECRET_KEY != ''
+        run: node scripts/stripe-subscription-e2e.mjs
+
+      - name: Explain missing test secret
+        if: env.STRIPE_TEST_SECRET_KEY == ''
+        run: echo 'Stripe lifecycle E2E skipped because STRIPE_TEST_SECRET_KEY is not configured. Build CI remains unblocked; configure one test-mode secret to enable permanent billing E2E.'

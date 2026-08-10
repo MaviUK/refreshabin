@@ -1,0 +1,24 @@
+.dashboard-brand-block {
+  display: grid;
+  gap: 4px;
+}
+
+.dashboard-logo-link {
+  display: inline-flex;
+  width: max-content;
+  text-decoration: none;
+}
+
+.dashboard-official-logo {
+  display: block;
+  width: 150px;
+  height: auto;
+  object-fit: contain;
+  border-radius: 8px;
+}
+
+@media (max-width: 620px) {
+  .dashboard-official-logo {
+    width: 112px;
+  }
+}

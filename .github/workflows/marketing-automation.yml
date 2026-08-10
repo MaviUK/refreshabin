@@ -1,0 +1,42 @@
+name: Marketing Automation
+
+on:
+  schedule:
+    - cron: '*/15 * * * *'
+  workflow_dispatch:
+  push:
+    branches:
+      - agent/platform-foundation
+    paths:
+      - '.github/workflows/marketing-automation.yml'
+      - 'supabase/functions/process-marketing-automation/**'
+      - 'supabase/functions/marketing-resend-webhook/**'
+      - 'supabase/migrations/*marketing*'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: marketing-automation
+  cancel-in-progress: false
+
+jobs:
+  process:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Validate scheduler secret
+        env:
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          set -euo pipefail
+          test -n "${SUPABASE_SERVICE_ROLE_KEY:-}" || { echo '::error title=Missing scheduler secret::SUPABASE_SERVICE_ROLE_KEY is not configured.'; exit 1; }
+      - name: Process campaigns and automations
+        env:
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          set -euo pipefail
+          response_file="$(mktemp)"
+          status="$(curl --silent --show-error --output "$response_file" --write-out '%{http_code}' --retry 2 --retry-all-errors --request POST --header "Authorization: Bearer ${SUPABASE_SERVICE_ROLE_KEY}" --header "Content-Type: application/json" --data '{}' 'https://uvlzxrsqylwksgwpsslp.supabase.co/functions/v1/process-marketing-automation')"
+          cat "$response_file"
+          if [ "$status" -lt 200 ] || [ "$status" -ge 300 ]; then echo "::error title=Marketing processor failed::Edge Function returned HTTP ${status}."; exit 1; fi
