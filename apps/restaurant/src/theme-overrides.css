@@ -1,0 +1,11 @@
+:root{--of-primary:#FF78AC;--of-secondary:#A8D5E3;--of-header:#FDF6EC;--of-surface:#FFFDF9;--of-background:#DCEFF4;--of-text:#2F2930;--of-radius:4px;--of-radius-small:2px}
+.home-page,.restaurants-page,.customer-site-account-layout{background:var(--of-background)!important;color:var(--of-text)}
+.customer-global-header-shell{background:var(--of-header)!important}
+.home-search-inner,.home-hero,.restaurant-card,.restaurants-empty,.customer-site-account-content section{border-radius:var(--of-radius)!important}
+.home-search-tabs,.home-cuisine-card,.restaurant-search-field,.restaurant-search-row select,.account-pill,.customer-global-account-link,.home-customer-link,.home-view-all-cuisines,.home-search-submit,.restaurant-favourite,.fulfilment-tags span{border-radius:var(--of-radius-small)!important}
+.home-search-submit,.restaurant-signup-button{background:var(--of-primary)!important}
+.home-search-tabs button.active,.home-cuisine-card:hover{background:var(--of-secondary)!important}
+.home-eyebrow,.restaurants-intro>span{color:var(--of-primary)!important}
+.restaurant-card,.home-search-inner,.restaurants-empty{background:var(--of-surface)!important}
+[data-customer-style="sharp"] .home-search-inner,[data-customer-style="sharp"] .home-hero,[data-customer-style="sharp"] .restaurant-card{box-shadow:6px 6px 0 color-mix(in srgb,var(--of-text) 14%,transparent)!important;border:1px solid color-mix(in srgb,var(--of-text) 16%,transparent)!important}
+[data-customer-style="sharp"] .home-search-submit,[data-customer-style="sharp"] .account-pill,[data-customer-style="sharp"] .customer-global-account-link{box-shadow:3px 3px 0 color-mix(in srgb,var(--of-text) 20%,transparent)!important}
